@@ -71,6 +71,54 @@ function sanitizeFileName(name = "") {
   // Remove characters illegal in Windows/macOS filenames
   return String(name).replace(/[<>:"/\\|?*\u0000-\u001F]/g, "_").trim();
 }
+function withPdfExt(name = "document") {
+  return name.toLowerCase().endsWith(".pdf") ? name : `${name}.pdf`;
+}
+function defaultDownloadsDir() {
+  // Where silent exports are saved
+  return app.getPath("downloads");
+}
+
+/** Build a minimal HTML shell for pdfView/pdfWH output */
+function buildHtmlDoc(html, css) {
+  return `<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <style>${css || ""}</style>
+</head>
+<body>${html || ""}</body>
+</html>`;
+}
+
+/** Render the given HTML/CSS to a PDF Buffer */
+async function renderToPdfBuffer(html, css) {
+  const doc = buildHtmlDoc(html, css);
+  let win;
+  try {
+    win = new BrowserWindow({
+      show: false,
+      backgroundColor: "#ffffff",
+      width: 900,
+      height: 1273, // ~A4 portrait @ ~96dpi
+      webPreferences: { sandbox: true },
+    });
+
+    const dataUrl = "data:text/html;base64," + Buffer.from(doc).toString("base64");
+    await win.loadURL(dataUrl);
+
+    const pdfBuffer = await win.webContents.printToPDF({
+      printBackground: true,
+      marginsType: 1, // default margins
+      pageSize: "A4",
+      landscape: false,
+    });
+    return pdfBuffer;
+  } finally {
+    if (win && !win.isDestroyed()) win.destroy();
+  }
+}
 
 /* -------- app lifecycle -------- */
 app.whenReady().then(() => {
@@ -113,10 +161,7 @@ ipcMain.handle("open-invoice-json", async () => {
   try {
     return JSON.parse(raw);
   } catch {
-    dialog.showErrorBox(
-      "Invalid JSON",
-      "The selected file is not a valid invoice JSON."
-    );
+    dialog.showErrorBox("Invalid JSON", "The selected file is not a valid invoice JSON.");
     return null;
   }
 });
@@ -134,16 +179,16 @@ async function pickLogoImpl() {
   const filePath = filePaths[0];
   const base64 = fs.readFileSync(filePath).toString("base64");
   const ext = path.extname(filePath).slice(1).toLowerCase();
-  return {
-    dataUrl: `data:image/${ext === "jpg" ? "jpeg" : ext};base64,${base64}`,
-  };
+  return { dataUrl: `data:image/${ext === "jpg" ? "jpeg" : ext};base64,${base64}` };
 }
-ipcMain.handle("pick-logo", pickLogoImpl);                 // older name
-ipcMain.handle("smartwebify:pickLogo", pickLogoImpl);      // name used by preload
+ipcMain.handle("pick-logo", pickLogoImpl);            // older name
+ipcMain.handle("smartwebify:pickLogo", pickLogoImpl); // name used by preload
 
-/* -------- Export PDF from *only* pdfView.js output --------
-   Renderer calls: window.smartwebify.exportPDFFromHTML({ html, css, meta })
----------------------------------------------------------------- */
+/* -------------------------------------------------------------------
+   LEGACY: Export PDF (always shows Save dialog) — kept for compatibility
+   Renderer (legacy) calls: window.smartwebify.exportPDFFromHTML({ html, css, meta })
+   on channel "export-pdf-from-html"
+-------------------------------------------------------------------- */
 ipcMain.handle("export-pdf-from-html", async (_evt, payload) => {
   const { html = "", css = "", meta } = payload || {};
   const suggested = `Invoice-${sanitizeFileName(meta?.number || "NEW")}.pdf`;
@@ -155,47 +200,71 @@ ipcMain.handle("export-pdf-from-html", async (_evt, payload) => {
   });
   if (save.canceled || !save.filePath) return null;
 
-  // Build a minimal document that contains ONLY your invoice HTML + CSS
-  const doc = `<!doctype html>
-<html>
-<head><meta charset="utf-8"><meta http-equiv="X-UA-Compatible" content="IE=edge">
-<style>${css}</style></head>
-<body>${html}</body>
-</html>`;
-
-  let win;
   try {
-    win = new BrowserWindow({
-      show: false,
-      backgroundColor: "#ffffff",
-      width: 900,
-      height: 1273, // ~A4 portrait @ 96dpi
-      webPreferences: { sandbox: true },
-    });
-
-    const dataUrl =
-      "data:text/html;base64," + Buffer.from(doc).toString("base64");
-
-    // Wait for content to load before printing
-    await win.loadURL(dataUrl);
-
-    const pdfBuffer = await win.webContents.printToPDF({
-      printBackground: true,
-      marginsType: 1, // default margins
-      pageSize: "A4",
-      landscape: false,
-    });
-
+    const pdfBuffer = await renderToPdfBuffer(html, css);
     fs.writeFileSync(save.filePath, pdfBuffer);
     return save.filePath;
   } catch (err) {
     console.error("export-pdf-from-html error:", err);
     dialog.showErrorBox("PDF Export Error", String(err?.message || err));
     return null;
-  } finally {
-    if (win && !win.isDestroyed()) win.destroy();
   }
 });
+
+/* -------------------------------------------------------------------
+   NEW: Export PDF with optional SILENT autosave and custom filename.
+   Renderer calls: window.smartwebify.exportPDFFromHTML({ html, css, meta })
+   where meta can include:
+     - filename: exact filename to use (e.g., "Retenue à la source - 123.pdf")
+     - silent:   true to save without a dialog
+     - number:   invoice number (used for default name when no filename)
+-------------------------------------------------------------------- */
+ipcMain.handle("smartwebify:exportPDFFromHTML", async (event, payload) => {
+  const { html = "", css = "", meta = {}, silent } = payload || {};
+  const isSilent = meta.silent === true || silent === true;
+
+  try {
+    const pdfBuffer = await renderToPdfBuffer(html, css);
+
+    if (isSilent) {
+      // Decide directory for silent save
+      const saveDir =
+        (meta.useSameDirAs ? path.dirname(meta.useSameDirAs) : null) ||
+        meta.saveDir ||
+        app.getPath("downloads");
+
+      const rawName =
+        meta.filename || `Invoice-${sanitizeFileName(meta.number || "NEW")}.pdf`;
+      const fileName = withPdfExt(sanitizeFileName(rawName));
+      const fullPath = path.join(saveDir, fileName);
+
+      fs.writeFileSync(fullPath, pdfBuffer);
+      return fullPath;
+    }
+
+    // Normal dialog path (for the main invoice if you want it that way)
+    const defaultName =
+      meta.filename ||
+      `Invoice-${sanitizeFileName(meta.number || "NEW")}.pdf`;
+    const { canceled, filePath } = await dialog.showSaveDialog(
+      BrowserWindow.fromWebContents(event.sender),
+      {
+        title: "Export PDF",
+        defaultPath: withPdfExt(defaultName),
+        filters: [{ name: "PDF", extensions: ["pdf"] }],
+      }
+    );
+    if (canceled || !filePath) return null;
+
+    fs.writeFileSync(filePath, pdfBuffer);
+    return filePath;
+  } catch (err) {
+    console.error("smartwebify:exportPDFFromHTML error:", err);
+    dialog.showErrorBox("PDF Export Error", String(err?.message || err));
+    return null;
+  }
+});
+
 
 /* -------- Openers used by renderer openPDFFile() ------------------ */
 ipcMain.handle("smartwebify:openPath", async (_evt, absPath) => {

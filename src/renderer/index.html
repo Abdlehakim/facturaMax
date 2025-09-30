@@ -37,7 +37,7 @@
       .section-box:has(#docType option[value="bc"]:checked) #invNumberLabel .for-bc { display: inline; }
 
       .label-inline { display:inline-flex; align-items:center; gap:.5rem; }
-      .label-text { cursor:default; user-select:text; }
+      .label-text { cursor:default; user-select:text; white-space:nowrap; }
       .col-toggle { cursor:pointer; }
 
       .hide-col-ref      #items thead th:nth-child(1),
@@ -54,6 +54,46 @@
       .hide-col-tva      #items tbody td:nth-child(6){ display:none; }
       .hide-col-discount #items thead th:nth-child(7),
       .hide-col-discount #items tbody td:nth-child(7){ display:none; }
+
+      /* ---------- Detail sections: hidden by default ---------- */
+      #extrasBox #shipFields,
+      #extrasBox #stampFields,
+      #whBox #whFields { display:none; }
+
+      /* ---------- Layout when visible ---------- */
+      /* Ship & Stamp: Libellé | Montant | TVA% */
+      #extrasBox #shipFields,
+      #extrasBox #stampFields{
+        grid-template-columns: 2fr 1fr 1fr;
+        gap:12px;
+        align-items:end;
+        width:100%;
+      }
+
+      /* Retenue: Taux | Base | Libellé (wide) | Montant */
+      #whBox #whFields{
+        margin-top: 10px;
+        grid-template-columns: 1fr 1fr 2fr 1fr;
+        gap:12px;
+        align-items:end;
+        width:100%;
+      }
+      #whFields label.full{ grid-column:auto; }
+
+      /* ---------- Reveal on checkbox ---------- */
+      #extrasBox .grid.two:has(#shipEnabled:checked)  #shipFields  { display:grid; }
+      #extrasBox .grid.two:has(#stampEnabled:checked) #stampFields { display:grid; }
+      #whBox:has(#whEnabled:checked) #whFields { display:grid; }
+
+      /* ---------- Responsive stacking ---------- */
+      @media (max-width: 900px){
+        #whBox #whFields{ grid-template-columns: 1fr 1fr; }
+        #whFields label.full{ grid-column:1 / -1; }
+      }
+      @media (max-width: 720px){
+        #extrasBox #shipFields,
+        #extrasBox #stampFields{ grid-template-columns: 1fr; }
+      }
     </style>
   </head>
 
@@ -169,9 +209,30 @@
           <div class="mini-sum">
             <table id="miniSum">
               <tbody>
+                <!-- Frais de livraison AVANT Total HT (et inclus dans Total HT & TVA si activé) -->
+                <tr id="miniShipRow" style="display:none">
+                  <td id="miniShipLabel">Frais de livraison</td>
+                  <td id="miniShip" class="right">0</td>
+                </tr>
+
                 <tr class="head"><th>Total HT</th><th id="miniHT" class="right">0</th></tr>
                 <tr><td>TVA</td><td id="miniTVA" class="right">0</td></tr>
+
+                <!-- Timbre fiscal n'affecte que le TTC -->
+                <tr id="miniStampRow" style="display:none">
+                  <td id="miniStampLabel">Timbre fiscal</td>
+                  <td id="miniStamp" class="right">0</td>
+                </tr>
+
                 <tr class="grand"><th>Total TTC</th><th id="miniTTC" class="right">0</th></tr>
+                <tr id="miniWHRow" style="display:none">
+                  <td id="miniWHLabel">Retenue à la source</td>
+                  <td id="miniWH" class="right">0</td>
+                </tr>
+                <tr id="miniNETRow" class="grand" style="display:none">
+                  <th>Net à payer</th>
+                  <th id="miniNET" class="right">0</th>
+                </tr>
               </tbody>
             </table>
           </div>
@@ -184,7 +245,6 @@
                   <div class="label-inline">
                     <label for="addRef" class="label-text">Référence</label>
                     <input id="colToggleRef" type="checkbox" class="col-toggle" aria-label="Masquer colonne Référence">
-                   <small style="white-space:nowrap;font-size:11px;opacity:.75;">(cela supprimera ce champ)</small>
                   </div>
                   <input id="addRef" placeholder="ex. : SKU-12345" />
                 </div>
@@ -193,7 +253,6 @@
                   <div class="label-inline">
                     <label for="addProduct" class="label-text">Produit</label>
                     <input id="colToggleProduct" type="checkbox" class="col-toggle" aria-label="Masquer colonne Produit">
-                     <small style="white-space:nowrap;font-size:11px;opacity:.75;">(cela supprimera ce champ)</small>
                   </div>
                   <input id="addProduct" placeholder="ex. : Ordinateur portable" />
                 </div>
@@ -202,7 +261,6 @@
                   <div class="label-inline">
                     <label for="addDesc" class="label-text">Description</label>
                     <input id="colToggleDesc" type="checkbox" class="col-toggle" aria-label="Masquer colonne Description">
-                     <small style="white-space:nowrap;font-size:11px;opacity:.75;">(cela supprimera ce champ)</small>
                   </div>
                   <input id="addDesc" placeholder="ex. : Garantie 2 ans, couleur noire…" />
                 </div>
@@ -211,7 +269,6 @@
                   <div class="label-inline">
                     <label for="addQty" class="label-text">Qté</label>
                     <input id="colToggleQty" type="checkbox" class="col-toggle" aria-label="Masquer colonne Qté">
-                     <small style="white-space:nowrap;font-size:11px;opacity:.75;">(cela supprimera ce champ)</small>
                   </div>
                   <input id="addQty" type="number" min="0" step="1" value="1" />
                 </div>
@@ -220,7 +277,6 @@
                   <div class="label-inline">
                     <label for="addPrice" class="label-text">Prix&nbsp;HT</label>
                     <input id="colTogglePrice" type="checkbox" class="col-toggle" aria-label="Masquer colonne Prix HT">
-                     <small style="white-space:nowrap;font-size:11px;opacity:.75;">(cela supprimera ce champ)</small>
                   </div>
                   <input id="addPrice" type="number" min="0" step="0.01" value="0" />
                 </div>
@@ -229,7 +285,6 @@
                   <div class="label-inline">
                     <label for="addTva" class="label-text">TVA&nbsp;%</label>
                     <input id="colToggleTva" type="checkbox" class="col-toggle" aria-label="Masquer colonne TVA">
-                     <small style="white-space:nowrap;font-size:11px;opacity:.75;">(cela supprimera ce champ)</small>
                   </div>
                   <input id="addTva" type="number" min="0" step="0.01" value="19" />
                 </div>
@@ -238,7 +293,6 @@
                   <div class="label-inline">
                     <label for="addDiscount" class="label-text">Remise&nbsp;%</label>
                     <input id="colToggleDiscount" type="checkbox" class="col-toggle" aria-label="Masquer colonne Remise">
-                     <small style="white-space:nowrap;font-size:11px;opacity:.75;">(cela supprimera ce champ)</small>
                   </div>
                   <input id="addDiscount" type="number" min="0" step="0.01" value="0" />
                 </div>
@@ -248,6 +302,96 @@
                 <button id="btnSubmitItem" type="button" class="btn">+ Ajouter</button>
                 <button id="btnNewItem" type="button" class="btn" disabled>Nouveau</button>
               </div>
+            </div>
+          </fieldset>
+
+          <!-- Frais & options -->
+          <fieldset class="section-box" id="extrasBox">
+            <legend>Frais & options</legend>
+
+            <div class="grid two">
+              <!-- FRAIS DE LIVRAISON -->
+              <div class="full">
+                <div class="label-inline">
+                  <span class="label-text">Activer les frais de livraison</span>
+                  <input id="shipEnabled" type="checkbox" class="col-toggle" aria-label="Activer les frais de livraison">
+                </div>
+              </div>
+
+              <div id="shipFields" class="full">
+                <label>
+                  Libellé
+                  <input id="shipLabel" placeholder="Frais de livraison" />
+                </label>
+                <label>
+                  Montant HT
+                  <input id="shipAmount" type="number" min="0" step="0.01" value="7" />
+                </label>
+                <label>
+                  TVA %
+                  <input id="shipTva" type="number" min="0" step="0.01" value="19" />
+                </label>
+              </div>
+
+              <!-- TIMBRE FISCAL -->
+              <div class="full" style="margin-top:.5rem">
+                <div class="label-inline">
+                  <span class="label-text">Activer le timbre fiscal</span>
+                  <input id="stampEnabled" type="checkbox" class="col-toggle" aria-label="Activer le timbre fiscal">
+                </div>
+              </div>
+
+              <div id="stampFields" class="full">
+                <label>
+                  Libellé
+                  <input id="stampLabel" placeholder="Timbre fiscal" />
+                </label>
+                <label>
+                  Montant HT
+                  <input id="stampAmount" type="number" min="0" step="0.001" value="0.600" />
+                </label>
+                <label>
+                  TVA %
+                  <input id="stampTva" type="number" min="0" step="0.01" value="0" />
+                </label>
+              </div>
+            </div>
+          </fieldset>
+
+          <!-- Retenue à la source -->
+          <fieldset class="section-box" id="whBox">
+            <legend>Retenue à la source</legend>
+
+            <div class="full" style="margin-top:.5rem">
+              <div class="label-inline">
+                <span class="label-text">Activer la retenue à la source</span>
+                <input id="whEnabled" type="checkbox" class="col-toggle" aria-label="Activer la retenue à la source">
+              </div>
+            </div>
+
+            <div id="whFields">
+              <label>
+                Taux %
+                <input id="whRate" type="number" min="0" step="0.01" value="1.5" />
+              </label>
+
+              <label>
+                Base de calcul
+                <select id="whBase">
+                  <option value="ht" selected>Total HT</option>
+                  <option value="ttc">Total TTC</option>
+                </select>
+              </label>
+
+              <label class="full">
+                Libellé (facultatif)
+                <input id="whLabel" placeholder="Retenue à la source" />
+              </label>
+
+              <label>
+                Montant (auto)
+                <input id="whAmount" readonly />
+              </label>
             </div>
           </fieldset>
         </section>
@@ -269,6 +413,7 @@
     </div>
 
     <script src="./pdfView.js"></script>
+    <script src="./pdfWH.js"></script>
     <script src="./renderer.js"></script>
   </body>
 </html>

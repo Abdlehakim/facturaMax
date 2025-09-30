@@ -23,10 +23,7 @@ function fileToDataURL(absPath) {
   }
 }
 
-/**
- * Resolve the logo path in both dev and packaged builds.
- * Your repo shows: src/renderer/assets/logoSW.png
- */
+/** Resolve the logo path in both dev and packaged builds. */
 function resolveLogoPath() {
   const candidates = [
     // dev layout (preload.js at project root)
@@ -44,24 +41,28 @@ const logoPath = resolveLogoPath();
 const logoDataURL = logoPath ? fileToDataURL(logoPath) : null;
 
 /* -------------------- expose safe API -------------------- */
-/* Use contextBridge to keep renderer isolated but give it the hooks it needs */
 contextBridge.exposeInMainWorld("smartwebify", {
   // invoice JSON
   saveInvoiceJSON: (data) => ipcRenderer.invoke("save-invoice-json", data),
   openInvoiceJSON: () => ipcRenderer.invoke("open-invoice-json"),
 
-  // PDF export for the *HTML built by pdfView.js*
-  exportPDFFromHTML: (payload) => ipcRenderer.invoke("export-pdf-from-html", payload),
+  // ✅ SILENT-capable PDF export (honors meta.silent, meta.filename, meta.useSameDirAs)
+  exportPDFFromHTML: (payload) =>
+    ipcRenderer.invoke("smartwebify:exportPDFFromHTML", payload),
 
-  // Optional file pickers (used for logo change)
+  // (Optional) Legacy dialog-only export, if you still need it somewhere:
+  exportPDFFromHTMLWithDialog: (payload) =>
+    ipcRenderer.invoke("export-pdf-from-html", payload),
+
+  // File pickers
   pickLogo: () => ipcRenderer.invoke("smartwebify:pickLogo"),
 
-  // Openers for exported files/URLs (renderer will prefer these over window.open)
+  // Openers for exported files/URLs
   openPath: (absPath) => ipcRenderer.invoke("smartwebify:openPath", absPath),
   showInFolder: (absPath) => ipcRenderer.invoke("smartwebify:showInFolder", absPath),
   openExternal: (url) => ipcRenderer.invoke("smartwebify:openExternal", url),
 
-  // print-mode signals (if you still use overlay flow anywhere)
+  // print-mode signals
   onEnterPrintMode: (cb) => ipcRenderer.on("enter-print-mode", () => cb && cb()),
   onExitPrintMode:  (cb) => ipcRenderer.on("exit-print-mode",  () => cb && cb()),
 

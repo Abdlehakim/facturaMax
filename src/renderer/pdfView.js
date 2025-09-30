@@ -1,4 +1,4 @@
-// pdfView.js (full updated file with Adresse / Adresse du client hidden when empty)
+// pdfView.js (full updated — Total HT includes Frais de livraison; TTC adds Timbre TTC)
 (function (global) {
   const PDF_CSS = `
 :root{
@@ -35,9 +35,9 @@ body.print-mode #pdfRoot {
 .pdf-small{font-size:12px}
 .pdf-meta{background:#f9fafb;padding:12px;border-radius:5px;margin-top:12px; width:280px}
 .pdf-meta-grid{display:grid;grid-template-columns:1fr 1fr;gap:3px;font-size:12px}
-.tableDiv{ margin-top:20px; border-radius:5px; border:2px solid #15335e; overflow-x:auto; height:500px }
+.tableDiv{ margin-top:20px; border-radius:5px; border:2px solid #15335e; overflow-x:auto; height:400px }
 .pdf-table{ width:100%; font-size:10px; table-layout:auto; font-family: var(--invoice-font); }
-.pdf-table th,.pdf-table td{ padding:8px; vertical-align:top }
+.pdf-table th,.pdf-table td{ padding:4px; vertical-align:top }
 .pdf-table thead th{ font-weight:600; background-color:#15335e; color:#fff; text-align:right; }
 .pdf-table thead th:nth-child(1),
 .pdf-table thead th:nth-child(2),
@@ -62,7 +62,7 @@ body.print-mode #pdfRoot {
   color:#0e1220;
   font-size:8px; font-weight:600;
   text-align:center;
-  padding:8px;
+  padding:4px;
   font-family: var(--invoice-font);
 }
 .pdf-mini-table .head th{ background:#15335e; color:#fff; }
@@ -118,7 +118,6 @@ body.print-mode #pdfRoot {
   const esc = (s = "") =>
     String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
-  // Helper to check non-empty values (used for optional lines)
   const hasVal = (v) => (v ?? "").toString().trim().length > 0;
 
   const fmtMoney = (v, c) => {
@@ -215,6 +214,24 @@ body.print-mode #pdfRoot {
     const client = state?.client || {};
     const meta = state?.meta || {};
     const items = Array.isArray(state?.items) ? state.items : [];
+    const ex = meta?.extras || {};
+
+    // ---- EXTRAS (not rendered as table rows) ----
+    const shipEnabled = !!ex?.shipping?.enabled;
+    const shipLabel   = (ex?.shipping?.label || "Frais de livraison");
+    const shipHT      = Number(ex?.shipping?.amount) || 0;
+    const shipTVApc   = Number(ex?.shipping?.tva) || 0;
+    const shipTVA     = shipHT * (shipTVApc / 100);
+    const shipTTC     = shipHT + shipTVA;
+
+    const stampEnabled = !!ex?.stamp?.enabled;
+    const stampLabel   = (ex?.stamp?.label || "Timbre fiscal");
+    const stampHT      = Number(ex?.stamp?.amount) || 0;
+    const stampTVApc   = Number(ex?.stamp?.tva) || 0;
+    const stampTVA     = stampHT * (stampTVApc / 100);
+    const stampTTC     = stampHT + stampTVA;
+    // ---------------------------------------------
+
     const cur = meta.currency || "TND";
     const logo = assets?.logo || company.logo || "";
     const type = getDocType(meta);
@@ -232,7 +249,7 @@ body.print-mode #pdfRoot {
       : "";
 
     const hide = hiddenColumnsFromDOM();
-    const hideTTC = hide.ttc || hide.price; // if Prix HT is hidden, hide Total TTC too
+    const hideTTC = hide.ttc || hide.price;
 
     const headerParts = [];
     if (!hide.ref)      headerParts.push("Réf.");
@@ -245,15 +262,12 @@ body.print-mode #pdfRoot {
     if (!hideTTC)       headerParts.push("Total TTC");
     const HEADERS = headerParts;
 
+    // ---- TABLE ROWS: only original items (no extras here) ----
     const rows = items.map((raw) => {
-      const hasNewShape =
-        Object.prototype.hasOwnProperty.call(raw, "product") ||
-        Object.prototype.hasOwnProperty.call(raw, "ref");
-
       const it = {
-        ref:      hasNewShape ? (raw.ref || "") : "",
-        product:  hasNewShape ? (raw.product || "") : "",
-        desc:     hasNewShape ? (raw.desc || (raw.product ? "" : (raw.desc || ""))) : (raw.desc || ""),
+        ref:      raw.ref || "",
+        product:  raw.product || "",
+        desc:     raw.desc || (raw.product ? "" : (raw.desc || "")),
         qty:      Number(raw.qty || 0),
         price:    Number(raw.price || 0),
         tva:      Number(raw.tva || 0),
@@ -278,7 +292,8 @@ body.print-mode #pdfRoot {
       return `<tr class="pdf-row">${cells.join("")}</tr>`;
     }).join("");
 
-    let subtotal = 0, totalDisc = 0, totalTVA = 0;
+    // ---- ITEMS-ONLY TOTALS ----
+    let subtotalItems = 0, totalDisc = 0, totalTVA_items = 0;
     items.forEach((raw) => {
       const qty = Number(raw.qty || 0);
       const price = Number(raw.price || 0);
@@ -288,11 +303,28 @@ body.print-mode #pdfRoot {
       const disc = base * (discount / 100);
       const after = base - disc;
       const tvaAmt = after * (tva / 100);
-      subtotal += base; totalDisc += disc; totalTVA += tvaAmt;
+      subtotalItems += base; totalDisc += disc; totalTVA_items += tvaAmt;
     });
-    const totalHT = subtotal - totalDisc;
-    const totalTTC = totalHT + totalTVA;
-    const wordsTTC = SHOW_WORDS ? amountInWords(totalTTC, cur) : "";
+    const totalHT_items = subtotalItems - totalDisc;
+
+    // ---- DISPLAY TOTALS (HT & TVA include SHIPPING) ----
+    const totalHT_display  = totalHT_items  + (shipEnabled ? shipHT  : 0);
+    const totalTVA_display = totalTVA_items + (shipEnabled ? shipTVA : 0);
+
+    // ---- TOTAL TTC  = (HT + TVA incl. shipping) + stamp TTC ----
+    const totalTTC_all = totalHT_display + totalTVA_display + (stampEnabled ? stampTTC : 0);
+
+    // Retenue à la source
+    const wh = meta?.withholding || {};
+    const whEnabled = !!(wh.enabled);
+    const whBaseHT  = totalHT_items + (shipEnabled ? shipHT : 0); // business rule
+    const whBaseVal = (wh.base === "ttc") ? totalTTC_all : whBaseHT;
+    const whAmount  = whEnabled ? (Math.max(0, whBaseVal) * (Number(wh.rate||0)/100)) : 0;
+    const netToPay  = totalTTC_all - whAmount;
+
+    // Amount in words – Net if retenue enabled, else TTC
+    const wordsTarget  = whEnabled ? netToPay : totalTTC_all;
+    const wordsTgtText = SHOW_WORDS ? amountInWords(wordsTarget, cur) : "";
 
     const notesHTML =
       state.notes && state.notes.trim()
@@ -301,35 +333,41 @@ body.print-mode #pdfRoot {
            </div>`
         : "";
 
+    const wordsHeaderFinal =
+      whEnabled
+        ? "Arrêté le présent montant net à payer à la somme de&nbsp;:"
+        : wordsHeader;
+
     const amountWordsBlock =
       (SHOW_WORDS || notesHTML)
         ? `<div class="pdf-amount-words">
-             ${SHOW_WORDS ? `${wordsHeader}<br/><strong>${esc(wordsTTC)}</strong>` : ""}
+             ${SHOW_WORDS ? `${wordsHeaderFinal}<br/><strong>${esc(wordsTgtText)}</strong>` : ""}
              ${notesHTML}
            </div>`
         : "";
 
-    const miniSumHTML = hideTTC ? "" : `
-        <div class="pdf-mini-sum">
-          <table class="pdf-mini-table">
-            <tbody>
-              <tr class="head">
-                <th>Total HT</th>
-                <th class="right">${fmtMoney(totalHT, cur)}</th>
-              </tr>
-              <tr>
-                <td>TVA</td>
-                <td class="right">${fmtMoney(totalTVA, cur)}</td>
-              </tr>
-              <tr class="grand">
-                <th>Total TTC</th>
-                <th class="right">${fmtMoney(totalTTC, cur)}</th>
-              </tr>
-            </tbody>
-          </table>
-        </div>`;
+    // ---- MINI SUM (shipping line BEFORE Total HT) ----
+    const miniRows = [];
+    if (shipEnabled && shipHT > 0) {
+      miniRows.push(`<tr><td>${esc(shipLabel)}</td><td class="right">${fmtMoney(shipTTC, cur)}</td></tr>`);
+    }
+    miniRows.push(
+      `<tr class="head"><th>Total HT</th><th class="right">${fmtMoney(totalHT_display, cur)}</th></tr>`,
+      `<tr><td>TVA</td><td class="right">${fmtMoney(totalTVA_display, cur)}</td></tr>`
+    );
+    if (stampEnabled && stampHT > 0) {
+      miniRows.push(`<tr><td>${esc(stampLabel)}</td><td class="right">${fmtMoney(stampTTC, cur)}</td></tr>`);
+    }
+    miniRows.push(`<tr class="grand"><th>Total TTC</th><th class="right">${fmtMoney(totalTTC_all, cur)}</th></tr>`);
+    if (whEnabled) {
+      const lbl = hasVal(wh.label) ? wh.label : "Retenue à la source";
+      miniRows.push(
+        `<tr><td>${esc(lbl)}</td><td class="right">- ${fmtMoney(whAmount, cur)}</td></tr>`,
+        `<tr class="grand"><th>Net à payer</th><th class="right">${fmtMoney(netToPay, cur)}</th></tr>`
+      );
+    }
 
-    // ========= Optional client & company lines =========
+    // Optional address/contacts
     const companyAddressHTML = hasVal(company.address)
       ? `<p class="pdf-small" style="margin:0px; padding-top:2px; text-transform:capitalize"><em style="font-weight:600">Adresse&nbsp;:</em> ${esc(company.address)}</p>`
       : ``;
@@ -397,7 +435,13 @@ body.print-mode #pdfRoot {
           </table>
         </div>
 
-        ${miniSumHTML}
+        <div class="pdf-mini-sum">
+          <table class="pdf-mini-table">
+            <tbody>
+              ${miniRows.join("")}
+            </tbody>
+          </table>
+        </div>
 
         ${amountWordsBlock}
 

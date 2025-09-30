@@ -1,17 +1,53 @@
-// renderer.js
+// renderer.js (full updated — Frais de livraison avant Total HT + inclus dans HT/TVA affichés; Timbre = TTC seulement; colonnes: checked = visible)
 const $  = (sel) => document.querySelector(sel);
 const $$ = (sel) => Array.from(document.querySelectorAll(sel));
 const getEl = (id) => document.getElementById(id);
 const setVal = (id, v) => { const el = getEl(id); if (el) el.value = v; };
 const getStr = (id, def = "") => { const el = getEl(id); return el ? el.value.trim() : def; };
-const getNum = (id, def = 0) => { const val = getStr(id, String(def)); const n = Number(val.replace?.(",", ".") ?? val); return Number.isFinite(n) ? n : def; };
+const getNum = (id, def = 0) => {
+  const val = getStr(id, String(def));
+  const n = Number(val.replace?.(",", ".") ?? val);
+  return Number.isFinite(n) ? n : def;
+};
 const setText = (id, v) => { const el = getEl(id); if (el) el.textContent = v; };
 const setSrc  = (id, v) => { const el = getEl(id); if (el) el.src = v; };
 
+// ---------- filename helpers ----------
+function slugForFile(s = "") {
+  return String(s)
+    .trim()
+    .replace(/[\/\\:*?"<>|]/g, "-")
+    .replace(/\s+/g, " ")
+    .replace(/[\u0000-\u001f]/g, "")
+    .trim();
+}
+function ensurePdfExt(name) { return name.toLowerCase().endsWith(".pdf") ? name : (name + ".pdf"); }
+// --------------------------------------
+
 const state = {
-  company: { name: "Smartwebify", vat: "1891628/W/A/M/000", phone: "+216 27 673 561", email: "contact@smartwebify.com", address: "Rue Mahbouba Soussia 2080 Teboulba", logo: "" },
+  company: {
+    name: "Smartwebify",
+    vat: "1891628/W/A/M/000",
+    phone: "+216 27 673 561",
+    email: "contact@smartwebify.com",
+    address: "Rue Mahbouba Soussia 2080 Teboulba",
+    logo: ""
+  },
   client:  { name: "", email: "", phone: "", address: "", vat: "" },
-  meta:    { number: "", currency: "TND", date: new Date().toISOString().slice(0,10), due: new Date(Date.now()+7*86400000).toISOString().slice(0,10), docType: "facture" },
+  meta:    {
+    number: "",
+    currency: "TND",
+    date: new Date().toISOString().slice(0,10),
+    due:  new Date(Date.now()+7*86400000).toISOString().slice(0,10),
+    docType: "facture",
+    // Retenue à la source
+    withholding: { enabled: false, rate: 1.5, base: "ht", label: "Retenue à la source" },
+    // Extras (shown only in mini-sum, NOT as table rows)
+    extras: {
+      shipping: { enabled:false, label:"Frais de livraison", amount:7, tva:19 },
+      stamp:    { enabled: false, label: "Timbre fiscal",      amount: 0.600, tva: 0 },
+    },
+  },
   notes: "",
   items: [ { ref: "SKU-001", product: "Ordinateur portable", desc: "Garantie 2 ans", qty: 1, price: 1000, tva: 19, discount: 0 } ],
 };
@@ -32,7 +68,9 @@ function loadCompanyFromLocal(){ if (COMPANY_LOCKED) return; try{ const c = JSON
 
 function bind(){
   [["companyName","name"],["companyVat","vat"],["companyPhone","phone"],["companyEmail","email"],["companyAddress","address"]].forEach(([id,key])=>{
-    const el = getEl(id); if(!el) return; el.value = state.company[key] || ""; if (COMPANY_LOCKED) { el.readOnly = true; el.classList.add("locked"); el.setAttribute("tabindex","-1"); }
+    const el = getEl(id); if(!el) return;
+    el.value = state.company[key] || "";
+    if (COMPANY_LOCKED) { el.readOnly = true; el.classList.add("locked"); el.setAttribute("tabindex","-1"); }
   });
   setVal("docType",  state.meta.docType || "facture");
   setVal("invNumber", state.meta.number);
@@ -44,13 +82,45 @@ function bind(){
   setVal("clientPhone", state.client.phone);
   setVal("clientVat", state.client.vat);
   setVal("clientAddress", state.client.address);
+
+  // Retenue à la source
+  const wh = state.meta.withholding || { enabled:false, rate:1.5, base:"ht", label:"Retenue à la source" };
+  if (getEl("whEnabled")) getEl("whEnabled").checked = !!wh.enabled;
+  setVal("whRate",  String(wh.rate ?? 1.5));
+  setVal("whBase",  String(wh.base ?? "ht"));
+  setVal("whLabel", String(wh.label ?? "Retenue à la source"));
+  toggleWHFields(!!wh.enabled);
+
+  // Extras (Frais de livraison / Timbre)
+  const ex = state.meta.extras || {};
+  const s  = ex.shipping || {};
+  const t  = ex.stamp    || {};
+  if (getEl("shipEnabled"))  getEl("shipEnabled").checked = !!s.enabled;
+  setVal("shipLabel",  String(s.label ?? "Frais de livraison"));
+  setVal("shipAmount", String(s.amount ?? 7));
+  setVal("shipTva",    String(s.tva ?? 19));
+  toggleShipFields(!!s.enabled);
+
+  if (getEl("stampEnabled")) getEl("stampEnabled").checked = !!t.enabled;
+  setVal("stampLabel",  String(t.label ?? "Timbre fiscal"));
+  setVal("stampAmount", String(t.amount ?? 0.600));
+  setVal("stampTva",    String(t.tva ?? 0));
+  toggleStampFields(!!t.enabled);
+
   const logo = window.smartwebify?.assets?.logo || state.company.logo;
   if (logo) setSrc("companyLogo", logo);
   setVal("notes", state.notes);
   setText("year", new Date().getFullYear());
+
+  // Ensure column toggles are checked by default (visible)
+  ["colToggleRef","colToggleProduct","colToggleDesc","colToggleQty","colTogglePrice","colToggleTva","colToggleDiscount"]
+    .forEach(id => { const el = getEl(id); if (el) el.checked = true; });
+
   renderItems();
   computeTotals();
   applyColumnHiding();
+  updateWHAmountPreview();
+  updateExtrasMiniRows();
 }
 
 function wireLiveBindings() {
@@ -68,7 +138,10 @@ function wireLiveBindings() {
   getEl("invNumber")?.addEventListener("input",  () => { state.meta.number  = getStr("invNumber", state.meta.number); });
   getEl("invDate")  ?.addEventListener("input",  () => { state.meta.date    = getStr("invDate",   state.meta.date); });
   getEl("invDue")   ?.addEventListener("input",  () => { state.meta.due     = getStr("invDue",    state.meta.due); });
-  getEl("currency") ?.addEventListener("change", () => { state.meta.currency = getStr("currency", state.meta.currency); renderItems(); });
+  getEl("currency") ?.addEventListener("change", () => {
+    state.meta.currency = getStr("currency", state.meta.currency);
+    renderItems(); computeTotals(); updateWHAmountPreview(); updateExtrasMiniRows();
+  });
   getEl("clientName")   ?.addEventListener("input", () => { state.client.name    = getStr("clientName",    state.client.name); });
   getEl("clientEmail")  ?.addEventListener("input", () => { state.client.email   = getStr("clientEmail",   state.client.email); });
   getEl("clientPhone")  ?.addEventListener("input", () => { state.client.phone   = getStr("clientPhone",   state.client.phone); });
@@ -76,9 +149,116 @@ function wireLiveBindings() {
   getEl("clientAddress")?.addEventListener("input", () => { state.client.address = getStr("clientAddress", state.client.address); });
   getEl("notes")?.addEventListener("input", () => { state.notes = getStr("notes", state.notes); });
 
-  // column toggles → hide/show columns & mini totals box
+  // column toggles → hide/show columns & mini totals box (checked = visible)
   ["colToggleRef","colToggleProduct","colToggleDesc","colToggleQty","colTogglePrice","colToggleTva","colToggleDiscount"]
     .forEach(id => getEl(id)?.addEventListener("change", applyColumnHiding));
+
+  // Retenue à la source bindings
+  getEl("whEnabled")?.addEventListener("change", () => {
+    state.meta.withholding.enabled = !!getEl("whEnabled").checked;
+    toggleWHFields(state.meta.withholding.enabled);
+    computeTotals();
+    updateWHAmountPreview();
+  });
+  getEl("whRate")?.addEventListener("input", () => {
+    state.meta.withholding.rate = getNum("whRate", state.meta.withholding.rate);
+    computeTotals(); updateWHAmountPreview();
+  });
+  getEl("whBase")?.addEventListener("change", () => {
+    state.meta.withholding.base = getStr("whBase", state.meta.withholding.base);
+    computeTotals(); updateWHAmountPreview();
+  });
+  getEl("whLabel")?.addEventListener("input", () => {
+    state.meta.withholding.label = getStr("whLabel", state.meta.withholding.label);
+    updateWHAmountPreview();
+  });
+
+  // Extras: Frais de livraison
+  getEl("shipEnabled")?.addEventListener("change", () => {
+    state.meta.extras.shipping.enabled = !!getEl("shipEnabled").checked;
+    toggleShipFields(state.meta.extras.shipping.enabled);
+    computeTotals(); updateExtrasMiniRows(); updateWHAmountPreview();
+  });
+  getEl("shipLabel")?.addEventListener("input", () => {
+    state.meta.extras.shipping.label = getStr("shipLabel", state.meta.extras.shipping.label);
+    updateExtrasMiniRows();
+  });
+  getEl("shipAmount")?.addEventListener("input", () => {
+    state.meta.extras.shipping.amount = getNum("shipAmount", state.meta.extras.shipping.amount);
+    computeTotals(); updateExtrasMiniRows(); updateWHAmountPreview();
+  });
+  getEl("shipTva")?.addEventListener("input", () => {
+    state.meta.extras.shipping.tva = getNum("shipTva", state.meta.extras.shipping.tva);
+    computeTotals(); updateExtrasMiniRows(); updateWHAmountPreview();
+  });
+
+  // Extras: Timbre fiscal
+  getEl("stampEnabled")?.addEventListener("change", () => {
+    state.meta.extras.stamp.enabled = !!getEl("stampEnabled").checked;
+    toggleStampFields(state.meta.extras.stamp.enabled);
+    computeTotals(); updateExtrasMiniRows(); updateWHAmountPreview();
+  });
+  getEl("stampLabel")?.addEventListener("input", () => {
+    state.meta.extras.stamp.label = getStr("stampLabel", state.meta.extras.stamp.label);
+    updateExtrasMiniRows();
+  });
+  getEl("stampAmount")?.addEventListener("input", () => {
+    state.meta.extras.stamp.amount = getNum("stampAmount", state.meta.extras.stamp.amount);
+    computeTotals(); updateExtrasMiniRows(); updateWHAmountPreview();
+  });
+  getEl("stampTva")?.addEventListener("input", () => {
+    state.meta.extras.stamp.tva = getNum("stampTva", state.meta.extras.stamp.tva);
+    computeTotals(); updateExtrasMiniRows(); updateWHAmountPreview();
+  });
+}
+
+function toggleWHFields(enabled) {
+  const fields = getEl("whFields");
+  if (fields) fields.style.display = enabled ? "" : "none";
+  const r1 = getEl("miniWHRow");
+  const r2 = getEl("miniNETRow");
+  if (r1) r1.style.display = enabled ? "" : "none";
+  if (r2) r2.style.display = enabled ? "" : "none";
+}
+function toggleShipFields(enabled) {
+  const f = getEl("shipFields");
+  if (f) f.style.display = enabled ? "" : "none";
+  const r = getEl("miniShipRow");
+  if (r) r.style.display = enabled ? "" : "none";
+}
+function toggleStampFields(enabled) {
+  const f = getEl("stampFields");
+  if (f) f.style.display = enabled ? "" : "none";
+  const r = getEl("miniStampRow");
+  if (r) r.style.display = enabled ? "" : "none";
+}
+
+function updateWHAmountPreview() {
+  const { whAmount } = computeTotalsReturn(); // uses current state
+  setVal("whAmount", formatMoney(whAmount, state.meta.currency || "TND"));
+  const lbl = state.meta.withholding?.label?.trim() || "Retenue à la source";
+  setText("miniWHLabel", lbl);
+}
+
+function updateExtrasMiniRows(){
+  const ex = state.meta.extras || {};
+  const cur = state.meta.currency || "TND";
+
+  // Shipping shown as TTC line (still included in HT/TVA totals below)
+  const shipTT = (ex.shipping?.enabled)
+    ? (Number(ex.shipping.amount||0) * (1 + Number(ex.shipping.tva||0)/100))
+    : 0;
+  if (getEl("miniShipLabel")) setText("miniShipLabel", ex.shipping?.label?.trim() || "Frais de livraison");
+  if (getEl("miniShip"))      setText("miniShip", formatMoney(shipTT, cur));
+  if (getEl("miniShipRow"))   getEl("miniShipRow").style.display = ex.shipping?.enabled ? "" : "none";
+
+  // Stamp (affects TTC only)
+  const stampTT = (ex.stamp?.enabled)
+    ? (Number(ex.stamp.amount||0) * (1 + Number(ex.stamp.tva||0)/100))
+    : 0;
+  if (getEl("miniStampLabel")) setText("miniStampLabel", ex.stamp?.label?.trim() || "Timbre fiscal");
+  if (getEl("miniStamp"))      setText("miniStamp", formatMoney(stampTT, cur));
+  if (getEl("miniStampRow"))   getEl("miniStampRow").style.display = ex.stamp?.enabled ? "" : "none";
 }
 
 function readInputs(){
@@ -99,12 +279,50 @@ function readInputs(){
   state.client.phone   = getStr("clientPhone", state.client.phone);
   state.client.vat     = getStr("clientVat", state.client.vat);
   state.client.address = getStr("clientAddress", state.client.address);
-  state.notes = getStr("notes", state.notes);
+
+  // retenue
+  const wh = state.meta.withholding || (state.meta.withholding = { enabled:false, rate:1.5, base:"ht", label:"Retenue à la source" });
+  wh.enabled = !!getEl("whEnabled")?.checked;
+  wh.rate    = getNum("whRate", wh.rate);
+  wh.base    = getStr("whBase", wh.base);
+  wh.label   = getStr("whLabel", wh.label);
+
+  // extras
+  const ex = state.meta.extras || (state.meta.extras = { shipping:{}, stamp:{} });
+  const s = ex.shipping || (ex.shipping = {});
+  const t = ex.stamp    || (ex.stamp = {});
+
+  s.enabled = !!getEl("shipEnabled")?.checked;
+  s.label   = getStr("shipLabel", s.label || "Frais de livraison");
+  s.amount  = getNum("shipAmount", s.amount ?? 7);
+  s.tva     = getNum("shipTva", s.tva ?? 19);
+
+  t.enabled = !!getEl("stampEnabled")?.checked;
+  t.label   = getStr("stampLabel", t.label || "Timbre fiscal");
+  t.amount  = getNum("stampAmount", t.amount ?? 0.600);
+  t.tva     = getNum("stampTva", t.tva ?? 0);
 }
 
-function unlockAddInputs() { ["addRef","addProduct","addDesc","addQty","addPrice","addTva","addDiscount"].forEach(id=>{ const el = getEl(id); if (el) { el.disabled = false; el.readOnly = false; } }); }
-function focusFirstEmptyAddField() { const order = ["addProduct","addDesc","addRef"]; const target = order.map(getEl).find(el => el && !el.value.trim()) || getEl("addProduct") || getEl("addDesc") || getEl("addRef"); if (target) { target.focus(); try { target.select(); } catch {} } }
-function killOverlays() { document.body.classList.remove("printing","print-mode"); const pdfRoot = document.getElementById("pdfRoot"); if (pdfRoot) { pdfRoot.style.display = "none"; pdfRoot.style.pointerEvents = "none"; pdfRoot.setAttribute("aria-hidden","true"); } }
+function unlockAddInputs() {
+  ["addRef","addProduct","addDesc","addQty","addPrice","addTva","addDiscount"].forEach(id=>{
+    const el = getEl(id); if (el) { el.disabled = false; el.readOnly = false; }
+  });
+}
+function focusFirstEmptyAddField() {
+  const order = ["addProduct","addDesc","addRef"];
+  const target = order.map(getEl).find(el => el && !el.value.trim())
+              || getEl("addProduct") || getEl("addDesc") || getEl("addRef");
+  if (target) { target.focus(); try { target.select(); } catch {} }
+}
+function killOverlays() {
+  document.body.classList.remove("printing","print-mode");
+  const pdfRoot = document.getElementById("pdfRoot");
+  if (pdfRoot) {
+    pdfRoot.style.display = "none";
+    pdfRoot.style.pointerEvents = "none";
+    pdfRoot.setAttribute("aria-hidden","true");
+  }
+}
 function recoverFocus() { killOverlays(); try { window.focus(); } catch {} unlockAddInputs(); }
 function installFocusGuards() {
   const handler = () => recoverFocus();
@@ -112,12 +330,25 @@ function installFocusGuards() {
   document.addEventListener("keydown",     handler, true);
   document.addEventListener("focusin",     handler, true);
   window.addEventListener("focus", recoverFocus);
-  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") recoverFocus(); });
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") recoverFocus();
+  });
 }
 
-function clearAddForm(){ setVal("addRef", ""); setVal("addProduct", ""); setVal("addDesc",""); setVal("addQty","1"); setVal("addPrice","0"); setVal("addTva","19"); setVal("addDiscount","0"); }
-function fillAddFormFromItem(it){ setVal("addRef", it.ref ?? ""); setVal("addProduct", it.product ?? ""); setVal("addDesc", it.desc ?? ""); setVal("addQty", String(it.qty ?? 1)); setVal("addPrice", String(it.price ?? 0)); setVal("addTva", String(it.tva ?? 19)); setVal("addDiscount", String(it.discount ?? 0)); }
-function setSubmitMode(mode){ const submitBtn = getEl("btnSubmitItem"); const newBtn = getEl("btnNewItem"); if(!submitBtn || !newBtn) return; if(mode === "update"){ submitBtn.textContent = "Mettre à jour"; submitBtn.dataset.mode="update"; newBtn.disabled = false; } else { submitBtn.textContent = "+ Ajouter"; submitBtn.dataset.mode="add"; newBtn.disabled = true; } }
+function clearAddForm(){
+  setVal("addRef", ""); setVal("addProduct", ""); setVal("addDesc","");
+  setVal("addQty","1"); setVal("addPrice","0"); setVal("addTva","19"); setVal("addDiscount","0");
+}
+function fillAddFormFromItem(it){
+  setVal("addRef", it.ref ?? ""); setVal("addProduct", it.product ?? ""); setVal("addDesc", it.desc ?? "");
+  setVal("addQty", String(it.qty ?? 1)); setVal("addPrice", String(it.price ?? 0));
+  setVal("addTva", String(it.tva ?? 19)); setVal("addDiscount", String(it.discount ?? 0));
+}
+function setSubmitMode(mode){
+  const submitBtn = getEl("btnSubmitItem"); const newBtn = getEl("btnNewItem"); if(!submitBtn || !newBtn) return;
+  if(mode === "update"){ submitBtn.textContent = "Mettre à jour"; submitBtn.dataset.mode="update"; newBtn.disabled = false; }
+  else { submitBtn.textContent = "+ Ajouter"; submitBtn.dataset.mode="add"; newBtn.disabled = true; }
+}
 function clearAddFormAndMode(){ selectedItemIndex=null; clearAddForm(); setSubmitMode("add"); }
 function enterUpdateMode(i){ selectedItemIndex=i; fillAddFormFromItem(state.items[i]); setSubmitMode("update"); }
 
@@ -154,7 +385,6 @@ function showDialog(message) {
     const msg = getEl("swbDialogMsg");
     const ok = getEl("swbDialogOk");
 
-    // hide cancel button if it exists (from showConfirm)
     const cancel = overlay.querySelector("#swbDialogCancel");
     if (cancel) cancel.style.display = "none";
 
@@ -180,13 +410,11 @@ function showDialog(message) {
   });
 }
 
-/** Styled confirm dialog sharing the same CSS/overlay as showDialog */
 function showConfirm(message, { okText = "OK", cancelText = "Annuler" } = {}) {
   const overlay = ensureDialog();
   const msg = getEl("swbDialogMsg");
   const ok = getEl("swbDialogOk");
 
-  // ensure a Cancel button exists
   let cancel = overlay.querySelector("#swbDialogCancel");
   if (!cancel) {
     cancel = document.createElement("button");
@@ -196,7 +424,6 @@ function showConfirm(message, { okText = "OK", cancelText = "Annuler" } = {}) {
     cancel.textContent = cancelText;
     ok.parentElement.insertBefore(cancel, ok);
   }
-  // show both buttons for confirm
   cancel.style.display = "";
   ok.textContent = okText;
   cancel.textContent = cancelText;
@@ -213,7 +440,6 @@ function showConfirm(message, { okText = "OK", cancelText = "Annuler" } = {}) {
       cancel.removeEventListener("click", onCancel);
       overlay.removeEventListener("click", onBackdrop);
       document.removeEventListener("keydown", onKey);
-      // keep cancel button for reuse; hide will be managed by showDialog next time
       recoverFocus();
       resolve(result);
     }
@@ -305,11 +531,19 @@ function renderItems(){
   });
   computeTotals();
   applyColumnHiding();
+  updateWHAmountPreview();
+  updateExtrasMiniRows();
 }
 
+// ---------- Totals (DISPLAY RULES) ----------
+// - Total HT & TVA include FRAIS DE LIVRAISON (HT & TVA) s'ils sont activés.
+// - TIMBRE FISCAL n'affecte PAS Total HT/TVA; il s'ajoute uniquement au Total TTC.
+// - Base WH "HT" = (HT des articles + HT livraison).
 function computeTotals(){
   readInputs();
   const currency = state.meta.currency || "TND";
+
+  // Items totals only
   let subtotal = 0, totalTax = 0, totalDiscount = 0;
   state.items.forEach((it)=>{
     const qty = Number(it.qty||0);
@@ -324,23 +558,71 @@ function computeTotals(){
     totalDiscount += disc;
     totalTax += tax;
   });
-  const totalHT  = subtotal - totalDiscount;
-  const totalTTC = totalHT + totalTax;
+  const totalHT_items  = subtotal - totalDiscount;
+  const totalTTC_items = totalHT_items + totalTax;
+
+  // Extras
+  const ex = state.meta.extras || {};
+  const shipHT  = (ex.shipping?.enabled) ? Number(ex.shipping.amount||0) : 0;
+  const shipTVA = shipHT * (Number(ex.shipping?.tva||0)/100);
+  const shipTT  = shipHT + shipTVA;
+
+  const stampHT = (ex.stamp?.enabled) ? Number(ex.stamp.amount||0) : 0;
+  const stampTVA= stampHT * (Number(ex.stamp?.tva||0)/100);
+  const stampTT = stampHT + stampTVA;
+
+  // DISPLAY TOTALS:
+  const displayHT  = totalHT_items + shipHT;      // HT incl. shipping
+  const displayTVA = totalTax + shipTVA;          // TVA incl. shipping
+  const totalTTC_all = displayHT + displayTVA + stampTT; // TTC incl. both shipping & stamp
+
+  // For WH base "ht": items HT + shipping HT (stamp excluded)
+  const totalHT_all_for_WH = totalHT_items + shipHT;
+
+  // (optional) debug fields if present
   setText("subtotal", formatMoney(subtotal, currency));
   setText("tax",      formatMoney(totalTax, currency));
   setText("discount", formatMoney(totalDiscount, currency));
-  setText("grand",    formatMoney(totalTTC, currency));
-  if(getEl("miniHT"))  setText("miniHT",  formatMoney(totalHT,  currency));
-  if(getEl("miniTVA")) setText("miniTVA", formatMoney(totalTax, currency));
-  if(getEl("miniTTC")) setText("miniTTC", formatMoney(totalTTC, currency));
+
+  // mini box values (order handled in HTML)
+  if(getEl("miniHT"))  setText("miniHT",  formatMoney(displayHT,  currency));
+  if(getEl("miniTVA")) setText("miniTVA", formatMoney(displayTVA, currency));
+  if(getEl("miniTTC")) setText("miniTTC", formatMoney(totalTTC_all, currency));
+
+  // Retenue à la source
+  const wh = state.meta.withholding || {};
+  const baseVal = (wh.base === "ttc") ? totalTTC_all : totalHT_all_for_WH;
+  const whAmount = (wh.enabled ? (Math.max(0, baseVal) * (Number(wh.rate||0)/100)) : 0);
+  const netToPay = totalTTC_all - whAmount;
+
+  const whRow  = getEl("miniWHRow");
+  const netRow = getEl("miniNETRow");
+  if (whRow)  whRow.style.display  = wh.enabled ? "" : "none";
+  if (netRow) netRow.style.display = wh.enabled ? "" : "none";
+  if (wh.enabled) {
+    const lbl = wh.label?.trim() || "Retenue à la source";
+    setText("miniWHLabel", lbl);
+    setText("miniWH",  "- " + formatMoney(whAmount, currency));
+    setText("miniNET", formatMoney(netToPay, currency));
+  }
 }
 
 function captureForm(){
   readInputs();
-  return { company:{...state.company}, client:{...state.client}, meta:{...state.meta}, notes:state.notes, items: state.items.map(x=>({...x})), totals: computeTotalsReturn() };
+  return {
+    company:{...state.company},
+    client:{...state.client},
+    meta:{...state.meta},
+    notes:state.notes,
+    items: state.items.map(x=>({...x})),
+    totals: computeTotalsReturn()
+  };
 }
+
 function computeTotalsReturn(){
   const currency = state.meta.currency || "TND";
+
+  // items
   let subtotal=0,totalTax=0,totalDiscount=0;
   state.items.forEach((it)=>{
     const base = Number(it.qty||0) * Number(it.price||0);
@@ -349,13 +631,55 @@ function computeTotalsReturn(){
     const tax = taxedBase * (Number(it.tva||0)/100);
     subtotal += base; totalDiscount += disc; totalTax += tax;
   });
-  return { currency, subtotal, discount: totalDiscount, tax: totalTax, grand: subtotal - totalDiscount + totalTax };
+  const totalHT_items  = subtotal - totalDiscount;
+
+  // extras
+  const ex = state.meta.extras || {};
+  const shipHT  = (ex.shipping?.enabled) ? Number(ex.shipping.amount||0) : 0;
+  const shipTVA = shipHT * (Number(ex.shipping?.tva||0)/100);
+  const shipTT  = shipHT + shipTVA;
+
+  const stampHT = (ex.stamp?.enabled) ? Number(ex.stamp.amount||0) : 0;
+  const stampTVA= stampHT * (Number(ex.stamp?.tva||0)/100);
+  const stampTT = stampHT + stampTVA;
+
+  // DISPLAY totals
+  const totalHT_display  = totalHT_items + shipHT;        // HT incl. shipping
+  const totalTVA_display = totalTax + shipTVA;            // TVA incl. shipping
+  const totalTTC_all     = totalHT_display + totalTVA_display + stampTT;
+
+  // WH base "ht" = items HT + shipping HT
+  const totalHT_all_for_WH = totalHT_items + shipHT;
+
+  // retenue
+  const wh = state.meta.withholding || {};
+  const baseVal = (wh.base === "ttc") ? totalTTC_all : totalHT_all_for_WH;
+  const whAmount = (wh.enabled ? (Math.max(0, baseVal) * (Number(wh.rate||0)/100)) : 0);
+  const net = totalTTC_all - whAmount;
+
+  return {
+    currency,
+    subtotal,
+    discount: totalDiscount,
+    tax: totalTVA_display,          // returned tax matches what we display
+    totalHT: totalHT_display,       // HT displayed (items + shipping)
+    grand: totalTTC_all,
+    totalTTC: totalTTC_all,
+    whAmount, net,
+    extras: { shipHT, shipTT, shipTVA, stampHT, stampTT, stampTVA }
+  };
 }
+
 function newInvoice(){
   state.client = { name:"", email:"", phone:"", address:"", vat:"" };
   state.meta.number = "";
   state.meta.date = new Date().toISOString().slice(0,10);
   state.meta.due  = new Date(Date.now()+7*86400000).toISOString().slice(0,10);
+  state.meta.withholding = { enabled:false, rate:1.5, base:"ht", label:"Retenue à la source" };
+  state.meta.extras = {
+    shipping: { enabled: false, label: "Frais de livraison", amount: 7, tva: 19 },
+    stamp:    { enabled:false, label:"Timbre fiscal",      amount:0.600, tva:0 }
+  };
   state.notes = "";
   state.items = [ { ref: "SKU-001", product: "Ordinateur portable", desc: "Garantie 2 ans", qty: 1, price: 1000, tva: 19, discount: 0 } ];
   clearAddFormAndMode(); bind();
@@ -400,42 +724,87 @@ function init(){
   setSubmitMode("add");
   installFocusGuards();
   ["addPrice", "addQty", "addTva", "addDiscount"].forEach(id => enableFirstClickSelectSecondClickCaret(getEl(id)));
+
   getEl("btnNew")?.addEventListener("click", newInvoice);
-  getEl("btnOpen")?.addEventListener("click", async ()=>{ const data = await window.smartwebify?.openInvoiceJSON?.(); if(!data) return; Object.assign(state, data); bind(); });
-  getEl("btnSave")?.addEventListener("click", async ()=>{ 
-    const payload = captureForm(); 
-    const saved = await window.smartwebify?.saveInvoiceJSON?.(payload); 
-    if(saved){ 
-      await showDialog(`Enregistré : ${saved}`); 
-      // recoverFocus handled by showDialog
-    } 
+  getEl("btnOpen")?.addEventListener("click", async ()=>{
+    const data = await window.smartwebify?.openInvoiceJSON?.();
+    if(!data) return;
+    Object.assign(state, data);
+    bind();
   });
+  getEl("btnSave")?.addEventListener("click", async ()=>{
+    const payload = captureForm();
+    const saved = await window.smartwebify?.saveInvoiceJSON?.(payload);
+    if(saved){ await showDialog(`Enregistré : ${saved}`); }
+  });
+
   getEl("btnPDF")?.addEventListener("click", async () => {
     readInputs();
     computeTotals();
-    const html = window.PDFView.build(state, window.smartwebify?.assets || {});
-    const css  = window.PDFView.css;
-    const meta = { number: state.meta.number, type: state.meta.docType };
-    const out  = await window.smartwebify?.exportPDFFromHTML?.({ html, css, meta });
-    if (!out) return;
-    const openNow = await showConfirm(`PDF exporté :\n${out}\n\nVoulez-vous l'ouvrir maintenant ?`);
+    const assets = window.smartwebify?.assets || {};
+
+    // 1) Export main document (Facture/Devis/BL/BC) — dialog path
+    const htmlInv = window.PDFView.build(state, assets);
+    const cssInv  = window.PDFView.css;
+    const metaInv = { number: state.meta.number, type: state.meta.docType };
+    const outInv  = await window.smartwebify?.exportPDFFromHTML?.({ html: htmlInv, css: cssInv, meta: metaInv });
+    if (!outInv) return; // user canceled the invoice save
+
+    // 2) Export separate Retenue à la source — SILENT in SAME FOLDER as invoice
+    let outWH = null;
+    if (state.meta?.withholding?.enabled && window.PDFWH) {
+      const htmlWH = window.PDFWH.build(state, assets);
+      const cssWH  = window.PDFWH.css;
+
+      const invNum  = slugForFile(state.meta.number || "");
+      const baseName = invNum ? `Retenue à la source - ${invNum}` : `Retenue à la source`;
+      const fileName = ensurePdfExt(baseName);
+
+      outWH = await window.smartwebify?.exportPDFFromHTML?.({
+        html: htmlWH,
+        css: cssWH,
+        meta: {
+          number: state.meta.number,
+          type: "retenue",
+          filename: fileName,
+          silent: true,           // no dialog
+          useSameDirAs: outInv    // save next to the invoice
+        }
+      });
+    }
+
+    // 3) Prompt to open now — open BOTH if available
+    const msg =
+      `PDF exporté :\n${outInv}` +
+      (outWH ? `\nCertificat exporté :\n${outWH}` : "") +
+      `\n\nVoulez-vous l'ouvrir maintenant ?`;
+
+    const openNow = await showConfirm(msg);
     if (openNow) {
-      const ok = await openPDFFile(out);
-      if (!ok) { await showDialog("Le PDF a été exporté, mais l'ouverture automatique a échoué."); }
+      const okInv = await openPDFFile(outInv);
+      if (!okInv) await showDialog("Le PDF de la facture a été exporté, mais l'ouverture automatique a échoué.");
+      if (outWH) {
+        const okWH = await openPDFFile(outWH);
+        if (!okWH) await showDialog("Le PDF de la retenue a été exporté, mais l'ouverture automatique a échoué.");
+      }
     }
   });
+
   getEl("btnSubmitItem")?.addEventListener("click", () => { submitItemForm(); });
   getEl("btnNewItem")?.addEventListener("click", () => { clearAddFormAndMode(); focusFirstEmptyAddField(); });
   ["addRef","addProduct","addDesc","addQty","addPrice","addTva","addDiscount"].forEach(id=>{
     getEl(id)?.addEventListener("keydown",(e)=>{ if(e.key==="Enter"){ e.preventDefault(); submitItemForm(); } });
   });
+
   getEl("companyLogo")?.addEventListener("click", async () => {
     if (!window.smartwebify?.pickLogo) return;
     const res = await window.smartwebify.pickLogo();
     if (res?.dataUrl) { state.company.logo = res.dataUrl; setSrc("companyLogo", res.dataUrl); }
   });
+
   const addFieldset = getEl("addRef")?.closest("fieldset.section-box");
   if (addFieldset) { addFieldset.addEventListener("mousedown", recoverFocus, true); }
+
   window.smartwebify?.onEnterPrintMode?.(() => { window.PDFView?.show?.(state, window.smartwebify?.assets || {}); });
   window.smartwebify?.onExitPrintMode?.(() => { window.PDFView?.hide?.(); recoverFocus(); });
 }
@@ -451,32 +820,33 @@ function setColumnVisibility(table, oneBasedIndex, visible){
   }
 }
 
+// Column visibility — checked = VISIBLE
 function applyColumnHiding(){
-  const ref      = getEl('colToggleRef')?.checked || false;
-  const product  = getEl('colToggleProduct')?.checked || false;
-  const desc     = getEl('colToggleDesc')?.checked || false;
-  const qty      = getEl('colToggleQty')?.checked || false;
-  const price    = getEl('colTogglePrice')?.checked || false;
-  const tva      = getEl('colToggleTva')?.checked || false;
-  const discount = getEl('colToggleDiscount')?.checked || false;
+  const refVis      = !!getEl('colToggleRef')?.checked;
+  const productVis  = !!getEl('colToggleProduct')?.checked;
+  const descVis     = !!getEl('colToggleDesc')?.checked;
+  const qtyVis      = !!getEl('colToggleQty')?.checked;
+  const priceVis    = !!getEl('colTogglePrice')?.checked;
+  const tvaVis      = !!getEl('colToggleTva')?.checked;
+  const discountVis = !!getEl('colToggleDiscount')?.checked;
 
-  document.body.classList.toggle('hide-col-ref', ref);
-  document.body.classList.toggle('hide-col-product', product);
-  document.body.classList.toggle('hide-col-desc', desc);
-  document.body.classList.toggle('hide-col-qty', qty);
-  document.body.classList.toggle('hide-col-price', price);
-  document.body.classList.toggle('hide-col-tva', tva);
-  document.body.classList.toggle('hide-col-discount', discount);
+  document.body.classList.toggle('hide-col-ref',      !refVis);
+  document.body.classList.toggle('hide-col-product',  !productVis);
+  document.body.classList.toggle('hide-col-desc',     !descVis);
+  document.body.classList.toggle('hide-col-qty',      !qtyVis);
+  document.body.classList.toggle('hide-col-price',    !priceVis);
+  document.body.classList.toggle('hide-col-tva',      !tvaVis);
+  document.body.classList.toggle('hide-col-discount', !discountVis);
 
-  // If Prix HT is hidden → hide Total TTC (column 8) and mini totals box
-  document.body.classList.toggle('hide-col-ttc', price);
+  // If Prix HT hidden → hide Total TTC (column 8) and mini totals box
+  document.body.classList.toggle('hide-col-ttc', !priceVis);
   const itemsTable = getEl('items');
-  setColumnVisibility(itemsTable, 8, !price); // 8 = Total TTC
+  setColumnVisibility(itemsTable, 8, priceVis); // 8 = Total TTC
   const mini = document.querySelector('.mini-sum');
-  if (mini) mini.style.display = price ? 'none' : '';
+  if (mini) mini.style.display = priceVis ? '' : 'none';
 }
 
-// ensure initial sync on load
+// ensure initial sync on load for column toggles
 getEl('colToggleRef')?.addEventListener('change', applyColumnHiding);
 getEl('colTogglePrice')?.addEventListener('change', applyColumnHiding);
 applyColumnHiding();
