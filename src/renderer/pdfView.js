@@ -1,4 +1,3 @@
-// pdfView.js (full updated — Total HT includes Frais de livraison; TTC adds Timbre TTC)
 (function (global) {
   const PDF_CSS = `
 :root{
@@ -68,15 +67,26 @@ body.print-mode #pdfRoot {
 .pdf-mini-table .head th{ background:#15335e; color:#fff; }
 .pdf-mini-table .grand th{ background:#15335e; font-size:10px; font-weight:600; color:#fff; }
 .pdf-mini-table .right{ text-align:center; }
-.pdf-sign{position:absolute;bottom:5mm;right:20mm;text-align:left;font-size:12px}
-.pdf-sign-line{font-size:9px;margin:0;border-top:1px solid #000;width:150px}
+.pdf-footer{
+  position:absolute;
+  left:14mm;
+  right:14mm;
+  bottom:5mm;
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-end;
+}
+.pdf-company{ font-size:9px; line-height:1.2; max-width:40%; }
+.pdf-sign{ text-align:left; font-size:12px; }
+.pdf-sign-line{ font-size:9px; margin:0; border-top:1px solid #000; width:150px; }
+
 @page { size:A4; margin:0; }
 .pdf-amount-words{
   position: absolute;
   display: flex;
   flex-direction: column;
   left: 15mm;
-  top: 230mm;
+  top: 210mm;
   max-width: 45%;
   font-size: 12px;
   line-height: 1.25;
@@ -125,6 +135,9 @@ body.print-mode #pdfRoot {
     try { return new Intl.NumberFormat(undefined, { style: "currency", currency: c }).format(n); }
     catch { return new Intl.NumberFormat(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n) + " " + (c || ""); }
   };
+
+  const joinCSV = (arr) => arr.filter(Boolean).join(", ");
+  const labelIf = (label, v) => hasVal(v) ? `${label} ${v}` : "";
 
   let cssInjected = false;
   function injectCssOnce() {
@@ -216,7 +229,6 @@ body.print-mode #pdfRoot {
     const items = Array.isArray(state?.items) ? state.items : [];
     const ex = meta?.extras || {};
 
-    // ---- EXTRAS (not rendered as table rows) ----
     const shipEnabled = !!ex?.shipping?.enabled;
     const shipLabel   = (ex?.shipping?.label || "Frais de livraison");
     const shipHT      = Number(ex?.shipping?.amount) || 0;
@@ -230,7 +242,6 @@ body.print-mode #pdfRoot {
     const stampTVApc   = Number(ex?.stamp?.tva) || 0;
     const stampTVA     = stampHT * (stampTVApc / 100);
     const stampTTC     = stampHT + stampTVA;
-    // ---------------------------------------------
 
     const cur = meta.currency || "TND";
     const logo = assets?.logo || company.logo || "";
@@ -262,7 +273,6 @@ body.print-mode #pdfRoot {
     if (!hideTTC)       headerParts.push("Total TTC");
     const HEADERS = headerParts;
 
-    // ---- TABLE ROWS: only original items (no extras here) ----
     const rows = items.map((raw) => {
       const it = {
         ref:      raw.ref || "",
@@ -292,7 +302,6 @@ body.print-mode #pdfRoot {
       return `<tr class="pdf-row">${cells.join("")}</tr>`;
     }).join("");
 
-    // ---- ITEMS-ONLY TOTALS ----
     let subtotalItems = 0, totalDisc = 0, totalTVA_items = 0;
     items.forEach((raw) => {
       const qty = Number(raw.qty || 0);
@@ -307,22 +316,17 @@ body.print-mode #pdfRoot {
     });
     const totalHT_items = subtotalItems - totalDisc;
 
-    // ---- DISPLAY TOTALS (HT & TVA include SHIPPING) ----
     const totalHT_display  = totalHT_items  + (shipEnabled ? shipHT  : 0);
     const totalTVA_display = totalTVA_items + (shipEnabled ? shipTVA : 0);
-
-    // ---- TOTAL TTC  = (HT + TVA incl. shipping) + stamp TTC ----
     const totalTTC_all = totalHT_display + totalTVA_display + (stampEnabled ? stampTTC : 0);
 
-    // Retenue à la source
     const wh = meta?.withholding || {};
     const whEnabled = !!(wh.enabled);
-    const whBaseHT  = totalHT_items + (shipEnabled ? shipHT : 0); // business rule
+    const whBaseHT  = totalHT_items + (shipEnabled ? shipHT : 0);
     const whBaseVal = (wh.base === "ttc") ? totalTTC_all : whBaseHT;
     const whAmount  = whEnabled ? (Math.max(0, whBaseVal) * (Number(wh.rate||0)/100)) : 0;
     const netToPay  = totalTTC_all - whAmount;
 
-    // Amount in words – Net if retenue enabled, else TTC
     const wordsTarget  = whEnabled ? netToPay : totalTTC_all;
     const wordsTgtText = SHOW_WORDS ? amountInWords(wordsTarget, cur) : "";
 
@@ -346,7 +350,6 @@ body.print-mode #pdfRoot {
            </div>`
         : "";
 
-    // ---- MINI SUM (shipping line BEFORE Total HT) ----
     const miniRows = [];
     if (shipEnabled && shipHT > 0) {
       miniRows.push(`<tr><td>${esc(shipLabel)}</td><td class="right">${fmtMoney(shipTTC, cur)}</td></tr>`);
@@ -367,7 +370,6 @@ body.print-mode #pdfRoot {
       );
     }
 
-    // Optional address/contacts
     const companyAddressHTML = hasVal(company.address)
       ? `<p class="pdf-small" style="margin:0px; padding-top:2px; text-transform:capitalize"><em style="font-weight:600">Adresse&nbsp;:</em> ${esc(company.address)}</p>`
       : ``;
@@ -387,6 +389,14 @@ body.print-mode #pdfRoot {
     const clientEmailHTML = hasVal(client.email)
       ? `<p class="pdf-small" style="padding-top:2px; margin:0"><em style="font-weight:600">Email&nbsp;:</em>${esc(client.email)}</p>`
       : ``;
+
+    const companyCSV = joinCSV([
+  hasVal(company.name)    ? esc(company.name)    : "",
+  hasVal(company.vat)     ? esc(company.vat)     : "",
+  hasVal(company.address) ? esc(company.address) : "",
+  hasVal(company.phone)   ? esc(company.phone)   : "",
+  hasVal(company.email)   ? esc(company.email)   : ""
+]);
 
     return `
       <div class="pdf-page">
@@ -445,11 +455,15 @@ body.print-mode #pdfRoot {
 
         ${amountWordsBlock}
 
-        <div class="pdf-sign">
-          <p class="pdf-sign-line">Signature et cachet</p>
-          <p style="margin:0;font-size:9px">Fait le : ${esc(meta.date || "")}</p>
-          <p style="margin-top:4px;font-style:italic;font-size:12px">Merci pour votre confiance&nbsp;!</p>
-        </div>
+        <div class="pdf-footer">
+  <div class="pdf-company">${companyCSV}</div>
+  <div class="pdf-sign">
+    <p class="pdf-sign-line">Signature et cachet</p>
+    <p style="margin:0;font-size:9px">Fait le : ${esc(meta.date || "")}</p>
+    <p style="margin-top:4px;font-style:italic;font-size:12px">Merci pour votre confiance&nbsp;!</p>
+  </div>
+</div>
+
       </div>`;
   }
 

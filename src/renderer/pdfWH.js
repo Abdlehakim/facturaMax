@@ -59,42 +59,39 @@ body.printing #pdfRoot, body.print-mode #pdfRoot { display:block !important; }
     catch { return new Intl.NumberFormat(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n) + " " + (c || ""); }
   };
 
-  // === Totals including Extras (Frais de livraison & Timbre fiscal) ===
-  function totalsFromState(state) {
+  // === Totals with BUSINESS RULE parity ===
+  // HT base for WH = items HT + Shipping HT (exclude Stamp HT)
+  // TTC base for WH = items TTC + Shipping TTC + Stamp TTC
+  function totalsForWH(state) {
     const items = Array.isArray(state?.items) ? state.items : [];
-    const ex     = state?.meta?.extras || {};
+    const ex    = state?.meta?.extras || {};
 
-    const extraRows = [];
-    if (ex?.shipping?.enabled && Number(ex.shipping.amount) > 0) {
-      extraRows.push({
-        qty: 1,
-        price: Number(ex.shipping.amount) || 0,
-        tva: Number(ex.shipping.tva) || 0,
-        discount: 0
-      });
-    }
-    if (ex?.stamp?.enabled && Number(ex.stamp.amount) > 0) {
-      extraRows.push({
-        qty: 1,
-        price: Number(ex.stamp.amount) || 0,
-        tva: Number(ex.stamp.tva) || 0,
-        discount: 0
-      });
-    }
-
-    const itemsPlus = [...items, ...extraRows];
-
-    let subtotal = 0, totalTax = 0, totalDiscount = 0;
-    for (const it of itemsPlus) {
-      const base = Number(it.qty||0) * Number(it.price||0);
-      const disc = base * (Number(it.discount||0)/100);
-      const taxedBase = Math.max(0, base - disc);
-      const tax = taxedBase * (Number(it.tva||0)/100);
+    // 1) Items-only totals
+    let subtotal = 0, totalDiscount = 0, totalTax = 0;
+    for (const it of items) {
+      const base = Number(it.qty || 0) * Number(it.price || 0);
+      const disc = base * (Number(it.discount || 0) / 100);
+      const after = Math.max(0, base - disc);
+      const tax = after * (Number(it.tva || 0) / 100);
       subtotal += base; totalDiscount += disc; totalTax += tax;
     }
-    const totalHT  = subtotal - totalDiscount;
-    const totalTTC = totalHT + totalTax;
-    return { subtotal, totalDiscount, totalTax, totalHT, totalTTC };
+    const totalHT_items  = subtotal - totalDiscount;
+    const totalTTC_items = totalHT_items + totalTax;
+
+    // 2) Extras
+    const shipHT   = ex?.shipping?.enabled ? Number(ex.shipping.amount || 0) : 0;
+    const shipTVA  = shipHT * (Number(ex?.shipping?.tva || 0) / 100);
+    const shipTT   = shipHT + shipTVA;
+
+    const stampHT  = ex?.stamp?.enabled ? Number(ex.stamp.amount || 0) : 0;
+    const stampTVA = stampHT * (Number(ex?.stamp?.tva || 0) / 100);
+    const stampTT  = stampHT + stampTVA;
+
+    // 3) Totals for WH base
+    const totalHT_all  = totalHT_items + shipHT;            // stamp excluded
+    const totalTTC_all = totalTTC_items + shipTT + stampTT; // stamp included
+
+    return { totalHT_all, totalTTC_all };
   }
 
   function build(state, assets) {
@@ -105,15 +102,16 @@ body.printing #pdfRoot, body.print-mode #pdfRoot { display:block !important; }
     const logo    = assets?.logo || company.logo || "";
 
     const wh = meta.withholding || {};
-    const enabled = !!wh.enabled;
-    const rate = Number(wh.rate || 0);
-    const base = (wh.base === "ttc") ? "ttc" : "ht";
-    const label = (wh.label ?? "Retenue à la source").trim() || "Retenue à la source";
+    const enabled   = !!wh.enabled;
+    const rate      = Number(wh.rate || 0);
+    const base      = (wh.base === "ttc") ? "ttc" : "ht";
+    const threshold = Number(wh.threshold || 0);
+    const label     = (wh.label ?? "Retenue à la source").trim() || "Retenue à la source";
 
-    // compute base and amount (now includes extras if enabled on the invoice)
-    const { totalHT, totalTTC } = totalsFromState(state);
-    const baseVal  = base === "ttc" ? totalTTC : totalHT;
-    const whAmount = enabled ? Math.max(0, baseVal) * (rate/100) : 0;
+    // === Use same base rules as the app ===
+    const { totalHT_all, totalTTC_all } = totalsForWH(state);
+    const baseVal  = base === "ttc" ? totalTTC_all : totalHT_all;
+    const whAmount = (enabled && baseVal > threshold) ? Math.max(0, baseVal) * (rate / 100) : 0;
 
     const baseLabel = base === "ttc" ? "Total TTC" : "Total HT";
 
@@ -126,6 +124,10 @@ body.printing #pdfRoot, body.print-mode #pdfRoot { display:block !important; }
     const clientAddr  = hasVal(client.address)  ? `<div><b>Adresse</b> : ${esc(client.address)}</div>` : "";
     const clientPhone = hasVal(client.phone)    ? `<div><b>Téléphone</b> : ${esc(client.phone)}</div>` : "";
     const clientEmail = hasVal(client.email)    ? `<div><b>Email</b> : ${esc(client.email)}</div>` : "";
+
+    const thresholdNote = enabled
+      ? `<div>Seuil (Montant &gt;) : ${fmtMoney(threshold, cur)}${baseVal <= threshold ? " — seuil non atteint" : ""}</div>`
+      : "";
 
     return `
       <div class="wh-page">
@@ -169,6 +171,7 @@ body.printing #pdfRoot, body.print-mode #pdfRoot { display:block !important; }
               <tr>
                 <th>Libellé</th>
                 <th>Base</th>
+                <th>Seuil (Montant &gt;)</th>
                 <th>Taux</th>
                 <th>Montant retenu</th>
               </tr>
@@ -177,6 +180,7 @@ body.printing #pdfRoot, body.print-mode #pdfRoot { display:block !important; }
               <tr>
                 <td>${esc(label)}</td>
                 <td>${esc(baseLabel)} : ${fmtMoney(baseVal, cur)}</td>
+                <td>${fmtMoney(threshold, cur)}</td>
                 <td>${rate.toLocaleString(undefined, {maximumFractionDigits:2})}%</td>
                 <td>${fmtMoney(whAmount, cur)}</td>
               </tr>
@@ -200,6 +204,7 @@ body.printing #pdfRoot, body.print-mode #pdfRoot { display:block !important; }
           </div>
           <div class="notes">
             Ce certificat atteste de la retenue effectuée conformément à la réglementation en vigueur.
+            ${thresholdNote}
           </div>
         </div>
       </div>

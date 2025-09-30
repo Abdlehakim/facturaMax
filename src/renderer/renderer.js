@@ -1,4 +1,4 @@
-// renderer.js (full updated — Frais de livraison avant Total HT + inclus dans HT/TVA affichés; Timbre = TTC seulement; colonnes: checked = visible)
+// renderer.js (full updated — adds WH threshold; shipping-before-HT; stamp in TTC only; column toggles checked=visible)
 const $  = (sel) => document.querySelector(sel);
 const $$ = (sel) => Array.from(document.querySelectorAll(sel));
 const getEl = (id) => document.getElementById(id);
@@ -40,12 +40,10 @@ const state = {
     date: new Date().toISOString().slice(0,10),
     due:  new Date(Date.now()+7*86400000).toISOString().slice(0,10),
     docType: "facture",
-    // Retenue à la source
-    withholding: { enabled: false, rate: 1.5, base: "ht", label: "Retenue à la source" },
-    // Extras (shown only in mini-sum, NOT as table rows)
+    withholding: { enabled: false, rate: 1.5, base: "ht", label: "Retenue à la source", threshold: 1000 },
     extras: {
       shipping: { enabled:false, label:"Frais de livraison", amount:7, tva:19 },
-      stamp:    { enabled: false, label: "Timbre fiscal",      amount: 0.600, tva: 0 },
+      stamp:    { enabled:false,  label:"Timbre fiscal",     amount:0.600, tva:0 },
     },
   },
   notes: "",
@@ -83,15 +81,14 @@ function bind(){
   setVal("clientVat", state.client.vat);
   setVal("clientAddress", state.client.address);
 
-  // Retenue à la source
-  const wh = state.meta.withholding || { enabled:false, rate:1.5, base:"ht", label:"Retenue à la source" };
+  const wh = state.meta.withholding || { enabled:false, rate:1.5, base:"ht", label:"Retenue à la source", threshold:1000 };
   if (getEl("whEnabled")) getEl("whEnabled").checked = !!wh.enabled;
   setVal("whRate",  String(wh.rate ?? 1.5));
   setVal("whBase",  String(wh.base ?? "ht"));
   setVal("whLabel", String(wh.label ?? "Retenue à la source"));
+  setVal("whThreshold", String(wh.threshold ?? 0));
   toggleWHFields(!!wh.enabled);
 
-  // Extras (Frais de livraison / Timbre)
   const ex = state.meta.extras || {};
   const s  = ex.shipping || {};
   const t  = ex.stamp    || {};
@@ -112,7 +109,6 @@ function bind(){
   setVal("notes", state.notes);
   setText("year", new Date().getFullYear());
 
-  // Ensure column toggles are checked by default (visible)
   ["colToggleRef","colToggleProduct","colToggleDesc","colToggleQty","colTogglePrice","colToggleTva","colToggleDiscount"]
     .forEach(id => { const el = getEl(id); if (el) el.checked = true; });
 
@@ -149,11 +145,10 @@ function wireLiveBindings() {
   getEl("clientAddress")?.addEventListener("input", () => { state.client.address = getStr("clientAddress", state.client.address); });
   getEl("notes")?.addEventListener("input", () => { state.notes = getStr("notes", state.notes); });
 
-  // column toggles → hide/show columns & mini totals box (checked = visible)
   ["colToggleRef","colToggleProduct","colToggleDesc","colToggleQty","colTogglePrice","colToggleTva","colToggleDiscount"]
     .forEach(id => getEl(id)?.addEventListener("change", applyColumnHiding));
 
-  // Retenue à la source bindings
+  // Retenue à la source
   getEl("whEnabled")?.addEventListener("change", () => {
     state.meta.withholding.enabled = !!getEl("whEnabled").checked;
     toggleWHFields(state.meta.withholding.enabled);
@@ -168,12 +163,16 @@ function wireLiveBindings() {
     state.meta.withholding.base = getStr("whBase", state.meta.withholding.base);
     computeTotals(); updateWHAmountPreview();
   });
+  getEl("whThreshold")?.addEventListener("input", () => {
+    state.meta.withholding.threshold = getNum("whThreshold", state.meta.withholding.threshold ?? 0);
+    computeTotals(); updateWHAmountPreview();
+  });
   getEl("whLabel")?.addEventListener("input", () => {
     state.meta.withholding.label = getStr("whLabel", state.meta.withholding.label);
     updateWHAmountPreview();
   });
 
-  // Extras: Frais de livraison
+  // Extras
   getEl("shipEnabled")?.addEventListener("change", () => {
     state.meta.extras.shipping.enabled = !!getEl("shipEnabled").checked;
     toggleShipFields(state.meta.extras.shipping.enabled);
@@ -192,7 +191,6 @@ function wireLiveBindings() {
     computeTotals(); updateExtrasMiniRows(); updateWHAmountPreview();
   });
 
-  // Extras: Timbre fiscal
   getEl("stampEnabled")?.addEventListener("change", () => {
     state.meta.extras.stamp.enabled = !!getEl("stampEnabled").checked;
     toggleStampFields(state.meta.extras.stamp.enabled);
@@ -234,7 +232,7 @@ function toggleStampFields(enabled) {
 }
 
 function updateWHAmountPreview() {
-  const { whAmount } = computeTotalsReturn(); // uses current state
+  const { whAmount } = computeTotalsReturn();
   setVal("whAmount", formatMoney(whAmount, state.meta.currency || "TND"));
   const lbl = state.meta.withholding?.label?.trim() || "Retenue à la source";
   setText("miniWHLabel", lbl);
@@ -244,7 +242,6 @@ function updateExtrasMiniRows(){
   const ex = state.meta.extras || {};
   const cur = state.meta.currency || "TND";
 
-  // Shipping shown as TTC line (still included in HT/TVA totals below)
   const shipTT = (ex.shipping?.enabled)
     ? (Number(ex.shipping.amount||0) * (1 + Number(ex.shipping.tva||0)/100))
     : 0;
@@ -252,7 +249,6 @@ function updateExtrasMiniRows(){
   if (getEl("miniShip"))      setText("miniShip", formatMoney(shipTT, cur));
   if (getEl("miniShipRow"))   getEl("miniShipRow").style.display = ex.shipping?.enabled ? "" : "none";
 
-  // Stamp (affects TTC only)
   const stampTT = (ex.stamp?.enabled)
     ? (Number(ex.stamp.amount||0) * (1 + Number(ex.stamp.tva||0)/100))
     : 0;
@@ -280,14 +276,13 @@ function readInputs(){
   state.client.vat     = getStr("clientVat", state.client.vat);
   state.client.address = getStr("clientAddress", state.client.address);
 
-  // retenue
-  const wh = state.meta.withholding || (state.meta.withholding = { enabled:false, rate:1.5, base:"ht", label:"Retenue à la source" });
-  wh.enabled = !!getEl("whEnabled")?.checked;
-  wh.rate    = getNum("whRate", wh.rate);
-  wh.base    = getStr("whBase", wh.base);
-  wh.label   = getStr("whLabel", wh.label);
+  const wh = state.meta.withholding || (state.meta.withholding = { enabled:false, rate:1.5, base:"ht", label:"Retenue à la source", threshold:1000 });
+  wh.enabled   = !!getEl("whEnabled")?.checked;
+  wh.rate      = getNum("whRate", wh.rate);
+  wh.base      = getStr("whBase", wh.base);
+  wh.label     = getStr("whLabel", wh.label);
+  wh.threshold = getNum("whThreshold", wh.threshold ?? 0);
 
-  // extras
   const ex = state.meta.extras || (state.meta.extras = { shipping:{}, stamp:{} });
   const s = ex.shipping || (ex.shipping = {});
   const t = ex.stamp    || (ex.stamp = {});
@@ -536,14 +531,10 @@ function renderItems(){
 }
 
 // ---------- Totals (DISPLAY RULES) ----------
-// - Total HT & TVA include FRAIS DE LIVRAISON (HT & TVA) s'ils sont activés.
-// - TIMBRE FISCAL n'affecte PAS Total HT/TVA; il s'ajoute uniquement au Total TTC.
-// - Base WH "HT" = (HT des articles + HT livraison).
 function computeTotals(){
   readInputs();
   const currency = state.meta.currency || "TND";
 
-  // Items totals only
   let subtotal = 0, totalTax = 0, totalDiscount = 0;
   state.items.forEach((it)=>{
     const qty = Number(it.qty||0);
@@ -559,9 +550,7 @@ function computeTotals(){
     totalTax += tax;
   });
   const totalHT_items  = subtotal - totalDiscount;
-  const totalTTC_items = totalHT_items + totalTax;
 
-  // Extras
   const ex = state.meta.extras || {};
   const shipHT  = (ex.shipping?.enabled) ? Number(ex.shipping.amount||0) : 0;
   const shipTVA = shipHT * (Number(ex.shipping?.tva||0)/100);
@@ -571,29 +560,25 @@ function computeTotals(){
   const stampTVA= stampHT * (Number(ex.stamp?.tva||0)/100);
   const stampTT = stampHT + stampTVA;
 
-  // DISPLAY TOTALS:
-  const displayHT  = totalHT_items + shipHT;      // HT incl. shipping
-  const displayTVA = totalTax + shipTVA;          // TVA incl. shipping
-  const totalTTC_all = displayHT + displayTVA + stampTT; // TTC incl. both shipping & stamp
+  const displayHT  = totalHT_items + shipHT;
+  const displayTVA = totalTax + shipTVA;
+  const totalTTC_all = displayHT + displayTVA + stampTT;
 
-  // For WH base "ht": items HT + shipping HT (stamp excluded)
   const totalHT_all_for_WH = totalHT_items + shipHT;
 
-  // (optional) debug fields if present
+  const wh = state.meta.withholding || {};
+  const baseVal = (wh.base === "ttc") ? totalTTC_all : totalHT_all_for_WH;
+  const threshold = Number(wh.threshold || 0);
+  const whAmount = (wh.enabled && baseVal > threshold) ? (Math.max(0, baseVal) * (Number(wh.rate||0)/100)) : 0;
+  const netToPay = totalTTC_all - whAmount;
+
   setText("subtotal", formatMoney(subtotal, currency));
   setText("tax",      formatMoney(totalTax, currency));
   setText("discount", formatMoney(totalDiscount, currency));
 
-  // mini box values (order handled in HTML)
   if(getEl("miniHT"))  setText("miniHT",  formatMoney(displayHT,  currency));
   if(getEl("miniTVA")) setText("miniTVA", formatMoney(displayTVA, currency));
   if(getEl("miniTTC")) setText("miniTTC", formatMoney(totalTTC_all, currency));
-
-  // Retenue à la source
-  const wh = state.meta.withholding || {};
-  const baseVal = (wh.base === "ttc") ? totalTTC_all : totalHT_all_for_WH;
-  const whAmount = (wh.enabled ? (Math.max(0, baseVal) * (Number(wh.rate||0)/100)) : 0);
-  const netToPay = totalTTC_all - whAmount;
 
   const whRow  = getEl("miniWHRow");
   const netRow = getEl("miniNETRow");
@@ -622,7 +607,6 @@ function captureForm(){
 function computeTotalsReturn(){
   const currency = state.meta.currency || "TND";
 
-  // items
   let subtotal=0,totalTax=0,totalDiscount=0;
   state.items.forEach((it)=>{
     const base = Number(it.qty||0) * Number(it.price||0);
@@ -633,7 +617,6 @@ function computeTotalsReturn(){
   });
   const totalHT_items  = subtotal - totalDiscount;
 
-  // extras
   const ex = state.meta.extras || {};
   const shipHT  = (ex.shipping?.enabled) ? Number(ex.shipping.amount||0) : 0;
   const shipTVA = shipHT * (Number(ex.shipping?.tva||0)/100);
@@ -643,26 +626,24 @@ function computeTotalsReturn(){
   const stampTVA= stampHT * (Number(ex.stamp?.tva||0)/100);
   const stampTT = stampHT + stampTVA;
 
-  // DISPLAY totals
-  const totalHT_display  = totalHT_items + shipHT;        // HT incl. shipping
-  const totalTVA_display = totalTax + shipTVA;            // TVA incl. shipping
+  const totalHT_display  = totalHT_items + shipHT;
+  const totalTVA_display = totalTax + shipTVA;
   const totalTTC_all     = totalHT_display + totalTVA_display + stampTT;
 
-  // WH base "ht" = items HT + shipping HT
   const totalHT_all_for_WH = totalHT_items + shipHT;
 
-  // retenue
   const wh = state.meta.withholding || {};
-  const baseVal = (wh.base === "ttc") ? totalTTC_all : totalHT_all_for_WH;
-  const whAmount = (wh.enabled ? (Math.max(0, baseVal) * (Number(wh.rate||0)/100)) : 0);
+  const baseVal   = (wh.base === "ttc") ? totalTTC_all : totalHT_all_for_WH;
+  const threshold = Number(wh.threshold || 0);
+  const whAmount  = (wh.enabled && baseVal > threshold) ? (Math.max(0, baseVal) * (Number(wh.rate||0)/100)) : 0;
   const net = totalTTC_all - whAmount;
 
   return {
     currency,
     subtotal,
     discount: totalDiscount,
-    tax: totalTVA_display,          // returned tax matches what we display
-    totalHT: totalHT_display,       // HT displayed (items + shipping)
+    tax: totalTVA_display,
+    totalHT: totalHT_display,
     grand: totalTTC_all,
     totalTTC: totalTTC_all,
     whAmount, net,
@@ -675,7 +656,7 @@ function newInvoice(){
   state.meta.number = "";
   state.meta.date = new Date().toISOString().slice(0,10);
   state.meta.due  = new Date(Date.now()+7*86400000).toISOString().slice(0,10);
-  state.meta.withholding = { enabled:false, rate:1.5, base:"ht", label:"Retenue à la source" };
+  state.meta.withholding = { enabled:false, rate:1.5, base:"ht", label:"Retenue à la source", threshold:1000 };
   state.meta.extras = {
     shipping: { enabled: false, label: "Frais de livraison", amount: 7, tva: 19 },
     stamp:    { enabled:false, label:"Timbre fiscal",      amount:0.600, tva:0 }
@@ -743,14 +724,12 @@ function init(){
     computeTotals();
     const assets = window.smartwebify?.assets || {};
 
-    // 1) Export main document (Facture/Devis/BL/BC) — dialog path
     const htmlInv = window.PDFView.build(state, assets);
     const cssInv  = window.PDFView.css;
     const metaInv = { number: state.meta.number, type: state.meta.docType };
     const outInv  = await window.smartwebify?.exportPDFFromHTML?.({ html: htmlInv, css: cssInv, meta: metaInv });
-    if (!outInv) return; // user canceled the invoice save
+    if (!outInv) return;
 
-    // 2) Export separate Retenue à la source — SILENT in SAME FOLDER as invoice
     let outWH = null;
     if (state.meta?.withholding?.enabled && window.PDFWH) {
       const htmlWH = window.PDFWH.build(state, assets);
@@ -767,13 +746,12 @@ function init(){
           number: state.meta.number,
           type: "retenue",
           filename: fileName,
-          silent: true,           // no dialog
-          useSameDirAs: outInv    // save next to the invoice
+          silent: true,
+          useSameDirAs: outInv
         }
       });
     }
 
-    // 3) Prompt to open now — open BOTH if available
     const msg =
       `PDF exporté :\n${outInv}` +
       (outWH ? `\nCertificat exporté :\n${outWH}` : "") +
@@ -820,7 +798,6 @@ function setColumnVisibility(table, oneBasedIndex, visible){
   }
 }
 
-// Column visibility — checked = VISIBLE
 function applyColumnHiding(){
   const refVis      = !!getEl('colToggleRef')?.checked;
   const productVis  = !!getEl('colToggleProduct')?.checked;
@@ -838,15 +815,13 @@ function applyColumnHiding(){
   document.body.classList.toggle('hide-col-tva',      !tvaVis);
   document.body.classList.toggle('hide-col-discount', !discountVis);
 
-  // If Prix HT hidden → hide Total TTC (column 8) and mini totals box
   document.body.classList.toggle('hide-col-ttc', !priceVis);
   const itemsTable = getEl('items');
-  setColumnVisibility(itemsTable, 8, priceVis); // 8 = Total TTC
+  setColumnVisibility(itemsTable, 8, priceVis);
   const mini = document.querySelector('.mini-sum');
   if (mini) mini.style.display = priceVis ? '' : 'none';
 }
 
-// ensure initial sync on load for column toggles
 getEl('colToggleRef')?.addEventListener('change', applyColumnHiding);
 getEl('colTogglePrice')?.addEventListener('change', applyColumnHiding);
 applyColumnHiding();
