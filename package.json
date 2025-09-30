@@ -1,0 +1,47 @@
+{
+  "name": "smartwebify-invoice-maker",
+  "version": "1.0.0",
+  "description": "Smartwebify Invoice Maker (Windows) – create, save and export invoices to PDF for development, marketing, graphics and design services.",
+  "main": "main.js",
+  "author": "Smartwebify",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win nsis",        
+    "dist:nsis": "electron-builder --win nsis",
+    "dist:portable": "electron-builder --win portable",
+    "pack:dir": "electron-builder --win dir"
+  },
+  "devDependencies": {
+    "electron": "^31.2.0",
+    "electron-builder": "^24.13.3",
+    "chokidar": "^4.0.3",
+    "electronmon": "^2.0.3"
+  },
+  "build": {
+    "appId": "com.smartwebify.invoice",
+    "productName": "Smartwebify Invoice Maker",
+    "directories": { "output": "dist" },
+    "files": [
+      "main.js",
+      "preload.js",
+      "src/renderer/**",
+      "package.json"
+    ],
+    "asar": true,
+    "win": {
+      "target": ["nsis"],                           
+      "artifactName": "Smartwebify-Invoice-Maker-Setup-${version}.exe"
+    },
+    "nsis": {
+      "oneClick": false,                             
+      "allowToChangeInstallationDirectory": true,    
+      "displayLanguageSelector": true,               
+      "installerLanguages": ["en_US", "fr_FR", "ar_SA"],
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Smartwebify Invoice Maker",
+      "perMachine": false                            
+    }
+  }
+}

@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self' data:; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: file:; font-src 'self' data:;" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Smartwebify – Créateur de factures</title>
+    <link rel="stylesheet" href="./styles.css" />
+
+    <style>
+      .section-box legend .for-devis,
+      .section-box legend .for-bl,
+      .section-box legend .for-bc { display: none; }
+      #invNumberLabel .for-devis,
+      #invNumberLabel .for-bl,
+      #invNumberLabel .for-bc { display: none; }
+
+      .section-box:has(#docType option[value="devis"]:checked) legend .for-facture { display: none; }
+      .section-box:has(#docType option[value="devis"]:checked) legend .for-devis { display: inline; }
+      .section-box:has(#docType option[value="devis"]:checked) #invNumberLabel .for-facture { display: none; }
+      .section-box:has(#docType option[value="devis"]:checked) #invNumberLabel .for-devis { display: inline; }
+
+      .section-box:has(#docType option[value="bl"]:checked) legend .for-facture,
+      .section-box:has(#docType option[value="bl"]:checked) legend .for-devis { display: none; }
+      .section-box:has(#docType option[value="bl"]:checked) legend .for-bl { display: inline; }
+      .section-box:has(#docType option[value="bl"]:checked) #invNumberLabel .for-facture,
+      .section-box:has(#docType option[value="bl"]:checked) #invNumberLabel .for-devis { display: none; }
+      .section-box:has(#docType option[value="bl"]:checked) #invNumberLabel .for-bl { display: inline; }
+
+      .section-box:has(#docType option[value="bc"]:checked) legend .for-facture,
+      .section-box:has(#docType option[value="bc"]:checked) legend .for-devis,
+      .section-box:has(#docType option[value="bc"]:checked) legend .for-bl { display: none; }
+      .section-box:has(#docType option[value="bc"]:checked) legend .for-bc { display: inline; }
+      .section-box:has(#docType option[value="bc"]:checked) #invNumberLabel .for-facture,
+      .section-box:has(#docType option[value="bc"]:checked) #invNumberLabel .for-devis,
+      .section-box:has(#docType option[value="bc"]:checked) #invNumberLabel .for-bl { display: none; }
+      .section-box:has(#docType option[value="bc"]:checked) #invNumberLabel .for-bc { display: inline; }
+
+      .label-inline { display:inline-flex; align-items:center; gap:.5rem; }
+      .label-text { cursor:default; user-select:text; }
+      .col-toggle { cursor:pointer; }
+
+      .hide-col-ref      #items thead th:nth-child(1),
+      .hide-col-ref      #items tbody td:nth-child(1){ display:none; }
+      .hide-col-product  #items thead th:nth-child(2),
+      .hide-col-product  #items tbody td:nth-child(2){ display:none; }
+      .hide-col-desc     #items thead th:nth-child(3),
+      .hide-col-desc     #items tbody td:nth-child(3){ display:none; }
+      .hide-col-qty      #items thead th:nth-child(4),
+      .hide-col-qty      #items tbody td:nth-child(4){ display:none; }
+      .hide-col-price    #items thead th:nth-child(5),
+      .hide-col-price    #items tbody td:nth-child(5){ display:none; }
+      .hide-col-tva      #items thead th:nth-child(6),
+      .hide-col-tva      #items tbody td:nth-child(6){ display:none; }
+      .hide-col-discount #items thead th:nth-child(7),
+      .hide-col-discount #items tbody td:nth-child(7){ display:none; }
+    </style>
+  </head>
+
+  <body>
+    <div id="pdfRoot" aria-hidden="true" style="display:none"></div>
+
+    <div class="app">
+      <header class="header">
+        <div class="brand">
+          <div class="logo-wrap">
+            <img id="companyLogo" alt="Logo Smartwebify" />
+          </div>
+          <div><h1>Smartwebify – Créateur de factures</h1></div>
+        </div>
+        <div class="actions">
+          <button id="btnNew" class="btn">Nouveau</button>
+          <button id="btnSave" class="btn">Enregistrer</button>
+          <button id="btnOpen" class="btn">Ouvrir</button>
+          <button id="btnPDF" class="btn">Exporter PDF</button>
+        </div>
+      </header>
+
+      <main id="invoice" class="paper">
+        <section class="grid three">
+          <fieldset class="section-box">
+            <legend id="docTypeLegend">
+              <span class="legend-text for-facture">Facture :</span>
+              <span class="legend-text for-devis">Devis :</span>
+              <span class="legend-text for-bl">Bon de livraison :</span>
+              <span class="legend-text for-bc">Bon de commande :</span>
+            </legend>
+
+            <div class="grid two">
+              <label>
+                Type de document
+                <select id="docType">
+                  <option value="facture" selected>Facture</option>
+                  <option value="devis">Devis</option>
+                  <option value="bl">Bon de livraison</option>
+                  <option value="bc">Bon de commande</option>
+                </select>
+              </label>
+
+              <label>
+                <span id="invNumberLabel">
+                  <span class="for-facture">N° de facture</span>
+                  <span class="for-devis">N° de devis</span>
+                  <span class="for-bl">N° de bon de livraison</span>
+                  <span class="for-bc">N° de bon de commande</span>
+                </span>
+                <input id="invNumber" />
+              </label>
+
+              <label>
+                Devise
+                <select id="currency">
+                  <option value="TND">TND</option>
+                  <option value="EUR">EUR</option>
+                  <option value="USD">USD</option>
+                </select>
+              </label>
+
+              <label>
+                Date
+                <input id="invDate" type="date" />
+              </label>
+            </div>
+          </fieldset>
+
+          <fieldset class="section-box">
+            <legend>Informations entreprise :</legend>
+            <div class="grid two">
+              <label>Nom de l’entreprise <input id="companyName" placeholder="Smartwebify SARL" /></label>
+              <label>Identifiant fiscal / TVA <input id="companyVat" placeholder="1891628/W/A/M000" /></label>
+              <label>Téléphone <input id="companyPhone" placeholder="+216 27 673 561" /></label>
+              <label>E-mail <input id="companyEmail" placeholder="contact@smartwebify.com" /></label>
+              <label class="full">Adresse <input id="companyAddress" placeholder="Rue Mahbouba Soussia 2080 Teboulba" /></label>
+            </div>
+          </fieldset>
+
+          <fieldset class="section-box">
+            <legend>Client</legend>
+            <div class="grid two">
+              <label>Nom du client <input id="clientName" placeholder="Client ou Entreprise" /></label>
+              <label>Identifiant fiscal / TVA <input id="clientVat" placeholder="TN-XXXXXXXXX" /></label>
+              <label>Téléphone du client <input id="clientPhone" placeholder="+216 ..." /></label>
+              <label>E-mail du client <input id="clientEmail" placeholder="client@email.com" /></label>
+              <label class="full">Adresse du client <input id="clientAddress" placeholder="Rue, Ville, Pays" /></label>
+            </div>
+          </fieldset>
+        </section>
+
+        <section class="flexit">
+          <div class="table-wrap tabM">
+            <table id="items">
+              <thead>
+                <tr>
+                  <th style="width:10%">Réf.</th>
+                  <th style="width:15%">Produit(s)</th>
+                  <th style="width:20%">Description(s)</th>
+                  <th>Qté</th>
+                  <th>Prix HT</th>
+                  <th>TVA %</th>
+                  <th>Remise %</th>
+                  <th>Total TTC</th>
+                  <th style="width:15%">Action</th>
+                </tr>
+              </thead>
+              <tbody id="itemBody"></tbody>
+            </table>
+          </div>
+
+          <div class="mini-sum">
+            <table id="miniSum">
+              <tbody>
+                <tr class="head"><th>Total HT</th><th id="miniHT" class="right">0</th></tr>
+                <tr><td>TVA</td><td id="miniTVA" class="right">0</td></tr>
+                <tr class="grand"><th>Total TTC</th><th id="miniTTC" class="right">0</th></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <fieldset class="section-box">
+            <legend>Ajouter un article</legend>
+            <div class="grid">
+              <div class="grid four">
+                <div>
+                  <div class="label-inline">
+                    <label for="addRef" class="label-text">Référence</label>
+                    <input id="colToggleRef" type="checkbox" class="col-toggle" aria-label="Masquer colonne Référence">
+                   <small style="white-space:nowrap;font-size:11px;opacity:.75;">(cela supprimera ce champ)</small>
+                  </div>
+                  <input id="addRef" placeholder="ex. : SKU-12345" />
+                </div>
+
+                <div>
+                  <div class="label-inline">
+                    <label for="addProduct" class="label-text">Produit</label>
+                    <input id="colToggleProduct" type="checkbox" class="col-toggle" aria-label="Masquer colonne Produit">
+                     <small style="white-space:nowrap;font-size:11px;opacity:.75;">(cela supprimera ce champ)</small>
+                  </div>
+                  <input id="addProduct" placeholder="ex. : Ordinateur portable" />
+                </div>
+
+                <div class="full">
+                  <div class="label-inline">
+                    <label for="addDesc" class="label-text">Description</label>
+                    <input id="colToggleDesc" type="checkbox" class="col-toggle" aria-label="Masquer colonne Description">
+                     <small style="white-space:nowrap;font-size:11px;opacity:.75;">(cela supprimera ce champ)</small>
+                  </div>
+                  <input id="addDesc" placeholder="ex. : Garantie 2 ans, couleur noire…" />
+                </div>
+
+                <div>
+                  <div class="label-inline">
+                    <label for="addQty" class="label-text">Qté</label>
+                    <input id="colToggleQty" type="checkbox" class="col-toggle" aria-label="Masquer colonne Qté">
+                     <small style="white-space:nowrap;font-size:11px;opacity:.75;">(cela supprimera ce champ)</small>
+                  </div>
+                  <input id="addQty" type="number" min="0" step="1" value="1" />
+                </div>
+
+                <div>
+                  <div class="label-inline">
+                    <label for="addPrice" class="label-text">Prix&nbsp;HT</label>
+                    <input id="colTogglePrice" type="checkbox" class="col-toggle" aria-label="Masquer colonne Prix HT">
+                     <small style="white-space:nowrap;font-size:11px;opacity:.75;">(cela supprimera ce champ)</small>
+                  </div>
+                  <input id="addPrice" type="number" min="0" step="0.01" value="0" />
+                </div>
+
+                <div>
+                  <div class="label-inline">
+                    <label for="addTva" class="label-text">TVA&nbsp;%</label>
+                    <input id="colToggleTva" type="checkbox" class="col-toggle" aria-label="Masquer colonne TVA">
+                     <small style="white-space:nowrap;font-size:11px;opacity:.75;">(cela supprimera ce champ)</small>
+                  </div>
+                  <input id="addTva" type="number" min="0" step="0.01" value="19" />
+                </div>
+
+                <div>
+                  <div class="label-inline">
+                    <label for="addDiscount" class="label-text">Remise&nbsp;%</label>
+                    <input id="colToggleDiscount" type="checkbox" class="col-toggle" aria-label="Masquer colonne Remise">
+                     <small style="white-space:nowrap;font-size:11px;opacity:.75;">(cela supprimera ce champ)</small>
+                  </div>
+                  <input id="addDiscount" type="number" min="0" step="0.01" value="0" />
+                </div>
+              </div>
+
+              <div class="add-actions end">
+                <button id="btnSubmitItem" type="button" class="btn">+ Ajouter</button>
+                <button id="btnNewItem" type="button" class="btn" disabled>Nouveau</button>
+              </div>
+            </div>
+          </fieldset>
+        </section>
+
+        <section class="grid">
+          <fieldset class="section-box">
+            <legend>Notes</legend>
+            <label>
+              <textarea id="notes" class="notes" rows="4" maxlength="700" placeholder="Conditions de paiement, coordonnées bancaires, notes de projet…"></textarea>
+            </label>
+          </fieldset>
+        </section>
+      </main>
+
+      <footer class="footer muted">
+        <span>© <span id="year"></span> Smartwebify. Tous droits réservés.</span>
+        <span>Pour Windows • Hors ligne • Export PDF</span>
+      </footer>
+    </div>
+
+    <script src="./pdfView.js"></script>
+    <script src="./renderer.js"></script>
+  </body>
+</html>
