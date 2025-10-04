@@ -1,3 +1,4 @@
+// pdfView.js — Document PDF renderer (Facture / Devis / BL / BC) — no WH inside the invoice PDF
 (function (global) {
   const PDF_CSS = `
 :root{
@@ -121,8 +122,8 @@ body.print-mode #pdfRoot {
 
   const CURRENCY_WORDS = {
     TND: { major: "dinars", minor: "millimes", minorFactor: 1000 },
-    EUR: { major: "euros", minor: "centimes", minorFactor: 100 },
-    USD: { major: "dollars", minor: "cents", minorFactor: 100 },
+    EUR: { major: "euros",  minor: "centimes", minorFactor: 100  },
+    USD: { major: "dollars",minor: "cents",    minorFactor: 100  },
   };
 
   const esc = (s = "") =>
@@ -137,7 +138,6 @@ body.print-mode #pdfRoot {
   };
 
   const joinCSV = (arr) => arr.filter(Boolean).join(", ");
-  const labelIf = (label, v) => hasVal(v) ? `${label} ${v}` : "";
 
   let cssInjected = false;
   function injectCssOnce() {
@@ -149,10 +149,11 @@ body.print-mode #pdfRoot {
     cssInjected = true;
   }
 
+  // Lightweight FR numbers-to-words (fallback if n2words not present)
   function wordsFR(n) {
     if (typeof window !== "undefined" && window.n2words) return window.n2words(n, { lang: "fr" });
     const UNITS = ["zéro","un","deux","trois","quatre","cinq","six","sept","huit","neuf","dix","onze","douze","treize","quatorze","quinze","seize"];
-    const TENS = ["","dix","vingt","trente","quarante","cinquante","soixante"];
+    const TENS  = ["","dix","vingt","trente","quarante","cinquante","soixante"];
     const two = (x) => {
       if (x < 17) return UNITS[x];
       if (x < 20) return "dix-" + UNITS[x - 10];
@@ -208,6 +209,7 @@ body.print-mode #pdfRoot {
     return root;
   }
 
+  // Mirror current UI column visibility
   function hiddenColumnsFromDOM() {
     const b = document.body.classList;
     return {
@@ -222,30 +224,35 @@ body.print-mode #pdfRoot {
     };
   }
 
+  // ==========================
+  // BUILD (NO retenue in PDF)
+  // ==========================
   function build(state, assets) {
     const company = state?.company || {};
-    const client = state?.client || {};
-    const meta = state?.meta || {};
-    const items = Array.isArray(state?.items) ? state.items : [];
-    const ex = meta?.extras || {};
+    const client  = state?.client  || {};
+    const meta    = state?.meta    || {};
+    const items   = Array.isArray(state?.items) ? state.items : [];
+    const ex      = meta?.extras || {};
 
+    // ---- Extras (shipping & stamp) ----
     const shipEnabled = !!ex?.shipping?.enabled;
     const shipLabel   = (ex?.shipping?.label || "Frais de livraison");
     const shipHT      = Number(ex?.shipping?.amount) || 0;
-    const shipTVApc   = Number(ex?.shipping?.tva) || 0;
+    const shipTVApc   = Number(ex?.shipping?.tva)    || 0;
     const shipTVA     = shipHT * (shipTVApc / 100);
     const shipTTC     = shipHT + shipTVA;
 
     const stampEnabled = !!ex?.stamp?.enabled;
     const stampLabel   = (ex?.stamp?.label || "Timbre fiscal");
     const stampHT      = Number(ex?.stamp?.amount) || 0;
-    const stampTVApc   = Number(ex?.stamp?.tva) || 0;
+    const stampTVApc   = Number(ex?.stamp?.tva)    || 0;
     const stampTVA     = stampHT * (stampTVApc / 100);
     const stampTTC     = stampHT + stampTVA;
 
-    const cur = meta.currency || "TND";
-    const logo = assets?.logo || company.logo || "";
-    const type = getDocType(meta);
+    const cur   = meta.currency || "TND";
+    const logo  = assets?.logo || company.logo || "";
+    const type  = getDocType(meta);
+
     const MAP = {
       facture: { DOC_LABEL: "Facture",           NUM_LABEL: "N° de facture",          SHOW_WORDS: true  },
       devis:   { DOC_LABEL: "Devis",             NUM_LABEL: "N° de devis",            SHOW_WORDS: true  },
@@ -255,10 +262,11 @@ body.print-mode #pdfRoot {
     const { DOC_LABEL, NUM_LABEL, SHOW_WORDS } = MAP[type];
 
     const wordsHeader =
-      type === "devis" ? "Arrêté le présent devis à la somme de&nbsp;:"
-      : type === "facture" ? "Arrêté la présente facture à la somme de&nbsp;:"
-      : "";
+      type === "devis"   ? "Arrêté le présent devis à la somme de&nbsp;:"
+    : type === "facture" ? "Arrêté la présente facture à la somme de&nbsp;:"
+    : "";
 
+    // ---- Column hiding (PDF mirrors current UI toggles) ----
     const hide = hiddenColumnsFromDOM();
     const hideTTC = hide.ttc || hide.price;
 
@@ -273,6 +281,7 @@ body.print-mode #pdfRoot {
     if (!hideTTC)       headerParts.push("Total TTC");
     const HEADERS = headerParts;
 
+    // ---- Line rows ----
     const rows = items.map((raw) => {
       const it = {
         ref:      raw.ref || "",
@@ -284,9 +293,9 @@ body.print-mode #pdfRoot {
         discount: Number(raw.discount || 0),
       };
 
-      const base = it.qty * it.price;
-      const disc = base * (it.discount / 100);
-      const after = base - disc;
+      const base   = it.qty * it.price;
+      const disc   = base * (it.discount / 100);
+      const after  = base - disc;
       const tvaAmt = after * (it.tva / 100);
       const lineTT = after + tvaAmt;
 
@@ -302,80 +311,55 @@ body.print-mode #pdfRoot {
       return `<tr class="pdf-row">${cells.join("")}</tr>`;
     }).join("");
 
+    // ---- Totals (NO retenue à la source in PDF) ----
     let subtotalItems = 0, totalDisc = 0, totalTVA_items = 0;
     items.forEach((raw) => {
-      const qty = Number(raw.qty || 0);
+      const qty   = Number(raw.qty || 0);
       const price = Number(raw.price || 0);
-      const tva = Number(raw.tva || 0);
-      const discount = Number(raw.discount || 0);
-      const base = qty * price;
-      const disc = base * (discount / 100);
+      const tva   = Number(raw.tva || 0);
+      const discP = Number(raw.discount || 0);
+      const base  = qty * price;
+      const disc  = base * (discP / 100);
       const after = base - disc;
-      const tvaAmt = after * (tva / 100);
-      subtotalItems += base; totalDisc += disc; totalTVA_items += tvaAmt;
+      const tvaAmt= after * (tva / 100);
+      subtotalItems += base;
+      totalDisc     += disc;
+      totalTVA_items+= tvaAmt;
     });
-    const totalHT_items = subtotalItems - totalDisc;
 
-    const totalHT_display  = totalHT_items  + (shipEnabled ? shipHT  : 0);
-    const totalTVA_display = totalTVA_items + (shipEnabled ? shipTVA : 0);
-    const totalTTC_all = totalHT_display + totalTVA_display + (stampEnabled ? stampTTC : 0);
+    const totalHT_items   = subtotalItems - totalDisc;
+    const totalHT_display = totalHT_items + (shipEnabled ? shipHT : 0);
+    const totalTVA_disp   = totalTVA_items + (shipEnabled ? shipTVA : 0);
+    const totalTTC_all    = totalHT_display + totalTVA_disp + (stampEnabled ? stampTTC : 0);
 
-    const wh = meta?.withholding || {};
-    const whEnabled = !!(wh.enabled);
-    const whBaseHT  = totalHT_items + (shipEnabled ? shipHT : 0);
-    const whBaseVal = (wh.base === "ttc") ? totalTTC_all : whBaseHT;
-    const whAmount  = whEnabled ? (Math.max(0, whBaseVal) * (Number(wh.rate||0)/100)) : 0;
-    const netToPay  = totalTTC_all - whAmount;
+    // Amount in words always uses Total TTC (no WH / no Net)
+    const wordsTarget       = totalTTC_all;
+    const wordsTgtText      = SHOW_WORDS ? amountInWords(wordsTarget, cur) : "";
+    const wordsHeaderFinal  = wordsHeader;
 
-    const wordsTarget  = whEnabled ? netToPay : totalTTC_all;
-    const wordsTgtText = SHOW_WORDS ? amountInWords(wordsTarget, cur) : "";
-
-    const notesHTML =
-      state.notes && state.notes.trim()
-        ? `<div class="pdf-notes">
-             <div class="pdf-notes-title"><span style="font-weight:600">Notes&nbsp;:</span>${esc(state.notes).replace(/\n/g, "<br/>")}</div>
-           </div>`
-        : "";
-
-    const wordsHeaderFinal =
-      whEnabled
-        ? "Arrêté le présent montant net à payer à la somme de&nbsp;:"
-        : wordsHeader;
-
-    const amountWordsBlock =
-      (SHOW_WORDS || notesHTML)
-        ? `<div class="pdf-amount-words">
-             ${SHOW_WORDS ? `${wordsHeaderFinal}<br/><strong>${esc(wordsTgtText)}</strong>` : ""}
-             ${notesHTML}
-           </div>`
-        : "";
-
+    // ---- Mini summary table (NO WH row, NO Net à payer row) ----
     const miniRows = [];
     if (shipEnabled && shipHT > 0) {
       miniRows.push(`<tr><td>${esc(shipLabel)}</td><td class="right">${fmtMoney(shipTTC, cur)}</td></tr>`);
     }
     miniRows.push(
       `<tr class="head"><th>Total HT</th><th class="right">${fmtMoney(totalHT_display, cur)}</th></tr>`,
-      `<tr><td>TVA</td><td class="right">${fmtMoney(totalTVA_display, cur)}</td></tr>`
+      `<tr><td>TVA</td><td class="right">${fmtMoney(totalTVA_disp, cur)}</td></tr>`
     );
     if (stampEnabled && stampHT > 0) {
       miniRows.push(`<tr><td>${esc(stampLabel)}</td><td class="right">${fmtMoney(stampTTC, cur)}</td></tr>`);
     }
     miniRows.push(`<tr class="grand"><th>Total TTC</th><th class="right">${fmtMoney(totalTTC_all, cur)}</th></tr>`);
-    if (whEnabled) {
-      const lbl = hasVal(wh.label) ? wh.label : "Retenue à la source";
-      miniRows.push(
-        `<tr><td>${esc(lbl)}</td><td class="right">- ${fmtMoney(whAmount, cur)}</td></tr>`,
-        `<tr class="grand"><th>Net à payer</th><th class="right">${fmtMoney(netToPay, cur)}</th></tr>`
-      );
-    }
 
     const companyAddressHTML = hasVal(company.address)
       ? `<p class="pdf-small" style="margin:0px; padding-top:2px; text-transform:capitalize"><em style="font-weight:600">Adresse&nbsp;:</em> ${esc(company.address)}</p>`
       : ``;
 
-    const clientVatHTML   = hasVal(client.vat)
-      ? `<p class="pdf-small" style="padding-top:2px; margin:0px"><em style="font-weight:600">MF&nbsp;:</em> ${esc(client.vat)}</p>`
+    const isParticulier = (state?.clientType || state?.client?.type) === 'particulier';
+    const idLabel = isParticulier ? "CIN / Passeport" : "MF";
+
+    const clientIdHTML = hasVal(client.vat)
+      ? `<p class="pdf-small" style="padding-top:2px; margin:0px"><em style="font-weight:600">${idLabel}&nbsp;:</em> ${esc(client.vat)}</p>`
       : ``;
 
     const clientAddressHTML = hasVal(client.address)
@@ -391,12 +375,27 @@ body.print-mode #pdfRoot {
       : ``;
 
     const companyCSV = joinCSV([
-  hasVal(company.name)    ? esc(company.name)    : "",
-  hasVal(company.vat)     ? esc(company.vat)     : "",
-  hasVal(company.address) ? esc(company.address) : "",
-  hasVal(company.phone)   ? esc(company.phone)   : "",
-  hasVal(company.email)   ? esc(company.email)   : ""
-]);
+      hasVal(company.name)    ? esc(company.name)    : "",
+      hasVal(company.vat)     ? esc(company.vat)     : "",
+      hasVal(company.address) ? esc(company.address) : "",
+      hasVal(company.phone)   ? esc(company.phone)   : "",
+      hasVal(company.email)   ? esc(company.email)   : ""
+    ]);
+
+    const notesHTML =
+      state.notes && state.notes.trim()
+        ? `<div class="pdf-notes">
+             <div class="pdf-notes-title"><span style="font-weight:600">Notes&nbsp;:</span>${esc(state.notes).replace(/\n/g, "<br/>")}</div>
+           </div>`
+        : "";
+
+    const amountWordsBlock =
+      (SHOW_WORDS || notesHTML)
+        ? `<div class="pdf-amount-words">
+             ${SHOW_WORDS ? `${wordsHeaderFinal}<br/><strong>${esc(wordsTgtText)}</strong>` : ""}
+             ${notesHTML}
+           </div>`
+        : "";
 
     return `
       <div class="pdf-page">
@@ -429,7 +428,7 @@ body.print-mode #pdfRoot {
           <fieldset class="section-box">
             <legend style="margin:0;font-weight:700">Client</legend>
             <p style="margin:0;">${esc(client.name || "—")}</p>
-            ${clientVatHTML}
+            ${clientIdHTML}
             ${clientAddressHTML}
             ${clientPhoneHTML}
             ${clientEmailHTML}
@@ -456,14 +455,13 @@ body.print-mode #pdfRoot {
         ${amountWordsBlock}
 
         <div class="pdf-footer">
-  <div class="pdf-company">${companyCSV}</div>
-  <div class="pdf-sign">
-    <p class="pdf-sign-line">Signature et cachet</p>
-    <p style="margin:0;font-size:9px">Fait le : ${esc(meta.date || "")}</p>
-    <p style="margin-top:4px;font-style:italic;font-size:12px">Merci pour votre confiance&nbsp;!</p>
-  </div>
-</div>
-
+          <div class="pdf-company">${companyCSV}</div>
+          <div class="pdf-sign">
+            <p class="pdf-sign-line">Signature et cachet</p>
+            <p style="margin:0;font-size:9px">Fait le : ${esc(meta.date || "")}</p>
+            <p style="margin-top:4px;font-style:italic;font-size:12px">Merci pour votre confiance&nbsp;!</p>
+          </div>
+        </div>
       </div>`;
   }
 

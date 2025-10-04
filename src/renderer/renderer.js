@@ -1,5 +1,6 @@
-// renderer.js (full updated — adds WH threshold; shipping-before-HT; stamp in TTC only; column toggles checked=visible)
-const $  = (sel) => document.querySelector(sel);
+// renderer.js (styles moved to external CSS; no inline CSS)
+
+const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => Array.from(document.querySelectorAll(sel));
 const getEl = (id) => document.getElementById(id);
 const setVal = (id, v) => { const el = getEl(id); if (el) el.value = v; };
@@ -10,9 +11,8 @@ const getNum = (id, def = 0) => {
   return Number.isFinite(n) ? n : def;
 };
 const setText = (id, v) => { const el = getEl(id); if (el) el.textContent = v; };
-const setSrc  = (id, v) => { const el = getEl(id); if (el) el.src = v; };
+const setSrc = (id, v) => { const el = getEl(id); if (el) el.src = v; };
 
-// ---------- filename helpers ----------
 function slugForFile(s = "") {
   return String(s)
     .trim()
@@ -22,7 +22,11 @@ function slugForFile(s = "") {
     .trim();
 }
 function ensurePdfExt(name) { return name.toLowerCase().endsWith(".pdf") ? name : (name + ".pdf"); }
-// --------------------------------------
+function ensureJsonExt(name) { return name.toLowerCase().endsWith(".json") ? name : (name + ".json"); }
+function docTypeLabel(t) {
+  const map = { facture: "Facture", devis: "Devis", bl: "Bon de livraison", bc: "Bon de commande" };
+  return map[String(t || "").toLowerCase()] || "Document";
+}
 
 const state = {
   company: {
@@ -33,7 +37,7 @@ const state = {
     address: "Rue Mahbouba Soussia 2080 Teboulba",
     logo: ""
   },
-  client:  { name: "", email: "", phone: "", address: "", vat: "" },
+  client:  { type: "societe", name: "", email: "", phone: "", address: "", vat: "" },
   meta:    {
     number: "",
     currency: "TND",
@@ -43,7 +47,7 @@ const state = {
     withholding: { enabled: false, rate: 1.5, base: "ht", label: "Retenue à la source", threshold: 1000 },
     extras: {
       shipping: { enabled:false, label:"Frais de livraison", amount:7, tva:19 },
-      stamp:    { enabled:false,  label:"Timbre fiscal",     amount:0.600, tva:0 },
+      stamp:    { enabled:false,  label:"Timbre fiscal",     amount:1, tva:0 },
     },
   },
   notes: "",
@@ -64,6 +68,15 @@ function formatPct(v) { return new Intl.NumberFormat(undefined, { maximumFractio
 function saveCompanyToLocal(){ if (COMPANY_LOCKED) return; try{ localStorage.setItem("swb_company", JSON.stringify(state.company)); }catch{} }
 function loadCompanyFromLocal(){ if (COMPANY_LOCKED) return; try{ const c = JSON.parse(localStorage.getItem("swb_company")||"null"); if(c) state.company = {...state.company, ...c}; }catch{} }
 
+function updateClientIdLabel() {
+  const type = state.client?.type === "particulier" ? "particulier" : "societe";
+  const labelText = type === "particulier" ? "CIN / passeport" : "Identifiant fiscal / TVA";
+  const placeholder = type === "particulier" ? "CIN ou Passeport" : "XXXXXXXXX";
+  setText("clientIdLabel", labelText);
+  const idInput = getEl("clientVat");
+  if (idInput) idInput.placeholder = placeholder;
+}
+
 function bind(){
   [["companyName","name"],["companyVat","vat"],["companyPhone","phone"],["companyEmail","email"],["companyAddress","address"]].forEach(([id,key])=>{
     const el = getEl(id); if(!el) return;
@@ -75,11 +88,14 @@ function bind(){
   setVal("currency",  state.meta.currency);
   setVal("invDate",   state.meta.date);
   setVal("invDue",    state.meta.due);
+
+  setVal("clientType", state.client.type || "societe");
   setVal("clientName", state.client.name);
   setVal("clientEmail", state.client.email);
   setVal("clientPhone", state.client.phone);
   setVal("clientVat", state.client.vat);
   setVal("clientAddress", state.client.address);
+  updateClientIdLabel();
 
   const wh = state.meta.withholding || { enabled:false, rate:1.5, base:"ht", label:"Retenue à la source", threshold:1000 };
   if (getEl("whEnabled")) getEl("whEnabled").checked = !!wh.enabled;
@@ -100,7 +116,7 @@ function bind(){
 
   if (getEl("stampEnabled")) getEl("stampEnabled").checked = !!t.enabled;
   setVal("stampLabel",  String(t.label ?? "Timbre fiscal"));
-  setVal("stampAmount", String(t.amount ?? 0.600));
+  setVal("stampAmount", String(t.amount ?? 1));
   setVal("stampTva",    String(t.tva ?? 0));
   toggleStampFields(!!t.enabled);
 
@@ -138,6 +154,11 @@ function wireLiveBindings() {
     state.meta.currency = getStr("currency", state.meta.currency);
     renderItems(); computeTotals(); updateWHAmountPreview(); updateExtrasMiniRows();
   });
+
+  getEl("clientType")  ?.addEventListener("change", () => {
+    state.client.type = getStr("clientType", state.client.type || "societe");
+    updateClientIdLabel();
+  });
   getEl("clientName")   ?.addEventListener("input", () => { state.client.name    = getStr("clientName",    state.client.name); });
   getEl("clientEmail")  ?.addEventListener("input", () => { state.client.email   = getStr("clientEmail",   state.client.email); });
   getEl("clientPhone")  ?.addEventListener("input", () => { state.client.phone   = getStr("clientPhone",   state.client.phone); });
@@ -148,7 +169,6 @@ function wireLiveBindings() {
   ["colToggleRef","colToggleProduct","colToggleDesc","colToggleQty","colTogglePrice","colToggleTva","colToggleDiscount"]
     .forEach(id => getEl(id)?.addEventListener("change", applyColumnHiding));
 
-  // Retenue à la source
   getEl("whEnabled")?.addEventListener("change", () => {
     state.meta.withholding.enabled = !!getEl("whEnabled").checked;
     toggleWHFields(state.meta.withholding.enabled);
@@ -172,7 +192,6 @@ function wireLiveBindings() {
     updateWHAmountPreview();
   });
 
-  // Extras
   getEl("shipEnabled")?.addEventListener("change", () => {
     state.meta.extras.shipping.enabled = !!getEl("shipEnabled").checked;
     toggleShipFields(state.meta.extras.shipping.enabled);
@@ -207,6 +226,17 @@ function wireLiveBindings() {
   getEl("stampTva")?.addEventListener("input", () => {
     state.meta.extras.stamp.tva = getNum("stampTva", state.meta.extras.stamp.tva);
     computeTotals(); updateExtrasMiniRows(); updateWHAmountPreview();
+  });
+
+  const selectAllIds = [
+    "shipLabel","shipAmount","shipTva","stampLabel","stampAmount","stampTva",
+    "whRate","whThreshold","whLabel"
+  ];
+  selectAllIds.forEach(id => {
+    const el = getEl(id);
+    if (!el) return;
+    el.addEventListener("focus", () => { try { el.select(); } catch {} });
+    el.addEventListener("click", () => { try { el.select(); } catch {} });
   });
 }
 
@@ -270,6 +300,8 @@ function readInputs(){
   state.meta.currency = getStr("currency", state.meta.currency) || state.meta.currency;
   state.meta.date     = getStr("invDate", state.meta.date);
   state.meta.due      = getStr("invDue", state.meta.due) || state.meta.due;
+
+  state.client.type    = getStr("clientType", state.client.type || "societe");
   state.client.name    = getStr("clientName", state.client.name);
   state.client.email   = getStr("clientEmail", state.client.email);
   state.client.phone   = getStr("clientPhone", state.client.phone);
@@ -294,7 +326,7 @@ function readInputs(){
 
   t.enabled = !!getEl("stampEnabled")?.checked;
   t.label   = getStr("stampLabel", t.label || "Timbre fiscal");
-  t.amount  = getNum("stampAmount", t.amount ?? 0.600);
+  t.amount  = getNum("stampAmount", t.amount ?? 1);
   t.tva     = getNum("stampTva", t.tva ?? 0);
 }
 
@@ -356,6 +388,17 @@ function ensureDialog() {
   overlay.setAttribute("aria-hidden", "true");
   const panel = document.createElement("div");
   panel.className = "swbDialog__panel";
+  const header = document.createElement("div");
+  header.className = "swbDialog__header";
+  const title = document.createElement("div");
+  title.id = "swbDialogTitle";
+  title.className = "swbDialog__title";
+  const closeX = document.createElement("button");
+  closeX.type = "button";
+  closeX.className = "swbDialog__close";
+  closeX.textContent = "×";
+  header.appendChild(title);
+  header.appendChild(closeX);
   const msg = document.createElement("div");
   msg.id = "swbDialogMsg";
   msg.className = "swbDialog__msg";
@@ -367,18 +410,24 @@ function ensureDialog() {
   ok.className = "swbDialog__ok";
   ok.textContent = "OK";
   actions.appendChild(ok);
+  panel.appendChild(header);
   panel.appendChild(msg);
   panel.appendChild(actions);
   overlay.appendChild(panel);
   document.body.appendChild(overlay);
+  closeX.addEventListener("click", () => {
+    const evt = new KeyboardEvent("keydown", { key: "Escape" });
+    document.dispatchEvent(evt);
+  });
   return overlay;
 }
 
-function showDialog(message) {
+function showDialog(message, { title = "Information" } = {}) {
   return new Promise((resolve) => {
     const overlay = ensureDialog();
     const msg = getEl("swbDialogMsg");
     const ok = getEl("swbDialogOk");
+    const ttl = getEl("swbDialogTitle");
 
     const cancel = overlay.querySelector("#swbDialogCancel");
     if (cancel) cancel.style.display = "none";
@@ -386,6 +435,8 @@ function showDialog(message) {
     overlay.style.display = "flex";
     overlay.setAttribute("aria-hidden","false");
     msg.textContent = message || "";
+    ttl.textContent = title;
+
     function close() {
       overlay.style.display = "none";
       overlay.setAttribute("aria-hidden","true");
@@ -405,17 +456,18 @@ function showDialog(message) {
   });
 }
 
-function showConfirm(message, { okText = "OK", cancelText = "Annuler" } = {}) {
+function showConfirm(message, { title = "Export terminé", okText = "Ouvrir", cancelText = "Fermer" } = {}) {
   const overlay = ensureDialog();
   const msg = getEl("swbDialogMsg");
   const ok = getEl("swbDialogOk");
+  const ttl = getEl("swbDialogTitle");
 
   let cancel = overlay.querySelector("#swbDialogCancel");
   if (!cancel) {
     cancel = document.createElement("button");
     cancel.id = "swbDialogCancel";
     cancel.type = "button";
-    cancel.className = "swbDialog__Annuler";
+    cancel.className = "swbDialog__cancel";
     cancel.textContent = cancelText;
     ok.parentElement.insertBefore(cancel, ok);
   }
@@ -427,6 +479,7 @@ function showConfirm(message, { okText = "OK", cancelText = "Annuler" } = {}) {
     overlay.style.display = "flex";
     overlay.setAttribute("aria-hidden", "false");
     msg.textContent = message || "";
+    ttl.textContent = title;
 
     function close(result) {
       overlay.style.display = "none";
@@ -466,7 +519,7 @@ async function submitItemForm(){
     discount: getNum("addDiscount",0),
   };
   if (!item.product && !item.desc) {
-    await showDialog("Veuillez saisir au moins un Produit ou une Description.");
+    await showDialog("Veuillez saisir au moins un Produit ou une Description.", { title: "Article incomplet" });
     focusFirstEmptyAddField();
     return;
   }
@@ -530,7 +583,6 @@ function renderItems(){
   updateExtrasMiniRows();
 }
 
-// ---------- Totals (DISPLAY RULES) ----------
 function computeTotals(){
   readInputs();
   const currency = state.meta.currency || "TND";
@@ -599,7 +651,7 @@ function captureForm(){
     client:{...state.client},
     meta:{...state.meta},
     notes:state.notes,
-    items: state.items.map(x=>({...x})),
+    items: state.items.map(x => ({ ...x })),
     totals: computeTotalsReturn()
   };
 }
@@ -652,14 +704,14 @@ function computeTotalsReturn(){
 }
 
 function newInvoice(){
-  state.client = { name:"", email:"", phone:"", address:"", vat:"" };
+  state.client = { type:"societe", name:"", email:"", phone:"", address:"", vat:"" };
   state.meta.number = "";
   state.meta.date = new Date().toISOString().slice(0,10);
   state.meta.due  = new Date(Date.now()+7*86400000).toISOString().slice(0,10);
   state.meta.withholding = { enabled:false, rate:1.5, base:"ht", label:"Retenue à la source", threshold:1000 };
   state.meta.extras = {
     shipping: { enabled: false, label: "Frais de livraison", amount: 7, tva: 19 },
-    stamp:    { enabled:false, label:"Timbre fiscal",      amount:0.600, tva:0 }
+    stamp:    { enabled:false, label:"Timbre fiscal",      amount:1, tva:0 }
   };
   state.notes = "";
   state.items = [ { ref: "SKU-001", product: "Ordinateur portable", desc: "Garantie 2 ans", qty: 1, price: 1000, tva: 19, discount: 0 } ];
@@ -713,10 +765,19 @@ function init(){
     Object.assign(state, data);
     bind();
   });
+
   getEl("btnSave")?.addEventListener("click", async ()=>{
     const payload = captureForm();
+    const label   = docTypeLabel(payload.meta?.docType || state.meta.docType);
+    const number  = (payload.meta?.number || "").trim() || "";
+    const dateStr = (payload.meta?.date || new Date().toISOString().slice(0,10));
+    const base    = slugForFile(number ? `${label} - ${number}` : `${label} - ${dateStr}`);
+    const filename = ensureJsonExt(base);
+    payload.meta = { ...(payload.meta || {}), type: payload.meta?.docType || state.meta.docType, typeLabel: label, filename };
     const saved = await window.smartwebify?.saveInvoiceJSON?.(payload);
-    if(saved){ await showDialog(`Enregistré : ${saved}`); }
+    if (saved) {
+      await showDialog(`Enregistré : ${saved}`, { title: "Sauvegarde" });
+    }
   });
 
   getEl("btnPDF")?.addEventListener("click", async () => {
@@ -726,29 +787,30 @@ function init(){
 
     const htmlInv = window.PDFView.build(state, assets);
     const cssInv  = window.PDFView.css;
-    const metaInv = { number: state.meta.number, type: state.meta.docType };
-    const outInv  = await window.smartwebify?.exportPDFFromHTML?.({ html: htmlInv, css: cssInv, meta: metaInv });
+
+    const invNum  = slugForFile(state.meta.number || "");
+    const typeLabel = docTypeLabel(state.meta.docType);
+    const baseName  = [typeLabel, invNum].filter(Boolean).join(" ");
+    const filename  = ensurePdfExt(baseName);
+
+    const outInv  = await window.smartwebify?.exportPDFFromHTML?.({
+      html: htmlInv,
+      css:  cssInv,
+      meta: { number: state.meta.number, type: state.meta.docType, filename }
+    });
     if (!outInv) return;
 
     let outWH = null;
     if (state.meta?.withholding?.enabled && window.PDFWH) {
       const htmlWH = window.PDFWH.build(state, assets);
       const cssWH  = window.PDFWH.css;
-
-      const invNum  = slugForFile(state.meta.number || "");
-      const baseName = invNum ? `Retenue à la source - ${invNum}` : `Retenue à la source`;
-      const fileName = ensurePdfExt(baseName);
-
+      const invNumWH   = slugForFile(state.meta.number || "");
+      const baseNameWH = invNumWH ? `Retenue à la source - ${invNumWH}` : `Retenue à la source`;
+      const fileNameWH = ensurePdfExt(baseNameWH);
       outWH = await window.smartwebify?.exportPDFFromHTML?.({
         html: htmlWH,
-        css: cssWH,
-        meta: {
-          number: state.meta.number,
-          type: "retenue",
-          filename: fileName,
-          silent: true,
-          useSameDirAs: outInv
-        }
+        css:  cssWH,
+        meta: { number: state.meta.number, type: "retenue", filename: fileNameWH, silent: true, useSameDirAs: outInv }
       });
     }
 
@@ -760,10 +822,10 @@ function init(){
     const openNow = await showConfirm(msg);
     if (openNow) {
       const okInv = await openPDFFile(outInv);
-      if (!okInv) await showDialog("Le PDF de la facture a été exporté, mais l'ouverture automatique a échoué.");
+      if (!okInv) await showDialog("Le PDF de la facture a été exporté, mais l'ouverture automatique a échoué.", { title: "Information" });
       if (outWH) {
         const okWH = await openPDFFile(outWH);
-        if (!okWH) await showDialog("Le PDF de la retenue a été exporté, mais l'ouverture automatique a échoué.");
+        if (!okWH) await showDialog("Le PDF de la retenue a été exporté, mais l'ouverture automatique a échoué.", { title: "Information" });
       }
     }
   });
@@ -772,6 +834,11 @@ function init(){
   getEl("btnNewItem")?.addEventListener("click", () => { clearAddFormAndMode(); focusFirstEmptyAddField(); });
   ["addRef","addProduct","addDesc","addQty","addPrice","addTva","addDiscount"].forEach(id=>{
     getEl(id)?.addEventListener("keydown",(e)=>{ if(e.key==="Enter"){ e.preventDefault(); submitItemForm(); } });
+    const el = getEl(id);
+    if (el) {
+      el.addEventListener("focus", () => { try { el.select(); } catch {} });
+      el.addEventListener("click", () => { try { el.select(); } catch {} });
+    }
   });
 
   getEl("companyLogo")?.addEventListener("click", async () => {
@@ -798,6 +865,23 @@ function setColumnVisibility(table, oneBasedIndex, visible){
   }
 }
 
+// Helper: show/hide only the input field in "Ajouter un article"
+function setAddInputVisibility({ref, product, desc, qty, price, tva, discount}) {
+  const map = {
+    addRef:       ref,
+    addProduct:   product,
+    addDesc:      desc,
+    addQty:       qty,
+    addPrice:     price,
+    addTva:       tva,
+    addDiscount:  discount
+  };
+  Object.entries(map).forEach(([id, vis]) => {
+    const el = getEl(id);
+    if (el) el.style.display = vis ? "" : "none";
+  });
+}
+
 function applyColumnHiding(){
   const refVis      = !!getEl('colToggleRef')?.checked;
   const productVis  = !!getEl('colToggleProduct')?.checked;
@@ -807,6 +891,7 @@ function applyColumnHiding(){
   const tvaVis      = !!getEl('colToggleTva')?.checked;
   const discountVis = !!getEl('colToggleDiscount')?.checked;
 
+  // Table columns
   document.body.classList.toggle('hide-col-ref',      !refVis);
   document.body.classList.toggle('hide-col-product',  !productVis);
   document.body.classList.toggle('hide-col-desc',     !descVis);
@@ -820,6 +905,17 @@ function applyColumnHiding(){
   setColumnVisibility(itemsTable, 8, priceVis);
   const mini = document.querySelector('.mini-sum');
   if (mini) mini.style.display = priceVis ? '' : 'none';
+
+  // Add-item form: hide only the INPUT fields (keep label + toggle visible)
+  setAddInputVisibility({
+    ref: refVis,
+    product: productVis,
+    desc: descVis,
+    qty: qtyVis,
+    price: priceVis,
+    tva: tvaVis,
+    discount: discountVis
+  });
 }
 
 getEl('colToggleRef')?.addEventListener('change', applyColumnHiding);

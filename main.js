@@ -68,15 +68,24 @@ function setupDevReload() {
 
 /* ---------------------------- utils ------------------------------- */
 function sanitizeFileName(name = "") {
-  // Remove characters illegal in Windows/macOS filenames
   return String(name).replace(/[<>:"/\\|?*\u0000-\u001F]/g, "_").trim();
 }
 function withPdfExt(name = "document") {
   return name.toLowerCase().endsWith(".pdf") ? name : `${name}.pdf`;
 }
-function defaultDownloadsDir() {
-  // Where silent exports are saved
-  return app.getPath("downloads");
+function withJsonExt(name = "document") {
+  return name.toLowerCase().endsWith(".json") ? name : `${name}.json`;
+}
+function todayStr() {
+  return new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+}
+function docTypeLabelFromValue(val = "") {
+  const v = String(val || "").toLowerCase();
+  if (v === "devis") return "Devis";
+  if (v === "bl")    return "Bon de livraison";
+  if (v === "bc")    return "Bon de commande";
+  // default
+  return "Facture";
 }
 
 /** Build a minimal HTML shell for pdfView/pdfWH output */
@@ -110,7 +119,7 @@ async function renderToPdfBuffer(html, css) {
 
     const pdfBuffer = await win.webContents.printToPDF({
       printBackground: true,
-      marginsType: 1, // default margins
+      marginsType: 1,
       pageSize: "A4",
       landscape: false,
     });
@@ -136,11 +145,15 @@ app.on("window-all-closed", () => {
 
 /* ============================== IPC =============================== */
 
-/* Save invoice JSON */
+/* Save invoice JSON — filename uses selected document type + number */
 ipcMain.handle("save-invoice-json", async (_evt, payload) => {
-  const suggested = `Invoice-${sanitizeFileName(payload?.meta?.number || "NEW")}.json`;
+  const meta = payload?.meta || {};
+  const typeLabel = docTypeLabelFromValue(meta.docType);
+  const numOrDate = sanitizeFileName(meta.number || todayStr());
+  const suggested = withJsonExt(`${typeLabel} - ${numOrDate}`);
+
   const { canceled, filePath } = await dialog.showSaveDialog({
-    title: "Save Invoice (.json)",
+    title: "Enregistrer",
     defaultPath: suggested,
     filters: [{ name: "JSON", extensions: ["json"] }],
   });
@@ -152,7 +165,7 @@ ipcMain.handle("save-invoice-json", async (_evt, payload) => {
 /* Open invoice JSON */
 ipcMain.handle("open-invoice-json", async () => {
   const { canceled, filePaths } = await dialog.showOpenDialog({
-    title: "Open Invoice (.json)",
+    title: "Ouvrir",
     filters: [{ name: "JSON", extensions: ["json"] }],
     properties: ["openFile"],
   });
@@ -161,7 +174,7 @@ ipcMain.handle("open-invoice-json", async () => {
   try {
     return JSON.parse(raw);
   } catch {
-    dialog.showErrorBox("Invalid JSON", "The selected file is not a valid invoice JSON.");
+    dialog.showErrorBox("JSON invalide", "Le fichier sélectionné n’est pas un JSON de facture valide.");
     return null;
   }
 });
@@ -169,10 +182,8 @@ ipcMain.handle("open-invoice-json", async () => {
 /* Pick logo → data URL (alias two channels for safety) */
 async function pickLogoImpl() {
   const { canceled, filePaths } = await dialog.showOpenDialog({
-    title: "Choose Logo Image",
-    filters: [
-      { name: "Images", extensions: ["png", "jpg", "jpeg", "webp", "bmp", "gif", "ico"] },
-    ],
+    title: "Choisir un logo",
+    filters: [{ name: "Images", extensions: ["png", "jpg", "jpeg", "webp", "bmp", "gif", "ico"] }],
     properties: ["openFile"],
   });
   if (canceled || !filePaths?.[0]) return null;
@@ -181,21 +192,17 @@ async function pickLogoImpl() {
   const ext = path.extname(filePath).slice(1).toLowerCase();
   return { dataUrl: `data:image/${ext === "jpg" ? "jpeg" : ext};base64,${base64}` };
 }
-ipcMain.handle("pick-logo", pickLogoImpl);            // older name
-ipcMain.handle("smartwebify:pickLogo", pickLogoImpl); // name used by preload
+ipcMain.handle("pick-logo", pickLogoImpl);
+ipcMain.handle("smartwebify:pickLogo", pickLogoImpl);
 
-/* -------------------------------------------------------------------
-   LEGACY: Export PDF (always shows Save dialog) — kept for compatibility
-   Renderer (legacy) calls: window.smartwebify.exportPDFFromHTML({ html, css, meta })
-   on channel "export-pdf-from-html"
--------------------------------------------------------------------- */
+/* Legacy dialog-only PDF export */
 ipcMain.handle("export-pdf-from-html", async (_evt, payload) => {
   const { html = "", css = "", meta } = payload || {};
-  const suggested = `Invoice-${sanitizeFileName(meta?.number || "NEW")}.pdf`;
+  const defaultName = withPdfExt(`${docTypeLabelFromValue(meta?.docType)} - ${sanitizeFileName(meta?.number || todayStr())}`);
 
   const save = await dialog.showSaveDialog({
-    title: "Export PDF",
-    defaultPath: suggested,
+    title: "Exporter PDF",
+    defaultPath: defaultName,
     filters: [{ name: "PDF", extensions: ["pdf"] }],
   });
   if (save.canceled || !save.filePath) return null;
@@ -206,19 +213,12 @@ ipcMain.handle("export-pdf-from-html", async (_evt, payload) => {
     return save.filePath;
   } catch (err) {
     console.error("export-pdf-from-html error:", err);
-    dialog.showErrorBox("PDF Export Error", String(err?.message || err));
+    dialog.showErrorBox("Erreur PDF", String(err?.message || err));
     return null;
   }
 });
 
-/* -------------------------------------------------------------------
-   NEW: Export PDF with optional SILENT autosave and custom filename.
-   Renderer calls: window.smartwebify.exportPDFFromHTML({ html, css, meta })
-   where meta can include:
-     - filename: exact filename to use (e.g., "Retenue à la source - 123.pdf")
-     - silent:   true to save without a dialog
-     - number:   invoice number (used for default name when no filename)
--------------------------------------------------------------------- */
+/* New export with optional silent autosave and custom filename */
 ipcMain.handle("smartwebify:exportPDFFromHTML", async (event, payload) => {
   const { html = "", css = "", meta = {}, silent } = payload || {};
   const isSilent = meta.silent === true || silent === true;
@@ -227,29 +227,29 @@ ipcMain.handle("smartwebify:exportPDFFromHTML", async (event, payload) => {
     const pdfBuffer = await renderToPdfBuffer(html, css);
 
     if (isSilent) {
-      // Decide directory for silent save
       const saveDir =
         (meta.useSameDirAs ? path.dirname(meta.useSameDirAs) : null) ||
         meta.saveDir ||
         app.getPath("downloads");
 
-      const rawName =
-        meta.filename || `Invoice-${sanitizeFileName(meta.number || "NEW")}.pdf`;
-      const fileName = withPdfExt(sanitizeFileName(rawName));
-      const fullPath = path.join(saveDir, fileName);
+      const baseName =
+        meta.filename ||
+        `${docTypeLabelFromValue(meta.docType)} - ${sanitizeFileName(meta.number || todayStr())}.pdf`;
 
+      const fileName = withPdfExt(sanitizeFileName(baseName));
+      const fullPath = path.join(saveDir, fileName);
       fs.writeFileSync(fullPath, pdfBuffer);
       return fullPath;
     }
 
-    // Normal dialog path (for the main invoice if you want it that way)
     const defaultName =
       meta.filename ||
-      `Invoice-${sanitizeFileName(meta.number || "NEW")}.pdf`;
+      `${docTypeLabelFromValue(meta.docType)} - ${sanitizeFileName(meta.number || todayStr())}.pdf`;
+
     const { canceled, filePath } = await dialog.showSaveDialog(
       BrowserWindow.fromWebContents(event.sender),
       {
-        title: "Export PDF",
+        title: "Exporter PDF",
         defaultPath: withPdfExt(defaultName),
         filters: [{ name: "PDF", extensions: ["pdf"] }],
       }
@@ -260,22 +260,20 @@ ipcMain.handle("smartwebify:exportPDFFromHTML", async (event, payload) => {
     return filePath;
   } catch (err) {
     console.error("smartwebify:exportPDFFromHTML error:", err);
-    dialog.showErrorBox("PDF Export Error", String(err?.message || err));
+    dialog.showErrorBox("Erreur PDF", String(err?.message || err));
     return null;
   }
 });
 
-
-/* -------- Openers used by renderer openPDFFile() ------------------ */
+/* Openers used by renderer openPDFFile() */
 ipcMain.handle("smartwebify:openPath", async (_evt, absPath) => {
   try {
-    const res = await shell.openPath(absPath); // resolves to "" on success
+    const res = await shell.openPath(absPath);
     return res === "";
   } catch {
     return false;
   }
 });
-
 ipcMain.handle("smartwebify:showInFolder", async (_evt, absPath) => {
   try {
     shell.showItemInFolder(absPath);
@@ -284,7 +282,6 @@ ipcMain.handle("smartwebify:showInFolder", async (_evt, absPath) => {
     return false;
   }
 });
-
 ipcMain.handle("smartwebify:openExternal", async (_evt, url) => {
   try {
     await shell.openExternal(url);
