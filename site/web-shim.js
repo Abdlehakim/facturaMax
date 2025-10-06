@@ -1,66 +1,80 @@
-// site/web-shim.js — browser shim + auto-download of latest Windows installer
+// site/web-shim.js
+// Web demo: export PDF by opening a print-only window with your HTML+CSS.
+// Works in Chrome/Edge/Firefox/Safari without extra libraries.
 
-const GITHUB_OWNER = "Abdlehakim";           // <-- change if different
-const GITHUB_REPO  = "smartwebify-invoice-maker"; // <-- your Electron repo
-const RELEASES_URL = `https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/releases`;
-const LATEST_API   = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/releases/latest`;
-
-let latestAssetUrl = null; // filled after fetch
-
-async function fetchLatestAssetUrl() {
-  try {
-    const res = await fetch(LATEST_API);
-    if (!res.ok) throw new Error("GitHub API error");
-    const data = await res.json();
-    const asset =
-      (data.assets || []).find(a => /Smartwebify-Invoice-Maker-Setup-.*\.exe$/i.test(a.name)) ||
-      (data.assets || [])[0];
-    latestAssetUrl = asset?.browser_download_url || null;
-
-    // If you add a header download button with id="downloadBtn", wire it:
-    const btn = document.getElementById("downloadBtn");
-    const meta = document.getElementById("downloadMeta");
-    if (btn) btn.href = latestAssetUrl || RELEASES_URL;
-    if (meta && data?.tag_name) meta.textContent = `Version ${data.tag_name}`;
-  } catch {
-    latestAssetUrl = null;
-  }
+function docTypeLabel(val = "") {
+  const v = String(val || "").toLowerCase();
+  if (v === "devis") return "Devis";
+  if (v === "bl")    return "Bon de livraison";
+  if (v === "bc")    return "Bon de commande";
+  return "Facture";
 }
 
-// Provide a no-op “smartwebify” so renderer works in the browser
-window.smartwebify = window.smartwebify || {
-  assets: {},
-  exportPDFFromHTML: async () => {
-    // Instead of blocking alert, offer download
-    const go = confirm(
-      "L’export PDF est disponible dans la version bureau.\nVoulez-vous télécharger l’installeur Windows maintenant ?"
-    );
-    if (go) {
-      if (!latestAssetUrl) {
-        // best effort: open releases page
-        window.open(RELEASES_URL, "_blank");
-      } else {
-        window.location.href = latestAssetUrl;
-      }
+function sanitize(name = "") {
+  return String(name).replace(/[<>:"/\\|?*\u0000-\u001F]/g, "_").trim();
+}
+
+function buildHtmlDoc(html, css, title) {
+  return `<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>${title}</title>
+  <style>
+    /* Ensure backgrounds and colors print */
+    @media print {
+      body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     }
-    return null; // keep contract with desktop
-  },
-  openDialog: async () => {
-    alert("Ouvrir est disponible dans l’application bureau.");
-    return null;
-  },
-  saveDialog: async () => {
-    alert("Enregistrer est disponible dans l’application bureau.");
-    return null;
-  }
-};
+    ${css || ""}
+  </style>
+</head>
+<body>${html || ""}</body>
+</html>`;
+}
 
-// Basic guards
-window.require = undefined;
-window.process = undefined;
-
+// Optional: set the logo on the live page for the demo UI
 window.addEventListener("DOMContentLoaded", () => {
   const img = document.getElementById("companyLogo");
   if (img && !img.src) img.src = "./logoSW.png";
-  fetchLatestAssetUrl();
 });
+
+// --- Public API exposed by preload in desktop; we mimic it in the web demo ---
+window.smartwebify = window.smartwebify || {};
+window.smartwebify.exportPDFFromHTML = async ({ html, css, meta = {} }) => {
+  const name = `${docTypeLabel(meta.docType)} - ${sanitize(meta.number || new Date().toISOString().slice(0,10))}.pdf`;
+  const title = name.replace(/\.pdf$/i, ""); // browsers use window.title as default filename
+
+  const printHtml = buildHtmlDoc(html, css, title);
+
+  // Open a popup to render and print
+  const w = window.open("", "_blank", "noopener,noreferrer");
+  if (!w) {
+    alert("La fenêtre d'impression a été bloquée. Autorisez les pop-ups pour ce site, puis réessayez.");
+    return null;
+  }
+
+  w.document.open();
+  w.document.write(printHtml);
+  w.document.close();
+
+  // Trigger print once content is ready
+  const doPrint = () => {
+    // Give the browser a tick to layout
+    setTimeout(() => {
+      try { w.focus(); } catch {}
+      w.print();
+      // Close after a short delay (user can cancel and the window will stay)
+      setTimeout(() => { try { w.close(); } catch {} }, 1500);
+    }, 150);
+  };
+
+  if (w.document.readyState === "complete") doPrint();
+  else w.onload = doPrint;
+
+  return true; // indicates we attempted to print
+};
+
+// Compatibility no-ops for other desktop-only functions
+window.smartwebify.openDialog   = async () => null;
+window.smartwebify.saveDialog   = async () => null;
+window.smartwebify.assets       = window.smartwebify.assets || {};
