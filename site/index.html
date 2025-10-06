@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Smartwebify Invoice Maker</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <main class="wrap">
+    <h1>Smartwebify Invoice Maker</h1>
+    <p>Créez et exportez vos Factures / Devis / BL en PDF – rapide et fiable.</p>
+
+    <div id="download" class="card">
+      <button id="btn">Télécharger la dernière version (Windows)</button>
+      <small id="meta"></small>
+    </div>
+
+    <ul class="list">
+      <li>Export PDF instantané</li>
+      <li>Modèles propres, calculs automatiques</li>
+      <li>Fonctionne hors-ligne (version bureau)</li>
+    </ul>
+  </main>
+
+  <script>
+  const owner = "YOUR_GH_USER";
+  const repo  = "smartwebify-invoice-maker"; // your Electron repo
+  const latestURL = `https://api.github.com/repos/${owner}/${repo}/releases/latest`;
+
+  async function init() {
+    try {
+      const res = await fetch(latestURL);
+      const data = await res.json();
+      const asset = (data.assets||[]).find(a => /Smartwebify-Invoice-Maker-Setup-.*\.exe$/i.test(a.name)) || (data.assets||[])[0];
+      const btn = document.getElementById("btn");
+      const meta = document.getElementById("meta");
+
+      if (asset) {
+        btn.onclick = () => window.location.href = asset.browser_download_url;
+        meta.textContent = `Version ${data.tag_name} • publié le ${new Date(data.published_at).toLocaleDateString()}`;
+      } else {
+        btn.textContent = "Voir toutes les releases";
+        btn.onclick = () => window.location.href = `https://github.com/${owner}/${repo}/releases`;
+      }
+    } catch {
+      // Fallback
+      document.getElementById("btn").onclick = () => window.location.href = `https://github.com/${owner}/${repo}/releases`;
+    }
+  }
+  init();
+  </script>
+</body>
+</html>
