@@ -18,30 +18,31 @@
     "chokidar": "^4.0.3",
     "electronmon": "^2.0.3"
   },
+  {
   "build": {
     "appId": "com.smartwebify.invoice",
     "productName": "Smartwebify Invoice Maker",
     "directories": { "output": "dist" },
-    "files": [
-      "main.js",
-      "preload.js",
-      "src/renderer/**",
-      "package.json"
-    ],
+    "files": ["main.js", "preload.js", "src/renderer/**", "package.json"],
     "asar": true,
     "win": {
-      "target": ["nsis"],                           
+      "target": ["nsis"],
       "artifactName": "Smartwebify-Invoice-Maker-Setup-${version}.exe"
     },
     "nsis": {
-      "oneClick": false,                             
-      "allowToChangeInstallationDirectory": true,    
-      "displayLanguageSelector": true,               
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "displayLanguageSelector": true,
       "installerLanguages": ["en_US", "fr_FR", "ar_SA"],
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "Smartwebify Invoice Maker",
-      "perMachine": false                            
-    }
+      "perMachine": false
+    },
+    "publish": [
+      { "provider": "github", "owner": "YOUR_GH_USER", "repo": "smartwebify-invoice-maker" }
+    ]
   }
+}
+
 }
