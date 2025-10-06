@@ -1,54 +1,687 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="fr">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Smartwebify Invoice Maker</title>
-  <link rel="stylesheet" href="./styles.css" />
-</head>
-<body>
-  <main class="wrap">
-    <h1>Smartwebify Invoice Maker</h1>
-    <p>Créez et exportez vos Factures / Devis / BL en PDF – rapide et fiable.</p>
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self' data:; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: file:; font-src 'self' data:;"
+    />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Smartwebify – Créateur de factures</title>
+    <link rel="stylesheet" href="./styles.css" />
 
-    <div id="download" class="card">
-      <button id="btn">Télécharger la dernière version (Windows)</button>
-      <small id="meta"></small>
+    <style>
+      .section-box legend .for-devis,
+      .section-box legend .for-bl,
+      .section-box legend .for-bc {
+        display: none;
+      }
+      #invNumberLabel .for-devis,
+      #invNumberLabel .for-bl,
+      #invNumberLabel .for-bc {
+        display: none;
+      }
+
+      .section-box:has(#docType option[value="devis"]:checked)
+        legend
+        .for-facture {
+        display: none;
+      }
+      .section-box:has(#docType option[value="devis"]:checked)
+        legend
+        .for-devis {
+        display: inline;
+      }
+      .section-box:has(#docType option[value="devis"]:checked)
+        #invNumberLabel
+        .for-facture {
+        display: none;
+      }
+      .section-box:has(#docType option[value="devis"]:checked)
+        #invNumberLabel
+        .for-devis {
+        display: inline;
+      }
+
+      .section-box:has(#docType option[value="bl"]:checked) legend .for-facture,
+      .section-box:has(#docType option[value="bl"]:checked) legend .for-devis {
+        display: none;
+      }
+      .section-box:has(#docType option[value="bl"]:checked) legend .for-bl {
+        display: inline;
+      }
+      .section-box:has(#docType option[value="bl"]:checked)
+        #invNumberLabel
+        .for-facture,
+      .section-box:has(#docType option[value="bl"]:checked)
+        #invNumberLabel
+        .for-devis {
+        display: none;
+      }
+      .section-box:has(#docType option[value="bl"]:checked)
+        #invNumberLabel
+        .for-bl {
+        display: inline;
+      }
+
+      .section-box:has(#docType option[value="bc"]:checked) legend .for-facture,
+      .section-box:has(#docType option[value="bc"]:checked) legend .for-devis,
+      .section-box:has(#docType option[value="bc"]:checked) legend .for-bl {
+        display: none;
+      }
+      .section-box:has(#docType option[value="bc"]:checked) legend .for-bc {
+        display: inline;
+      }
+      .section-box:has(#docType option[value="bc"]:checked)
+        #invNumberLabel
+        .for-facture,
+      .section-box:has(#docType option[value="bc"]:checked)
+        #invNumberLabel
+        .for-devis,
+      .section-box:has(#docType option[value="bc"]:checked)
+        #invNumberLabel
+        .for-bl {
+        display: none;
+      }
+      .section-box:has(#docType option[value="bc"]:checked)
+        #invNumberLabel
+        .for-bc {
+        display: inline;
+      }
+
+      .label-inline {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
+      .label-text {
+        cursor: default;
+        user-select: text;
+        white-space: nowrap;
+      }
+      .col-toggle {
+        cursor: pointer;
+      }
+
+      .hide-col-ref #items thead th:nth-child(1),
+      .hide-col-ref #items tbody td:nth-child(1) {
+        display: none;
+      }
+      .hide-col-product #items thead th:nth-child(2),
+      .hide-col-product #items tbody td:nth-child(2) {
+        display: none;
+      }
+      .hide-col-desc #items thead th:nth-child(3),
+      .hide-col-desc #items tbody td:nth-child(3) {
+        display: none;
+      }
+      .hide-col-qty #items thead th:nth-child(4),
+      .hide-col-qty #items tbody td:nth-child(4) {
+        display: none;
+      }
+      .hide-col-price #items thead th:nth-child(5),
+      .hide-col-price #items tbody td:nth-child(5) {
+        display: none;
+      }
+      .hide-col-tva #items thead th:nth-child(6),
+      .hide-col-tva #items tbody td:nth-child(6) {
+        display: none;
+      }
+      .hide-col-discount #items thead th:nth-child(7),
+      .hide-col-discount #items tbody td:nth-child(7) {
+        display: none;
+      }
+
+      #extrasBox #shipFields,
+      #extrasBox #stampFields,
+      #whBox #whFields {
+        display: none;
+      }
+
+      #extrasBox #shipFields,
+      #extrasBox #stampFields {
+        grid-template-columns: 2fr 1fr 1fr;
+        gap: 12px;
+        align-items: end;
+        width: 100%;
+      }
+
+      /* Retenue: Taux | Base | Seuil | Libellé (large) | Montant */
+      #whBox #whFields {
+        margin-top: 10px;
+        grid-template-columns: 1fr 1fr 1fr 2fr 1fr;
+        gap: 12px;
+        align-items: end;
+        width: 100%;
+      }
+      #whFields label.full {
+        grid-column: auto;
+      }
+
+      #extrasBox .grid.two:has(#shipEnabled:checked) #shipFields {
+        display: grid;
+      }
+      #extrasBox .grid.two:has(#stampEnabled:checked) #stampFields {
+        display: grid;
+      }
+      #whBox:has(#whEnabled:checked) #whFields {
+        display: grid;
+      }
+
+      @media (max-width: 900px) {
+        #whBox #whFields {
+          grid-template-columns: 1fr 1fr;
+        }
+        #whFields label.full {
+          grid-column: 1 / -1;
+        }
+      }
+      @media (max-width: 720px) {
+        #extrasBox #shipFields,
+        #extrasBox #stampFields {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+
+  <body>
+    <div id="pdfRoot" aria-hidden="true" style="display: none"></div>
+
+    <div class="app">
+      <header class="header">
+        <div class="brand">
+          <div class="logo-wrap">
+            <img id="companyLogo" alt="Logo Smartwebify" />
+          </div>
+          <div><h1>Smartwebify – Créateur de factures</h1></div>
+        </div>
+        <div class="actions">
+          <button id="btnNew" class="btn">Nouveau</button>
+          <button id="btnSave" class="btn">Enregistrer</button>
+          <button id="btnOpen" class="btn">Ouvrir</button>
+          <button id="btnPDF" class="btn">Exporter PDF</button>
+        </div>
+      </header>
+
+      <main id="invoice" class="paper">
+        <section class="grid three">
+          <fieldset class="section-box">
+            <legend id="docTypeLegend">
+              <span class="legend-text for-facture">Facture :</span>
+              <span class="legend-text for-devis">Devis :</span>
+              <span class="legend-text for-bl">Bon de livraison :</span>
+              <span class="legend-text for-bc">Bon de commande :</span>
+            </legend>
+
+            <div class="grid two">
+              <label>
+                Type de document
+                <select id="docType">
+                  <option value="facture" selected>Facture</option>
+                  <option value="devis">Devis</option>
+                  <option value="bl">Bon de livraison</option>
+                  <option value="bc">Bon de commande</option>
+                </select>
+              </label>
+
+              <label>
+                <span id="invNumberLabel">
+                  <span class="for-facture">N° de facture</span>
+                  <span class="for-devis">N° de devis</span>
+                  <span class="for-bl">N° de bon de livraison</span>
+                  <span class="for-bc">N° de bon de commande</span>
+                </span>
+                <input id="invNumber" />
+              </label>
+
+              <label>
+                Devise
+                <select id="currency">
+                  <option value="TND">TND</option>
+                  <option value="EUR">EUR</option>
+                  <option value="USD">USD</option>
+                </select>
+              </label>
+
+              <label>
+                Date
+                <input id="invDate" type="date" />
+              </label>
+            </div>
+          </fieldset>
+
+          <fieldset class="section-box">
+            <legend>Informations entreprise :</legend>
+            <div class="grid two">
+              <label
+                >Nom de l’entreprise
+                <input id="companyName" placeholder="Smartwebify SARL"
+              /></label>
+              <label
+                >Identifiant fiscal / TVA
+                <input id="companyVat" placeholder="1891628/W/A/M000"
+              /></label>
+              <label
+                >Téléphone
+                <input id="companyPhone" placeholder="+216 27 673 561"
+              /></label>
+              <label
+                >E-mail
+                <input id="companyEmail" placeholder="contact@smartwebify.com"
+              /></label>
+              <label class="full"
+                >Adresse
+                <input
+                  id="companyAddress"
+                  placeholder="Rue Mahbouba Soussia 2080 Teboulba"
+              /></label>
+            </div>
+          </fieldset>
+
+          <fieldset class="section-box">
+            <legend>Client</legend>
+            <div class="grid two">
+              <label class="full" >
+                Type de client
+                <select id="clientType">
+                  <option value="societe" selected>
+                    Société / personne morale
+                  </option>
+                  <option value="particulier">Particulier</option>
+                </select>
+              </label>
+
+              <label
+                >Nom du client
+                <input id="clientName" placeholder="Client ou Entreprise"
+              /></label>
+
+              <label>
+                <span id="clientIdLabel">Identifiant fiscal / TVA</span>
+                <input id="clientVat" placeholder="XXXXXXXXX" />
+              </label>
+
+              <label
+                >Téléphone du client
+                <input id="clientPhone" placeholder="+216 ..."
+              /></label>
+              <label
+                >E-mail du client
+                <input id="clientEmail" placeholder="client@email.com"
+              /></label>
+              <label class="full"
+                >Adresse du client
+                <input id="clientAddress" placeholder="Rue, Ville, Pays"
+              /></label>
+            </div>
+          </fieldset>
+        </section>
+
+        <section class="flexit">
+          <div class="table-wrap tabM">
+            <table id="items">
+              <thead>
+                <tr>
+                  <th style="width: 10%">Réf.</th>
+                  <th style="width: 15%">Produit(s)</th>
+                  <th style="width: 20%">Description(s)</th>
+                  <th>Qté</th>
+                  <th>Prix HT</th>
+                  <th>TVA %</th>
+                  <th>Remise %</th>
+                  <th>Total TTC</th>
+                  <th style="width: 15%">Action</th>
+                </tr>
+              </thead>
+              <tbody id="itemBody"></tbody>
+            </table>
+          </div>
+
+          <div class="mini-sum">
+            <table id="miniSum">
+              <tbody>
+                <tr id="miniShipRow" style="display: none">
+                  <td id="miniShipLabel">Frais de livraison</td>
+                  <td id="miniShip" class="right">0</td>
+                </tr>
+
+                <tr class="head">
+                  <th>Total HT</th>
+                  <th id="miniHT" class="right">0</th>
+                </tr>
+                <tr>
+                  <td>TVA</td>
+                  <td id="miniTVA" class="right">0</td>
+                </tr>
+
+                <tr id="miniStampRow" style="display: none">
+                  <td id="miniStampLabel">Timbre fiscal</td>
+                  <td id="miniStamp" class="right">0</td>
+                </tr>
+
+                <tr class="grand">
+                  <th>Total TTC</th>
+                  <th id="miniTTC" class="right">0</th>
+                </tr>
+                <tr id="miniWHRow" style="display: none">
+                  <td id="miniWHLabel">Retenue à la source</td>
+                  <td id="miniWH" class="right">0</td>
+                </tr>
+                <tr id="miniNETRow" class="grand" style="display: none">
+                  <th>Net à payer</th>
+                  <th id="miniNET" class="right">0</th>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <fieldset class="section-box">
+            <legend>Ajouter un article</legend>
+            <div class="grid">
+              <div class="grid four">
+                <div>
+                  <div class="label-inline">
+                    <label for="addRef" class="label-text">Référence</label>
+                    <input
+                      id="colToggleRef"
+                      type="checkbox"
+                      class="col-toggle"
+                      aria-label="Masquer colonne Référence"
+                    />
+                  </div>
+                  <input id="addRef" placeholder="ex. : SKU-12345" />
+                </div>
+
+                <div>
+                  <div class="label-inline">
+                    <label for="addProduct" class="label-text">Produit</label>
+                    <input
+                      id="colToggleProduct"
+                      type="checkbox"
+                      class="col-toggle"
+                      aria-label="Masquer colonne Produit"
+                    />
+                  </div>
+                  <input
+                    id="addProduct"
+                    placeholder="ex. : Ordinateur portable"
+                  />
+                </div>
+
+                <div class="full">
+                  <div class="label-inline">
+                    <label for="addDesc" class="label-text">Description</label>
+                    <input
+                      id="colToggleDesc"
+                      type="checkbox"
+                      class="col-toggle"
+                      aria-label="Masquer colonne Description"
+                    />
+                  </div>
+                  <input
+                    id="addDesc"
+                    placeholder="ex. : Garantie 2 ans, couleur noire…"
+                  />
+                </div>
+
+                <div>
+                  <div class="label-inline">
+                    <label for="addQty" class="label-text">Qté</label>
+                    <input
+                      id="colToggleQty"
+                      type="checkbox"
+                      class="col-toggle"
+                      aria-label="Masquer colonne Qté"
+                    />
+                  </div>
+                  <input id="addQty" type="number" min="0" step="1" value="1" />
+                </div>
+
+                <div>
+                  <div class="label-inline">
+                    <label for="addPrice" class="label-text"
+                      >Prix&nbsp;HT</label
+                    >
+                    <input
+                      id="colTogglePrice"
+                      type="checkbox"
+                      class="col-toggle"
+                      aria-label="Masquer colonne Prix HT"
+                    />
+                  </div>
+                  <input
+                    id="addPrice"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value="0"
+                  />
+                </div>
+
+                <div>
+                  <div class="label-inline">
+                    <label for="addTva" class="label-text">TVA&nbsp;%</label>
+                    <input
+                      id="colToggleTva"
+                      type="checkbox"
+                      class="col-toggle"
+                      aria-label="Masquer colonne TVA"
+                    />
+                  </div>
+                  <input
+                    id="addTva"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value="19"
+                  />
+                </div>
+
+                <div>
+                  <div class="label-inline">
+                    <label for="addDiscount" class="label-text"
+                      >Remise&nbsp;%</label
+                    >
+                    <input
+                      id="colToggleDiscount"
+                      type="checkbox"
+                      class="col-toggle"
+                      aria-label="Masquer colonne Remise"
+                    />
+                  </div>
+                  <input
+                    id="addDiscount"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value="0"
+                  />
+                </div>
+              </div>
+
+              <div class="add-actions end">
+                <button id="btnSubmitItem" type="button" class="btn">
+                  + Ajouter
+                </button>
+                <button id="btnNewItem" type="button" class="btn" disabled>
+                  Nouveau
+                </button>
+              </div>
+            </div>
+          </fieldset>
+
+          <fieldset class="section-box" id="extrasBox">
+            <legend>Frais & options</legend>
+
+            <div class="grid two">
+              <div class="full">
+                <div class="label-inline">
+                  <span class="label-text">Activer les frais de livraison</span>
+                  <input
+                    id="shipEnabled"
+                    type="checkbox"
+                    class="col-toggle"
+                    aria-label="Activer les frais de livraison"
+                  />
+                </div>
+              </div>
+
+              <div id="shipFields" class="full">
+                <label>
+                  Libellé
+                  <input id="shipLabel" placeholder="Frais de livraison" />
+                </label>
+                <label>
+                  Montant HT
+                  <input
+                    id="shipAmount"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value="7"
+                  />
+                </label>
+                <label>
+                  TVA %
+                  <input
+                    id="shipTva"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value="19"
+                  />
+                </label>
+              </div>
+
+              <div class="full" style="margin-top: 0.5rem">
+                <div class="label-inline">
+                  <span class="label-text">Activer le timbre fiscal</span>
+                  <input
+                    id="stampEnabled"
+                    type="checkbox"
+                    class="col-toggle"
+                    aria-label="Activer le timbre fiscal"
+                  />
+                </div>
+              </div>
+
+              <div id="stampFields" class="full">
+                <label>
+                  Libellé
+                  <input id="stampLabel" placeholder="Timbre fiscal" />
+                </label>
+                <label>
+                  Montant HT
+                  <input
+                    id="stampAmount"
+                    type="number"
+                    min="0"
+                    step="0.001"
+                    value="1"
+                  />
+                </label>
+                <label>
+                  TVA %
+                  <input
+                    id="stampTva"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value="0"
+                  />
+                </label>
+              </div>
+            </div>
+          </fieldset>
+
+          <fieldset class="section-box" id="whBox">
+            <legend>Retenue à la source</legend>
+
+            <div class="full" style="margin-top: 0.5rem">
+              <div class="label-inline">
+                <span class="label-text">Activer la retenue à la source</span>
+                <input
+                  id="whEnabled"
+                  type="checkbox"
+                  class="col-toggle"
+                  aria-label="Activer la retenue à la source"
+                />
+              </div>
+            </div>
+
+            <div id="whFields">
+              <label>
+                Taux %
+                <input
+                  id="whRate"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value="1.5"
+                />
+              </label>
+
+              <label>
+                Base de calcul
+                <select id="whBase">
+                  <option value="ht" selected>Total HT</option>
+                  <option value="ttc">Total TTC</option>
+                </select>
+              </label>
+
+              <!-- NEW threshold field -->
+              <label>
+                Seuil (Montant &gt;)
+                <input
+                  id="whThreshold"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value="1000"
+                />
+              </label>
+
+              <label class="full">
+                Libellé (facultatif)
+                <input id="whLabel" placeholder="Retenue à la source" />
+              </label>
+
+              <label>
+                Montant (auto)
+                <input id="whAmount" readonly />
+              </label>
+            </div>
+          </fieldset>
+        </section>
+
+        <section class="grid">
+          <fieldset class="section-box">
+            <legend>Notes</legend>
+            <label>
+              <textarea
+                id="notes"
+                class="notes"
+                rows="4"
+                maxlength="700"
+                placeholder="Conditions de paiement, coordonnées bancaires, notes de projet…"
+              ></textarea>
+            </label>
+          </fieldset>
+        </section>
+      </main>
+
+      <footer class="footer muted">
+        <span
+          >© <span id="year"></span> Smartwebify. Tous droits réservés.</span
+        >
+        <span>Pour Windows • Hors ligne • Export PDF</span>
+      </footer>
     </div>
 
-    <ul class="list">
-      <li>Export PDF instantané</li>
-      <li>Modèles propres, calculs automatiques</li>
-      <li>Fonctionne hors-ligne (version bureau)</li>
-    </ul>
-  </main>
-
-  <script>
-  const owner = "YOUR_GH_USER";
-  const repo  = "smartwebify-invoice-maker"; // your Electron repo
-  const latestURL = `https://api.github.com/repos/${owner}/${repo}/releases/latest`;
-
-  async function init() {
-    try {
-      const res = await fetch(latestURL);
-      const data = await res.json();
-      const asset = (data.assets||[]).find(a => /Smartwebify-Invoice-Maker-Setup-.*\.exe$/i.test(a.name)) || (data.assets||[])[0];
-      const btn = document.getElementById("btn");
-      const meta = document.getElementById("meta");
-
-      if (asset) {
-        btn.onclick = () => window.location.href = asset.browser_download_url;
-        meta.textContent = `Version ${data.tag_name} • publié le ${new Date(data.published_at).toLocaleDateString()}`;
-      } else {
-        btn.textContent = "Voir toutes les releases";
-        btn.onclick = () => window.location.href = `https://github.com/${owner}/${repo}/releases`;
-      }
-    } catch {
-      // Fallback
-      document.getElementById("btn").onclick = () => window.location.href = `https://github.com/${owner}/${repo}/releases`;
-    }
-  }
-  init();
-  </script>
-</body>
+    <script src="./pdfView.js"></script>
+    <script src="./pdfWH.js"></script>
+    <script src="./renderer.js"></script>
+    <link rel="stylesheet" href="./app-custom.css" />
+  </body>
 </html>
