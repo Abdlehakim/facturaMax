@@ -2,10 +2,15 @@
 <html lang="fr">
   <head>
     <meta charset="UTF-8" />
-    <meta
-      http-equiv="Content-Security-Policy"
-      content="default-src 'self' data:; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: file:; font-src 'self' data:;"
-    />
+    <meta http-equiv="Content-Security-Policy"
+  content="
+    default-src 'self' data:;
+    script-src 'self';
+    style-src 'self' 'unsafe-inline';
+    img-src 'self' data: file:;
+    font-src 'self' data:;
+    connect-src 'self' https://api.github.com;
+  ">
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Smartwebify – Créateur de factures</title>
     <link rel="stylesheet" href="./styles.css" />
