@@ -125,8 +125,8 @@ body.printing #pdfRoot, body.print-mode #pdfRoot { display:block !important; }
 
 /* Bottom */
 .cert{ margin-top:10mm; font-size:12px; text-align:left; line-height:1.35; }
-.place-date{ margin-top:6mm; text-align:center; font-size:12.5px; font-weight:600; }
-.signature{ margin-top:6mm; text-align:center; font-size:12px; }
+.place-date{ margin-top:20mm; text-align:center; font-size:12.5px; font-weight:600; }
+.signature{text-align:center; font-size:12px; }
 `;
 
   // ---------- helpers ----------
@@ -361,7 +361,7 @@ body.printing #pdfRoot, body.print-mode #pdfRoot { display:block !important; }
               <div class="row">
                 <span class="lab">Nom, prénom ou raison sociale</span>
                 <span class="dots"></span>
-                <span style="font-weight:600;">${esc(client.name || "")}</span>
+                <span style="font-weight:600; text-transform:capitalize;">${esc(client.name || "")}</span>
               </div>
               <div class="row">
                 <span class="lab">Adresse professionnelle</span>
@@ -385,7 +385,6 @@ body.printing #pdfRoot, body.print-mode #pdfRoot { display:block !important; }
         <div class="place-date">
           A ${esc(placeGuess)}, le <span>${esc(date)}</span>
         </div>
-
         <div class="signature">
           cachet et signature du payeur
         </div>

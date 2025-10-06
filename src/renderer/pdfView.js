@@ -427,7 +427,7 @@ body.print-mode #pdfRoot {
 
           <fieldset class="section-box">
             <legend style="margin:0;font-weight:700">Client</legend>
-            <p style="margin:0;">${esc(client.name || "—")}</p>
+            <p style="margin:0;font-weight:600; text-transform:capitalize; font-size:12px;">${esc(client.name || "—")}</p>
             ${clientIdHTML}
             ${clientAddressHTML}
             ${clientPhoneHTML}
