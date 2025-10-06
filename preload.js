@@ -11,11 +11,11 @@ function fileToDataURL(absPath) {
     const buf = fs.readFileSync(absPath); // works inside asar too
     const ext = path.extname(absPath).slice(1).toLowerCase();
     const mime =
-      ext === "png"  ? "image/png"  :
-      ext === "jpg"  || ext === "jpeg" ? "image/jpeg" :
-      ext === "webp" ? "image/webp" :
-      ext === "gif"  ? "image/gif"  :
-      ext === "bmp"  ? "image/bmp"  :
+      ext === "png"   ? "image/png"  :
+      ext === "jpg"   || ext === "jpeg" ? "image/jpeg" :
+      ext === "webp"  ? "image/webp" :
+      ext === "gif"   ? "image/gif"  :
+      ext === "bmp"   ? "image/bmp"  :
       "application/octet-stream";
     return `data:${mime};base64,${buf.toString("base64")}`;
   } catch {
@@ -28,7 +28,7 @@ function resolveLogoPath() {
   const candidates = [
     // dev layout (preload.js at project root)
     path.join(__dirname, "src", "renderer", "assets", "logoSW.png"),
-    // if you ever copy assets next to preload.js
+    // if assets are copied next to preload.js in packaging
     path.join(__dirname, "assets", "logoSW.png"),
     // resources path (packaged apps)
     path.join(process.resourcesPath || "", "src", "renderer", "assets", "logoSW.png"),
@@ -38,19 +38,26 @@ function resolveLogoPath() {
 }
 
 const logoPath = resolveLogoPath();
-const logoDataURL = logoPath ? fileToDataURL(logoPath) : null;
+const logoDataURL = logoPath ? fileToDataURL(logoPath) : "";
 
 /* -------------------- expose safe API -------------------- */
 contextBridge.exposeInMainWorld("smartwebify", {
-  // invoice JSON
+  // Invoice JSON
   saveInvoiceJSON: (data) => ipcRenderer.invoke("save-invoice-json", data),
   openInvoiceJSON: () => ipcRenderer.invoke("open-invoice-json"),
 
-  // ✅ SILENT-capable PDF export (honors meta.silent, meta.filename, meta.useSameDirAs)
+  // PDF export (general)
   exportPDFFromHTML: (payload) =>
     ipcRenderer.invoke("smartwebify:exportPDFFromHTML", payload),
 
-  // (Optional) Legacy dialog-only export, if you still need it somewhere:
+  // Convenience: always save to Desktop (silent)
+  exportPDFToDesktop: ({ html, css, meta = {} }) =>
+    ipcRenderer.invoke("smartwebify:exportPDFFromHTML", {
+      html, css,
+      meta: { ...meta, to: "desktop", silent: true }
+    }),
+
+  // (Optional) Legacy dialog-only export
   exportPDFFromHTMLWithDialog: (payload) =>
     ipcRenderer.invoke("export-pdf-from-html", payload),
 
@@ -62,13 +69,21 @@ contextBridge.exposeInMainWorld("smartwebify", {
   showInFolder: (absPath) => ipcRenderer.invoke("smartwebify:showInFolder", absPath),
   openExternal: (url) => ipcRenderer.invoke("smartwebify:openExternal", url),
 
-  // print-mode signals
-  onEnterPrintMode: (cb) => ipcRenderer.on("enter-print-mode", () => cb && cb()),
-  onExitPrintMode:  (cb) => ipcRenderer.on("exit-print-mode",  () => cb && cb()),
+  // Print-mode signals (return unsubscribe for cleanup)
+  onEnterPrintMode: (cb) => {
+    const listener = () => cb && cb();
+    ipcRenderer.on("enter-print-mode", listener);
+    return () => ipcRenderer.removeListener("enter-print-mode", listener);
+  },
+  onExitPrintMode: (cb) => {
+    const listener = () => cb && cb();
+    ipcRenderer.on("exit-print-mode", listener);
+    return () => ipcRenderer.removeListener("exit-print-mode", listener);
+  },
 
-  // assets available to the renderer / pdfView
+  // Assets available to the renderer / pdfView
   assets: {
     // IMPORTANT: data URL so it renders in data: HTML & printToPDF
-    logo: logoDataURL || "", // empty string if not found
+    logo: logoDataURL, // empty string if not found
   },
 });
