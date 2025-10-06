@@ -39,9 +39,7 @@
       "shortcutName": "Smartwebify Invoice Maker",
       "perMachine": false
     },
-    "publish": [
-      { "provider": "github", "owner": "YOUR_GH_USER", "repo": "smartwebify-invoice-maker" }
-    ]
+    "publish": [{ "provider": "github", "owner": "YOUR_USER", "repo": "smartwebify-invoice-maker" }]
   }
 }
 

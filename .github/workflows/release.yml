@@ -1,0 +1,27 @@
+name: Build & Publish (Windows)
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write   # allows creating releases & uploading assets
+
+jobs:
+  win:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - run: npm ci
+
+      # electron-builder will publish to GitHub Releases using the built-in token
+      - name: Build & publish to GitHub Releases
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # no PAT needed
+        run: npm run dist:nsis -- --publish always
