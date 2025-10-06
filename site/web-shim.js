@@ -1,19 +1,12 @@
 // site/web-shim.js
-// Web demo: export PDF by opening a print-only window with your HTML+CSS.
-// Works in Chrome/Edge/Firefox/Safari without extra libraries.
-
-function docTypeLabel(val = "") {
-  const v = String(val || "").toLowerCase();
+function docTypeLabel(v = "") {
+  v = String(v).toLowerCase();
   if (v === "devis") return "Devis";
-  if (v === "bl")    return "Bon de livraison";
-  if (v === "bc")    return "Bon de commande";
+  if (v === "bl") return "Bon de livraison";
+  if (v === "bc") return "Bon de commande";
   return "Facture";
 }
-
-function sanitize(name = "") {
-  return String(name).replace(/[<>:"/\\|?*\u0000-\u001F]/g, "_").trim();
-}
-
+function sanitize(s = "") { return String(s).replace(/[<>:"/\\|?*\u0000-\u001F]/g, "_").trim(); }
 function buildHtmlDoc(html, css, title) {
   return `<!doctype html>
 <html>
@@ -21,10 +14,7 @@ function buildHtmlDoc(html, css, title) {
   <meta charset="utf-8">
   <title>${title}</title>
   <style>
-    /* Ensure backgrounds and colors print */
-    @media print {
-      body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    }
+    @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
     ${css || ""}
   </style>
 </head>
@@ -32,49 +22,52 @@ function buildHtmlDoc(html, css, title) {
 </html>`;
 }
 
-// Optional: set the logo on the live page for the demo UI
+// ensure logo in the web demo
 window.addEventListener("DOMContentLoaded", () => {
   const img = document.getElementById("companyLogo");
   if (img && !img.src) img.src = "./logoSW.png";
 });
 
-// --- Public API exposed by preload in desktop; we mimic it in the web demo ---
+// Export without popups: render into a hidden iframe, then window.print()
 window.smartwebify = window.smartwebify || {};
 window.smartwebify.exportPDFFromHTML = async ({ html, css, meta = {} }) => {
-  const name = `${docTypeLabel(meta.docType)} - ${sanitize(meta.number || new Date().toISOString().slice(0,10))}.pdf`;
-  const title = name.replace(/\.pdf$/i, ""); // browsers use window.title as default filename
+  const name = `${docTypeLabel(meta.docType)} - ${sanitize(meta.number || new Date().toISOString().slice(0,10))}`;
+  const printHtml = buildHtmlDoc(html, css, name);
 
-  const printHtml = buildHtmlDoc(html, css, title);
+  const blob = new Blob([printHtml], { type: "text/html" });
+  const url = URL.createObjectURL(blob);
 
-  // Open a popup to render and print
-  const w = window.open("", "_blank", "noopener,noreferrer");
-  if (!w) {
-    alert("La fenêtre d'impression a été bloquée. Autorisez les pop-ups pour ce site, puis réessayez.");
-    return null;
-  }
+  const iframe = document.createElement("iframe");
+  iframe.style.position = "fixed";
+  iframe.style.right = "0";
+  iframe.style.bottom = "0";
+  iframe.style.width = "0";
+  iframe.style.height = "0";
+  iframe.style.border = "0";
+  document.body.appendChild(iframe);
 
-  w.document.open();
-  w.document.write(printHtml);
-  w.document.close();
-
-  // Trigger print once content is ready
-  const doPrint = () => {
-    // Give the browser a tick to layout
+  iframe.onload = () => {
+    // Small delay to ensure layout/fonts are ready
     setTimeout(() => {
-      try { w.focus(); } catch {}
-      w.print();
-      // Close after a short delay (user can cancel and the window will stay)
-      setTimeout(() => { try { w.close(); } catch {} }, 1500);
-    }, 150);
+      try {
+        iframe.contentWindow.document.title = name; // becomes default filename in some browsers
+        iframe.contentWindow.focus();
+        iframe.contentWindow.print();
+      } finally {
+        // cleanup after print dialog opens
+        setTimeout(() => {
+          URL.revokeObjectURL(url);
+          iframe.remove();
+        }, 1500);
+      }
+    }, 100);
   };
 
-  if (w.document.readyState === "complete") doPrint();
-  else w.onload = doPrint;
-
-  return true; // indicates we attempted to print
+  iframe.src = url;
+  return true;
 };
 
-// Compatibility no-ops for other desktop-only functions
-window.smartwebify.openDialog   = async () => null;
-window.smartwebify.saveDialog   = async () => null;
-window.smartwebify.assets       = window.smartwebify.assets || {};
+// No-ops for desktop-only helpers
+window.smartwebify.openDialog = async () => null;
+window.smartwebify.saveDialog = async () => null;
+window.smartwebify.assets = window.smartwebify.assets || {};
