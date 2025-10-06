@@ -170,21 +170,32 @@ app.on("window-all-closed", () => {
 /* ============================== IPC =============================== */
 
 /* Save invoice JSON — filename uses selected document type + number */
-ipcMain.handle("save-invoice-json", async (_evt, payload) => {
+// main.js (handler)
+ipcMain.handle("save-invoice-json", async (_evt, payload = {}) => {
   const meta = payload?.meta || {};
   const typeLabel = docTypeLabelFromValue(meta.docType);
   const numOrDate = sanitizeFileName(meta.number || todayStr());
-  const suggested = withJsonExt(`${typeLabel} - ${numOrDate}`);
+  const baseName  = withJsonExt(`${typeLabel} - ${numOrDate}`);
+
+  if (meta?.silent === true || meta?.to === "desktop" || meta?.saveDir) {
+    const dir = meta?.to === "desktop"
+      ? app.getPath("desktop")
+      : meta?.saveDir || resolveSaveDir({ to: "desktop" });
+    const target = ensureUniquePath(path.join(dir, baseName));
+    fs.writeFileSync(target, JSON.stringify(payload, null, 2), "utf-8");
+    return target; // returns absolute path on desktop
+  }
 
   const { canceled, filePath } = await dialog.showSaveDialog({
     title: "Enregistrer",
-    defaultPath: path.join(app.getPath("desktop"), suggested), // default to Desktop
+    defaultPath: path.join(app.getPath("desktop"), baseName),
     filters: [{ name: "JSON", extensions: ["json"] }],
   });
   if (canceled || !filePath) return null;
   fs.writeFileSync(filePath, JSON.stringify(payload, null, 2), "utf-8");
   return filePath;
 });
+
 
 /* Open invoice JSON */
 ipcMain.handle("open-invoice-json", async () => {

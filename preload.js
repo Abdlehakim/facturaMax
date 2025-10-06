@@ -26,64 +26,81 @@ function fileToDataURL(absPath) {
 /** Resolve the logo path in both dev and packaged builds. */
 function resolveLogoPath() {
   const candidates = [
-    // dev layout (preload.js at project root)
+    // dev layout (this file at project root)
     path.join(__dirname, "src", "renderer", "assets", "logoSW.png"),
-    // if assets are copied next to preload.js in packaging
+    // if you copy assets next to preload.js during packaging
     path.join(__dirname, "assets", "logoSW.png"),
-    // resources path (packaged apps)
+    // resources folder (packaged app)
     path.join(process.resourcesPath || "", "src", "renderer", "assets", "logoSW.png"),
     path.join(process.resourcesPath || "", "assets", "logoSW.png"),
   ];
   return candidates.find(p => p && fs.existsSync(p)) || null;
 }
 
-const logoPath = resolveLogoPath();
+const logoPath    = resolveLogoPath();
 const logoDataURL = logoPath ? fileToDataURL(logoPath) : "";
 
 /* -------------------- expose safe API -------------------- */
 contextBridge.exposeInMainWorld("smartwebify", {
-  // Invoice JSON
+  /* ---------- Invoice JSON ---------- */
+
+  // Dialog save (defaults to Desktop in main.js)
   saveInvoiceJSON: (data) => ipcRenderer.invoke("save-invoice-json", data),
+
+  // Silent save directly to Desktop (unique filename)
+  saveInvoiceJSONToDesktop: (data) =>
+    ipcRenderer.invoke("save-invoice-json", {
+      ...data,
+      meta: { ...(data?.meta || {}), to: "desktop", silent: true },
+    }),
+
+  // Open JSON (dialog)
   openInvoiceJSON: () => ipcRenderer.invoke("open-invoice-json"),
 
-  // PDF export (general)
+  /* ---------- PDF export ---------- */
+
+  // General export honoring meta.silent / meta.filename / meta.to / meta.saveDir
   exportPDFFromHTML: (payload) =>
     ipcRenderer.invoke("smartwebify:exportPDFFromHTML", payload),
 
-  // Convenience: always save to Desktop (silent)
+  // Convenience: always save to Desktop (silent, no dialog)
   exportPDFToDesktop: ({ html, css, meta = {} }) =>
     ipcRenderer.invoke("smartwebify:exportPDFFromHTML", {
       html, css,
-      meta: { ...meta, to: "desktop", silent: true }
+      meta: { ...meta, to: "desktop", silent: true },
     }),
 
-  // (Optional) Legacy dialog-only export
+  // Optional legacy dialog-only export
   exportPDFFromHTMLWithDialog: (payload) =>
     ipcRenderer.invoke("export-pdf-from-html", payload),
 
-  // File pickers
+  /* ---------- File pickers ---------- */
+
   pickLogo: () => ipcRenderer.invoke("smartwebify:pickLogo"),
 
-  // Openers for exported files/URLs
-  openPath: (absPath) => ipcRenderer.invoke("smartwebify:openPath", absPath),
-  showInFolder: (absPath) => ipcRenderer.invoke("smartwebify:showInFolder", absPath),
-  openExternal: (url) => ipcRenderer.invoke("smartwebify:openExternal", url),
+  /* ---------- Openers / Shell ---------- */
 
-  // Print-mode signals (return unsubscribe for cleanup)
+  openPath:      (absPath) => ipcRenderer.invoke("smartwebify:openPath", absPath),
+  showInFolder:  (absPath) => ipcRenderer.invoke("smartwebify:showInFolder", absPath),
+  openExternal:  (url)     => ipcRenderer.invoke("smartwebify:openExternal", url),
+
+  /* ---------- Print-mode signals (unsubscribe-friendly) ---------- */
+
   onEnterPrintMode: (cb) => {
-    const listener = () => cb && cb();
-    ipcRenderer.on("enter-print-mode", listener);
-    return () => ipcRenderer.removeListener("enter-print-mode", listener);
+    const fn = () => cb && cb();
+    ipcRenderer.on("enter-print-mode", fn);
+    return () => ipcRenderer.removeListener("enter-print-mode", fn);
   },
   onExitPrintMode: (cb) => {
-    const listener = () => cb && cb();
-    ipcRenderer.on("exit-print-mode", listener);
-    return () => ipcRenderer.removeListener("exit-print-mode", listener);
+    const fn = () => cb && cb();
+    ipcRenderer.on("exit-print-mode", fn);
+    return () => ipcRenderer.removeListener("exit-print-mode", fn);
   },
 
-  // Assets available to the renderer / pdfView
+  /* ---------- Assets available to renderer/pdf ---------- */
+
   assets: {
-    // IMPORTANT: data URL so it renders in data: HTML & printToPDF
-    logo: logoDataURL, // empty string if not found
+    // data URL so it works in data: HTML & printToPDF
+    logo: logoDataURL,
   },
 });
