@@ -7,39 +7,60 @@
   "license": "MIT",
   "scripts": {
     "start": "electron .",
-    "dist": "electron-builder --win nsis",        
+    "dist": "electron-builder --win nsis",
     "dist:nsis": "electron-builder --win nsis",
     "dist:portable": "electron-builder --win portable",
     "pack:dir": "electron-builder --win dir"
   },
   "devDependencies": {
+    "chokidar": "^4.0.3",
     "electron": "^31.2.0",
     "electron-builder": "^24.13.3",
-    "chokidar": "^4.0.3",
     "electronmon": "^2.0.3"
   },
-  
   "build": {
     "appId": "com.smartwebify.invoice",
     "productName": "Smartwebify Invoice Maker",
-    "directories": { "output": "dist" },
-    "files": ["main.js", "preload.js", "src/renderer/**", "package.json"],
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "src/renderer/**",
+      "package.json"
+    ],
     "asar": true,
     "win": {
-      "target": ["nsis"],
+      "target": [
+        "nsis"
+      ],
       "artifactName": "Smartwebify-Invoice-Maker-Setup-${version}.exe"
     },
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "displayLanguageSelector": true,
-      "installerLanguages": ["en_US", "fr_FR", "ar_SA"],
+      "installerLanguages": [
+        "en_US",
+        "fr_FR",
+        "ar_SA"
+      ],
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "Smartwebify Invoice Maker",
       "perMachine": false
     },
-    "publish": [{ "provider": "github", "owner": "YOUR_USER", "repo": "smartwebify-invoice-maker" }]
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "YOUR_USER",
+        "repo": "smartwebify-invoice-maker"
+      }
+    ]
+  },
+  "dependencies": {
+    "html2canvas": "^1.4.1",
+    "jspdf": "^3.0.3"
   }
 }
-
