@@ -207,9 +207,9 @@ td .del:hover{
 .hide-col-price    #items thead th:nth-child(5),
 .hide-col-price    #items tbody td:nth-child(5){ display:none; white-space: nowrap; }
 .hide-col-tva      #items thead th:nth-child(6),
-.hide-col-tva      #items tbody td:nth-child(6){ display:none;white-space: nowrap; }
+.hide-col-tva      #items tbody td:nth-child(6){ display:none;white-space: nowrap;min-width: 84px; }
 .hide-col-discount #items thead th:nth-child(7),
-.hide-col-discount #items tbody td:nth-child(7){ display:none;white-space: nowrap; }
+.hide-col-discount #items tbody td:nth-child(7){ display:none;white-space: nowrap;min-width: 84px; }
 /* TTC col toggle handled in JS for nth-child(8) */
 
 /* =========================
