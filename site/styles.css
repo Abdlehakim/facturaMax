@@ -549,14 +549,18 @@ td .del:hover {
   color: #0b1220;
 }
 
-.swbDialog__msg {
+.swbDialog__msg{
   padding: 14px;
   font-size: 13px;
-  line-height: 1.4;
+  line-height: 1.5;
   color: #1f2937;
-  white-space: pre-wrap;
-  word-break: break-word;
-  white-space: nowrap;
+
+  /* wrap naturally only when reaching container width */
+  white-space: pre-wrap;          /* <- no forced line breaks */
+   word-break: break-word;           /* break at spaces */
+  overflow-wrap: anywhere;      /* but if a single token is too long, break it */
+  max-height: 40vh;
+  overflow: auto;
 }
 
 /* Actions: left & right groups */

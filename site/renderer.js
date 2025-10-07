@@ -557,7 +557,9 @@ function init(){
     }
     const invLabel = resInv?.name || fileName;
     const whLabel  = resWH ? (resWH?.name || "Retenue à la source.pdf") : null;
-    const msg = `PDF exporté :\n${invLabel}` + (whLabel ? `\nCertificat exporté :\n${whLabel}` : "");
+    const msg =
+  "PDF exporté : " + invLabel +
+  (whLabel ? "\nCertificat exporté : " + whLabel : "");
     const openViaAnchor = (url) => { if (!url) return; const a = document.createElement("a"); a.href = url; a.target = "_blank"; a.rel = "noopener"; document.body.appendChild(a); a.click(); a.remove(); };
 
 await showConfirm(msg, {

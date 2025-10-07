@@ -6,6 +6,8 @@
   "author": "Smartwebify",
   "license": "MIT",
   "scripts": {
+    "dev:site": "http-server ./site -p 8080 -c-1",
+    "dev:renderer": "http-server ./src/renderer -p 8081 -c-1",
     "start": "electron .",
     "dist": "electron-builder --win nsis",
     "dist:nsis": "electron-builder --win nsis",
@@ -16,7 +18,8 @@
     "chokidar": "^4.0.3",
     "electron": "^31.2.0",
     "electron-builder": "^24.13.3",
-    "electronmon": "^2.0.3"
+    "electronmon": "^2.0.3",
+    "http-server": "^14.1.1"
   },
   "build": {
     "appId": "com.smartwebify.invoice",

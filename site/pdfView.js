@@ -113,32 +113,39 @@ body.print-mode #pdfRoot {
   line-height: 1.25;
   font-weight: 500;
 }
-
 .section-box{
   position: relative;
-  border: none;                 /* we’ll draw it ourselves */
-  border-radius: 5px;
-  padding: 14px 16px 16px;
+  border: none;              /* we’ll draw our own border */
+  border-radius: 6px;
+  padding: 16px;             /* leave space inside */
   background: #fff;
 }
+
+/* draw the full border behind everything (including the legend) */
 .section-box::before{
   content: "";
   position: absolute;
-  inset: 0;                     /* top/right/bottom/left: 0 */
-  border: 1px solid #15335e;    /* your color */
-  border-radius: 5px;
-  pointer-events: none;         /* purely decorative */
+  inset: 0;
+  border: 1.5px solid #15335e;
+  border-radius: 6px;
+  z-index: 0;                /* behind text */
+  pointer-events: none;
 }
 
-/* LEGEND: color + let the border cross behind it */
+/* put the legend text ON the border line */
 .section-box > legend{
+  position: absolute;
+  top: 0;                    /* align to top edge */
+  left: 14px;
+  transform: translateY(-50%); /* sits centered on the border line */
   margin: 0;
+  padding: 0 6px;            /* small side padding only */
   font-weight: 700;
-  color: #15335e;               /* requested color */
-  padding: 0 8px;
-  background: transparent;      /* allow the border to be visible across it */
-  letter-spacing: 0.02em;
+  color: #15335e;            /* your blue */
+  background: transparent;   /* let the border cross the letters */
+  z-index: 1;                /* above the border */
 }
+
 
 .pdf-notes{
   margin-top:10px;
@@ -151,6 +158,10 @@ body.print-mode #pdfRoot {
 .pdf-notes-title{
   font-weight: 400;
   letter-spacing: .02em;
+}
+  .pdf-table thead th:nth-child(6),
+.pdf-table thead th:nth-child(7){
+  white-space: nowrap;
 }
 `;
 
