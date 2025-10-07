@@ -114,30 +114,48 @@ body.print-mode #pdfRoot {
   font-weight: 500;
 }
 
+/* Fieldset with continuous top line and rounded corners */
 .section-box{
   position: relative;
-  border: none;                 /* we’ll draw it ourselves */
-  border-radius: 5px;
+  border: none;                 /* we'll draw the border ourselves */
+  border-radius: 8px;
   padding: 14px 16px 16px;
   background: #fff;
+  overflow: hidden;             /* clip the long legend line inside the rounded box */
 }
+
+/* Draw the full border behind, so corners look clean */
 .section-box::before{
   content: "";
   position: absolute;
-  inset: 0;                     /* top/right/bottom/left: 0 */
-  border: 1px solid #15335e;    /* your color */
-  border-radius: 5px;
-  pointer-events: none;         /* purely decorative */
+  inset: 0;
+  border: 1px solid #15335e;
+  border-radius: 8px;
+  pointer-events: none;
 }
 
-/* LEGEND: color + let the border cross behind it */
+/* Legend styled like the screenshot */
 .section-box > legend{
+  position: relative;
   margin: 0;
   font-weight: 700;
-  color: #15335e;               /* requested color */
-  padding: 0 8px;
-  background: transparent;      /* allow the border to be visible across it */
+  color: #15335e;
   letter-spacing: 0.02em;
+  padding: 0 10px;              /* space around the text */
+  background: #fff;             /* mask the border under the text, like your sample */
+  line-height: 1.2;
+}
+
+/* Thin line that continues to the right of the legend text */
+.section-box > legend::after{
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 100%;
+  transform: translateY(-50%);
+  height: 1px;
+  width: 2000px;                /* very long; clipped by overflow on the fieldset */
+  background: #15335e;
 }
 
 .pdf-notes{
@@ -450,7 +468,7 @@ body.print-mode #pdfRoot {
           </div>
 
           <fieldset class="section-box">
-            <legend style="margin:0;font-weight:700">Client</legend>
+             <legend>Client</legend>
             <p style="margin:0;font-weight:600; text-transform:capitalize; font-size:12px;">${esc(client.name || "—")}</p>
             ${clientIdHTML}
             ${clientAddressHTML}
