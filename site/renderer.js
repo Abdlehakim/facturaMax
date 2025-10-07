@@ -889,21 +889,12 @@ getEl("btnPDF")?.addEventListener("click", async () => {
     `\n\nVoulez-vous l'ouvrir maintenant ?`;
 
   // 4) Only open when user clicks "Ouvrir"
-  await showConfirm(msg, {
-    okText: "Ouvrir",
-    cancelText: "Fermer",
-    onOk: () => {
-      const openUrlInNewTab = (url) => {
-        if (!url) return false;
-        const w = window.open("about:blank", "_blank", "noopener"); // created inside this click
-        if (!w) return false;
-        w.location.href = url; // navigate immediately
-        return true;
-      };
-      openUrlInNewTab(resInv?.url);
-      if (resWH?.url) openUrlInNewTab(resWH.url);
-    }
-  });
+await showConfirm(msg, {
+  okText: "Ouvrir",
+  cancelText: "Fermer",
+  // Let showConfirm handle multi-tab opening via <a target="_blank"> clicks
+  openUrls: [resInv?.url, resWH?.url].filter(Boolean)
+});
 });
 
 
