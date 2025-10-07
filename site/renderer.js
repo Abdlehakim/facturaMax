@@ -265,33 +265,97 @@ function showDialog(message, { title = "Information" } = {}) {
   });
 }
 
-function showConfirm(message, { title = "Export terminé", okText = "Ouvrir", cancelText = "Fermer", onOk, openUrls, extra } = {}) {
+function showConfirm(
+  message,
+  {
+    title = "Export terminé",
+    okText = "Ouvrir",
+    cancelText = "Fermer",
+    onOk,
+    openUrls,
+    extra,            // { text, onClick }
+    okKeepsOpen = false
+  } = {}
+) {
   const overlay = ensureDialog();
   const msg = getEl("swbDialogMsg");
   const ok = getEl("swbDialogOk");
   const ttl = getEl("swbDialogTitle");
+
   let cancel = overlay.querySelector("#swbDialogCancel");
-  if (!cancel) { cancel = document.createElement("button"); cancel.id = "swbDialogCancel"; cancel.type = "button"; cancel.className = "swbDialog__cancel"; ok.parentElement.insertBefore(cancel, ok); }
+  if (!cancel) {
+    cancel = document.createElement("button");
+    cancel.id = "swbDialogCancel";
+    cancel.type = "button";
+    cancel.className = "swbDialog__cancel";
+    ok.parentElement.insertBefore(cancel, ok);
+  }
+
   let extraBtn = overlay.querySelector("#swbDialogExtra");
-  if (!extraBtn) { extraBtn = document.createElement("button"); extraBtn.id = "swbDialogExtra"; extraBtn.type = "button"; extraBtn.className = "swbDialog__extra"; ok.parentElement.insertBefore(extraBtn, ok); }
+  if (!extraBtn) {
+    extraBtn = document.createElement("button");
+    extraBtn.id = "swbDialogExtra";
+    extraBtn.type = "button";
+    ok.parentElement.insertBefore(extraBtn, ok);
+  }
+
+  // make BOTH primary actions look the same
+  extraBtn.className = ok.className;   // same classes as OK
   extraBtn.style.display = extra ? "" : "none";
+
   ok.textContent = okText;
   cancel.textContent = cancelText;
   cancel.style.display = "";
+
   const previouslyFocused = document.activeElement;
-  function openUrlInNewTab(url) { if (!url) return false; try { const w = window.open(url, "_blank", "noopener,noreferrer"); return !!w; } catch { return false; } }
+
+  function openUrlInNewTab(url) {
+    if (!url) return false;
+    try { return !!window.open(url, "_blank", "noopener,noreferrer"); }
+    catch { return false; }
+  }
   const urls = Array.isArray(openUrls) ? openUrls.filter(Boolean) : (openUrls ? [openUrls] : []);
+
   return new Promise((resolve) => {
     msg.textContent = message || "";
     ttl.textContent = title;
-    function close(result) { ok.removeEventListener("click", onOkClick); cancel.removeEventListener("click", onCancel); overlay.removeEventListener("click", onBackdrop); document.removeEventListener("keydown", onKey); extraBtn.removeEventListener("click", onExtraClick); closeOverlayA11y(overlay, previouslyFocused, [ok, cancel, extraBtn]); recoverFocus(); resolve(result); }
-    function runOpeners() { try { onOk && onOk(); } catch {} for (const u of urls) { openUrlInNewTab(u); } }
-    function onOkClick() { runOpeners(); close(true); }
+
+    function close(result) {
+      ok.removeEventListener("click", onOkClick);
+      cancel.removeEventListener("click", onCancel);
+      overlay.removeEventListener("click", onBackdrop);
+      document.removeEventListener("keydown", onKey);
+      extraBtn.removeEventListener("click", onExtraClick);
+      closeOverlayA11y(overlay, previouslyFocused, [ok, cancel, extraBtn]);
+      recoverFocus();
+      resolve(result);
+    }
+
+    function runOpeners() {
+      try { onOk && onOk(); } catch {}
+      for (const u of urls) openUrlInNewTab(u);
+    }
+
+    function onOkClick() {
+      runOpeners();
+      if (!okKeepsOpen) close(true);   // <-- keep dialog if requested
+    }
     function onCancel()  { close(false); }
     function onBackdrop(e) { if (e.target === overlay) close(false); }
-    function onKey(e) { if (e.key === "Enter") { runOpeners(); close(true); } else if (e.key === "Escape") close(false); }
-    function onExtraClick() { try { extra?.onClick && extra.onClick(); } catch {} }
-    if (extra && extra.text) { extraBtn.textContent = extra.text; extraBtn.addEventListener("click", onExtraClick); }
+    function onKey(e) {
+      if (e.key === "Enter") { onOkClick(); }
+      else if (e.key === "Escape") close(false);
+    }
+
+    function onExtraClick() {
+      try { extra?.onClick && extra.onClick(); } catch {}
+    }
+
+    if (extra && extra.text) {
+      extraBtn.textContent = extra.text;
+      extraBtn.addEventListener("click", onExtraClick);
+    }
+
     openOverlayA11y(overlay, ok);
     ok.addEventListener("click", onOkClick);
     cancel.addEventListener("click", onCancel);
@@ -299,6 +363,7 @@ function showConfirm(message, { title = "Export terminé", okText = "Ouvrir", ca
     document.addEventListener("keydown", onKey);
   });
 }
+
 
 async function submitItemForm(){
   recoverFocus();
