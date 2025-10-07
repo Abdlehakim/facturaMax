@@ -113,19 +113,32 @@ body.print-mode #pdfRoot {
   font-weight: 500;
 }
 
-.section-box {
-  border: 1px solid #15335e;
+.section-box{
+  position: relative;
+  border: none;                 /* we’ll draw it ourselves */
   border-radius: 5px;
   padding: 14px 16px 16px;
-  background: #ffff;
+  background: #fff;
 }
-.section-box > legend {
+.section-box::before{
+  content: "";
+  position: absolute;
+  inset: 0;                     /* top/right/bottom/left: 0 */
+  border: 1px solid #15335e;    /* your color */
+  border-radius: 5px;
+  pointer-events: none;         /* purely decorative */
+}
+
+/* LEGEND: color + let the border cross behind it */
+.section-box > legend{
+  margin: 0;
   font-weight: 700;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
+  color: #15335e;               /* requested color */
   padding: 0 8px;
-  margin-left: 8px;
+  background: transparent;      /* allow the border to be visible across it */
+  letter-spacing: 0.02em;
 }
+  
 .pdf-notes{
   margin-top:10px;
   font-size:10px;
