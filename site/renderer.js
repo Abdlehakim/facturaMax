@@ -892,7 +892,7 @@ getEl("btnPDF")?.addEventListener("click", async () => {
 await showConfirm(msg, {
   okText: "Ouvrir",
   cancelText: "Fermer",
-  // Let showConfirm handle multi-tab opening via <a target="_blank"> clicks
+  // open BOTH tabs only when the user clicks "Ouvrir"
   openUrls: [resInv?.url, resWH?.url].filter(Boolean)
 });
 });
