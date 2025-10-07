@@ -46,7 +46,7 @@ textarea{ resize: vertical; }
   display:flex; justify-content:space-between; align-items:center;
   gap:16px; margin-bottom:16px;
 }
-.brand{ display:flex; gap:12px; align-items:center; }
+.brand{ display:flex; justify-content: center; gap:12px; align-items:center; }
 .logo-wrap{ display:flex; align-items:center; gap:8px; }
 .logo-wrap img{
   width:164px; height:44px; border-radius:5px;
