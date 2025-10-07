@@ -904,42 +904,48 @@ getEl("btnPDF")?.addEventListener("click", async () => {
 await showConfirm(msg, {
   okText: "Ouvrir",
   cancelText: "Fermer",
-onOk: () => {
-  const invUrl  = resInv?.url || null;
-  const certUrl = resWH?.url  || null;
-  const delayMs = 800; // 0.8s is safe; tweak if you like
+  extra: resWH?.url ? {
+    text: "Ouvrir le certificat",
+    onClick: () => { try { window.open(resWH.url, "_blank", "noopener"); } catch {} }
+  } : undefined,
+  onOk: () => {
+    const invUrl  = resInv?.url || null;
+    const certUrl = resWH?.url  || null;
+    const delayMs = 800;
 
-  // 1) open the invoice now (this is inside the user's click)
-  if (invUrl) {
-    try { window.open(invUrl, "_blank", "noopener"); } catch {}
-  }
+    // Helper to open via anchor (friendlier to popup blockers)
+    const openViaAnchor = (url) => {
+      if (!url) return;
+      const a = document.createElement("a");
+      a.href = url;
+      a.target = "_blank";
+      a.rel = "noopener";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    };
 
-  // 2) pre-open a tab for the certificate in the SAME click
-  if (certUrl) {
-    let certTab = null;
-    try {
-      certTab = window.open("", "_blank", "noopener");  // no 'noreferrer'
+    // 1) Open the invoice now (primary guarantee)
+    if (invUrl) openViaAnchor(invUrl);
+
+    // 2) Pre-open a blank tab for the certificate, then navigate it
+    if (certUrl) {
+      let certTab = null;
+      try { certTab = window.open("", "_blank", "noopener"); } catch {}
       if (certTab) {
-        // Keep it alive so the browser doesn't discard it
         try {
           certTab.document.write("<!doctype html><title>Certificat…</title><p style='font:14px sans-serif;margin:2rem'>Chargement du certificat…</p>");
           certTab.document.close();
         } catch {}
-        // Navigate after a small delay
         setTimeout(() => {
           try { if (!certTab.closed) certTab.location.replace(certUrl); } catch {}
         }, delayMs);
       } else {
-        // Fallback: attempt to open the certificate directly while we're still in the click
-        try { window.open(certUrl, "_blank", "noopener"); } catch {}
+        // Fallback attempt still inside the same click
+        openViaAnchor(certUrl);
       }
-    } catch {
-      // Final fallback (won't work if popups are blocked)
-      try { window.open(certUrl, "_blank", "noopener"); } catch {}
     }
   }
-}
-
 });
 
 
