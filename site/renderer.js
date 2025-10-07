@@ -495,105 +495,34 @@ function showDialog(message, { title = "Information" } = {}) {
 }
 
 // --- showConfirm (confirm-style) ---
-function showConfirm(
-  message,
-  {
-    title = "Export terminé",
-    okText = "Ouvrir",
-    cancelText = "Fermer",
-    onOk,
-    openUrls,
-    // EXTRA BUTTON support
-    extra // { text: string, onClick: fn } optional
-  } = {}
-) {
-  const overlay = ensureDialog();
-  const msg = getEl("swbDialogMsg");
-  const ok = getEl("swbDialogOk");
-  const ttl = getEl("swbDialogTitle");
+await showConfirm(msg, {
+  okText: "Ouvrir",
+  cancelText: "Fermer",
+  onOk: () => {
+    const invUrl = resInv?.url || null;
+    const certUrl = resWH?.url || null;
+    const delayMs = 600; // small delay before showing the certificate
 
-  let cancel = overlay.querySelector("#swbDialogCancel");
-  if (!cancel) {
-    cancel = document.createElement("button");
-    cancel.id = "swbDialogCancel";
-    cancel.type = "button";
-    cancel.className = "swbDialog__cancel";
-    ok.parentElement.insertBefore(cancel, ok);
+    // 1) open the invoice now (this is the user's click)
+    if (invUrl) {
+      try { window.open(invUrl, "_blank", "noopener,noreferrer"); } catch {}
+    }
+
+    // 2) pre-open a blank tab *during the same click* so popup blockers allow it,
+    //    then navigate it to the certificate after a short delay.
+    if (certUrl) {
+      let certTab = null;
+      try { certTab = window.open("about:blank", "_blank", "noopener,noreferrer"); } catch {}
+
+      // Navigate after a small delay
+      setTimeout(() => {
+        try {
+          if (certTab && !certTab.closed) certTab.location.href = certUrl;
+        } catch {}
+      }, delayMs);
+    }
   }
-
-  // EXTRA BUTTON (ghost/secondary)
-  let extraBtn = overlay.querySelector("#swbDialogExtra");
-  if (!extraBtn) {
-    extraBtn = document.createElement("button");
-    extraBtn.id = "swbDialogExtra";
-    extraBtn.type = "button";
-    extraBtn.className = "swbDialog__extra";
-    ok.parentElement.insertBefore(extraBtn, ok); // place to the left of OK
-  }
-  extraBtn.style.display = extra ? "" : "none";
-
-  ok.textContent = okText;
-  cancel.textContent = cancelText;
-  cancel.style.display = "";
-
-  const previouslyFocused = document.activeElement;
-
-  function openUrlInNewTab(url) {
-    if (!url) return false;
-    try {
-      const w = window.open(url, "_blank", "noopener,noreferrer");
-      return !!w;
-    } catch { return false; }
-  }
-
-  const urls = Array.isArray(openUrls) ? openUrls.filter(Boolean) : (openUrls ? [openUrls] : []);
-
-  return new Promise((resolve) => {
-    msg.textContent = message || "";
-    ttl.textContent = title;
-
-    function close(result) {
-      ok.removeEventListener("click", onOkClick);
-      cancel.removeEventListener("click", onCancel);
-      overlay.removeEventListener("click", onBackdrop);
-      document.removeEventListener("keydown", onKey);
-      extraBtn.removeEventListener("click", onExtraClick);
-      closeOverlayA11y(overlay, previouslyFocused, [ok, cancel, extraBtn]);
-      recoverFocus();
-      resolve(result);
-    }
-
-    function runOpeners() {
-      try { onOk && onOk(); } catch {}
-      for (const u of urls) { openUrlInNewTab(u); } // opens (likely only first)
-    }
-
-    function onOkClick() { runOpeners(); close(true); }
-    function onCancel()  { close(false); }
-    function onBackdrop(e) { if (e.target === overlay) close(false); }
-    function onKey(e) {
-      if (e.key === "Enter") { runOpeners(); close(true); }
-      else if (e.key === "Escape") close(false);
-    }
-
-    // EXTRA BUTTON handler (dedicated user gesture)
-    function onExtraClick() {
-      try { extra?.onClick && extra.onClick(); } catch {}
-    }
-
-    // Bind extra button if provided
-    if (extra && extra.text) {
-      extraBtn.textContent = extra.text;
-      extraBtn.addEventListener("click", onExtraClick);
-    }
-
-    openOverlayA11y(overlay, ok);
-    ok.addEventListener("click", onOkClick);
-    cancel.addEventListener("click", onCancel);
-    overlay.addEventListener("click", onBackdrop);
-    document.addEventListener("keydown", onKey);
-  });
-}
+});
 
 
 
