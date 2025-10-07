@@ -460,10 +460,14 @@ function showDialog(message, { title = "Information" } = {}) {
   });
 }
 
-// replace your showConfirm with this version
 function showConfirm(
   message,
-  { title = "Export terminé", okText = "Ouvrir", cancelText = "Fermer", onOpen } = {}
+  {
+    title = "Export terminé",
+    okText = "Ouvrir",
+    cancelText = "Fermer",
+    onOk // <-- NEW: function to run synchronously in the click handler
+  } = {}
 ) {
   const overlay = ensureDialog();
   const msg = getEl("swbDialogMsg");
@@ -476,8 +480,10 @@ function showConfirm(
     cancel.id = "swbDialogCancel";
     cancel.type = "button";
     cancel.className = "swbDialog__cancel";
+    cancel.textContent = cancelText;
     ok.parentElement.insertBefore(cancel, ok);
   }
+  cancel.style.display = "";
   ok.textContent = okText;
   cancel.textContent = cancelText;
 
@@ -490,7 +496,7 @@ function showConfirm(
     function close(result) {
       overlay.style.display = "none";
       overlay.setAttribute("aria-hidden", "true");
-      ok.removeEventListener("click", onOk);
+      ok.removeEventListener("click", onOkClick);
       cancel.removeEventListener("click", onCancel);
       overlay.removeEventListener("click", onBackdrop);
       document.removeEventListener("keydown", onKey);
@@ -498,27 +504,26 @@ function showConfirm(
       resolve(result);
     }
 
-    function onOk() {
-      // ✅ run the opener inside the direct click handler (user gesture)
-      if (typeof onOpen === "function") {
-        try { onOpen(); } catch {}
-      }
+    function onOkClick() {
+      // IMPORTANT: run the callback while we're still in the user click handler
+      try { onOk && onOk(); } catch {}
       close(true);
     }
-    function onCancel()  { close(false); }
-    function onBackdrop(e){ if (e.target === overlay) close(false); }
+    function onCancel() { close(false); }
+    function onBackdrop(e) { if (e.target === overlay) close(false); }
     function onKey(e) {
-      if (e.key === "Enter")  onOk();
-      if (e.key === "Escape") onCancel();
+      if (e.key === "Enter") { try { onOk && onOk(); } catch {} close(true); }
+      else if (e.key === "Escape") close(false);
     }
 
-    ok.addEventListener("click", onOk);
+    ok.addEventListener("click", onOkClick);
     cancel.addEventListener("click", onCancel);
     overlay.addEventListener("click", onBackdrop);
     document.addEventListener("keydown", onKey);
     ok.focus();
   });
 }
+
 
 
 async function submitItemForm(){
@@ -780,12 +785,12 @@ function init(){
     bind();
   });
 
-  // ------- SINGLE handler for Exporter PDF (works Web + Desktop) -------
 getEl("btnPDF")?.addEventListener("click", async () => {
+  // 1) make sure state/totals are up to date
   readInputs();
   computeTotals();
 
-  const assets = window.smartwebify?.assets || {};
+  const assets  = window.smartwebify?.assets || {};
   const htmlInv = window.PDFView.build(state, assets);
   const cssInv  = window.PDFView.css;
 
@@ -793,57 +798,90 @@ getEl("btnPDF")?.addEventListener("click", async () => {
   const typeLabel = docTypeLabel(state.meta.docType);
   const fileName  = ensurePdfExt([typeLabel, invNum].filter(Boolean).join(" "));
 
-  // 1) Export main
+  // 2) export main invoice
   const resInv = await window.smartwebify?.exportPDFFromHTML?.({
-    html: htmlInv, css: cssInv,
+    html: htmlInv,
+    css:  cssInv,
     meta: { number: state.meta.number, type: state.meta.docType, filename: fileName }
   });
   if (!resInv) return;
 
-  // 2) Export withholding (optional)
+  // 3) export withholding certificate (optional)
   let resWH = null;
   if (state.meta?.withholding?.enabled && window.PDFWH) {
     const htmlWH = window.PDFWH.build(state, assets);
     const cssWH  = window.PDFWH.css;
-    const baseWH = ensurePdfExt(
-      (invNum ? `Retenue à la source - ${invNum}` : `Retenue à la source`)
-    );
+    const baseWH = ensurePdfExt(invNum ? `Retenue à la source - ${invNum}` : `Retenue à la source`);
+
     resWH = await window.smartwebify?.exportPDFFromHTML?.({
-      html: htmlWH, css: cssWH,
-      meta: { number: state.meta.number, type: "retenue", filename: baseWH, silent: true, useSameDirAs: resInv?.path || resInv }
+      html: htmlWH,
+      css:  cssWH,
+      meta: {
+        number: state.meta.number,
+        type:   "retenue",
+        filename: baseWH,
+        silent: true,
+        // if desktop, place next to the invoice
+        useSameDirAs: resInv?.path || resInv
+      }
     });
   }
 
-  // 3) Build message
+  // 4) build message shown to the user
   const invLabel = resInv?.name || (typeof resInv === "string" ? resInv : fileName);
   const whLabel  = resWH ? (resWH?.name || (typeof resWH === "string" ? resWH : "Retenue à la source.pdf")) : null;
+
   const msg =
     `PDF exporté :\n${invLabel}` +
     (whLabel ? `\nCertificat exporté :\n${whLabel}` : "") +
     `\n\nVoulez-vous l'ouvrir maintenant ?`;
 
-  // 4) Tell the dialog how to open, synchronously on click
+  // 5) opening logic that must run INSIDE the dialog's button click
   const openWithUserGesture = () => {
-    // WEB case: web-shim returns { ok, name, url }
-    const tryOpenUrl = (u) => {
-      if (!u) return false;
-      // Use an anchor click for best compatibility with popup policies
+    // helper: open a URL in a new tab via <a target="_blank"> to satisfy popup policies
+    const openUrlInNewTab = (url) => {
+      if (!url) return false;
       const a = document.createElement("a");
-      a.href = u; a.target = "_blank"; a.rel = "noopener";
+      a.href = url;
+      a.target = "_blank";
+      a.rel = "noopener";
       document.body.appendChild(a);
       a.click();
       a.remove();
       return true;
     };
 
-    if (resInv?.url) { tryOpenUrl(resInv.url); }
-    else if (typeof resInv === "string") { window.open(resInv, "_blank", "noopener"); }
+    // Try opening the invoice (web first, then desktop fallback)
+    if (resInv?.url) {
+      openUrlInNewTab(resInv.url);
+    } else {
+      const p = typeof resInv === "string" ? resInv : (resInv?.path || resInv?.name || "");
+      if (p) {
+        // Electron/desktop: this will open with the system PDF viewer
+        // We don't await here; being synchronous isn't required for native open
+        window.smartwebify?.openPath?.(p) || window.smartwebify?.showInFolder?.(p);
+      }
+    }
 
-    if (resWH?.url) { tryOpenUrl(resWH.url); }
-    else if (typeof resWH === "string") { window.open(resWH, "_blank", "noopener"); }
+    // OPTIONAL: also try to open the withholding certificate.
+    // Many browsers allow only one popup per click; the second may be blocked.
+    if (resWH?.url) {
+      openUrlInNewTab(resWH.url);
+    } else if (resWH) {
+      const p2 = typeof resWH === "string" ? resWH : (resWH?.path || resWH?.name || "");
+      if (p2) {
+        window.smartwebify?.openPath?.(p2) || window.smartwebify?.showInFolder?.(p2);
+      }
+    }
   };
 
-  await showConfirm(msg, { onOpen: openWithUserGesture });
+  // 6) show dialog; when user clicks "Ouvrir", we open inside that same click handler
+  await showConfirm(msg, {
+    // If your dialog API uses a different prop name, change this to that name (e.g. onOpen)
+    onOk: openWithUserGesture,
+    okText: "Ouvrir",
+    cancelText: "Fermer"
+  });
 });
 
 
