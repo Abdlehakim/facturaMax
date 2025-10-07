@@ -532,13 +532,21 @@ function init(){
     const msg = `PDF exporté :\n${invLabel}` + (whLabel ? `\nCertificat exporté :\n${whLabel}` : "");
     const openViaAnchor = (url) => { if (!url) return; const a = document.createElement("a"); a.href = url; a.target = "_blank"; a.rel = "noopener"; document.body.appendChild(a); a.click(); a.remove(); };
 
-    await showConfirm(msg, {
-      title: "Ouvrir les documents",
-      okText: "Ouvrir la facture",
-      cancelText: "Fermer",
-      extra: resWH?.url ? { text: "Ouvrir le certificat", onClick: () => { try { openViaAnchor(resWH.url); } catch {} } } : undefined,
-      onOk: () => { const invUrl = resInv?.url || null; if (invUrl) openViaAnchor(invUrl); }
-    });
+await showConfirm(msg, {
+  title: "Ouvrir les documents",
+  okText: "Ouvrir la facture",
+  cancelText: "Fermer",
+  okKeepsOpen: true, // <-- don't close on OK
+  extra: resWH?.url ? {
+    text: "Ouvrir le certificat",
+    onClick: () => { try { openViaAnchor(resWH.url); } catch {} }
+  } : undefined,
+  onOk: () => {
+    const invUrl = resInv?.url || null;
+    if (invUrl) openViaAnchor(invUrl);
+  }
+});
+
   });
 
   getEl("btnSubmitItem")?.addEventListener("click", () => { submitItemForm(); });
