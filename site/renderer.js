@@ -83,8 +83,9 @@ function bind(){
   setVal("stampAmount", String(t.amount ?? 1));
   setVal("stampTva",    String(t.tva ?? 0));
   toggleStampFields(!!t.enabled);
-  const logo = window.smartwebify?.assets?.logo || state.company.logo;
-  if (logo) setSrc("companyLogo", logo);
+  const bundled = "./assets/logoSW.png";
+const logo = window.smartwebify?.assets?.logo || state.company.logo || bundled;
+setSrc("companyLogo", logo)
   setVal("notes", state.notes);
   setText("year", new Date().getFullYear());
   ["colToggleRef","colToggleProduct","colToggleDesc","colToggleQty","colTogglePrice","colToggleTva","colToggleDiscount"].forEach(id => { const el = getEl(id); if (el) el.checked = true; });
