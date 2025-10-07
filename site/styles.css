@@ -210,6 +210,18 @@ td .del:hover{
 .hide-col-tva      #items tbody td:nth-child(6){ display:none;white-space: nowrap;min-width: 84px; }
 .hide-col-discount #items thead th:nth-child(7),
 .hide-col-discount #items tbody td:nth-child(7){ display:none;white-space: nowrap;min-width: 84px; }
+
+#items thead th:nth-child(6),
+#items thead th:nth-child(7){
+  white-space: nowrap;
+}
+
+/* optional: give those columns a bit more room */
+#items thead th:nth-child(6),
+#items thead th:nth-child(7){
+  min-width: 84px;           /* adjust if needed */
+}
+
 /* TTC col toggle handled in JS for nth-child(8) */
 
 /* =========================
