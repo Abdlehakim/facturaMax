@@ -780,55 +780,79 @@ function init(){
     }
   });
 
-  getEl("btnPDF")?.addEventListener("click", async () => {
+// renderer.js (attach to your existing #btnPDF listener)
+getEl("btnPDF")?.addEventListener("click", async (ev) => {
+  // 0) Pre-open tabs in the same user gesture (prevents popup blocking)
+  //    We open one for the invoice and (optionally) one for the withholding cert.
+  const winInv = window.open("about:blank", "_blank", "noopener,noreferrer");
+  // Only pre-open the second if WH is enabled (so you don’t spawn a useless tab)
+  const shouldOpenWH = !!(state?.meta?.withholding?.enabled && window.PDFWH);
+  const winWH  = shouldOpenWH ? window.open("about:blank", "_blank", "noopener,noreferrer") : null;
+
+  try {
+    // 1) ensure state/totals are up to date
     readInputs();
     computeTotals();
-    const assets = window.smartwebify?.assets || {};
 
+    const assets  = window.smartwebify?.assets || {};
+
+    // 2) build invoice HTML/CSS and export to a Blob URL
     const htmlInv = window.PDFView.build(state, assets);
     const cssInv  = window.PDFView.css;
-
     const invNum  = slugForFile(state.meta.number || "");
-    const typeLabel = docTypeLabel(state.meta.docType);
-    const baseName  = [typeLabel, invNum].filter(Boolean).join(" ");
-    const filename  = ensurePdfExt(baseName);
+    const typeLbl = docTypeLabel(state.meta.docType);
+    const invName = ensurePdfExt([typeLbl, invNum].filter(Boolean).join(" "));
 
-    const outInv  = await window.smartwebify?.exportPDFFromHTML?.({
-      html: htmlInv,
-      css:  cssInv,
-      meta: { number: state.meta.number, type: state.meta.docType, filename }
+    const outInv = await window.smartwebify?.exportPDFFromHTML?.({
+      html: htmlInv, css: cssInv, meta: { number: state.meta.number, type: state.meta.docType, filename: invName },
+      // (if your export returns a Blob, adapt below accordingly)
     });
-    if (!outInv) return;
+    if (!outInv) { winInv?.close(); winWH?.close(); return; }
 
-    let outWH = null;
-    if (state.meta?.withholding?.enabled && window.PDFWH) {
+    // If your export returns a Blob:
+    const invBlob = outInv.blob || outInv;             // support either shape
+    const invURL  = URL.createObjectURL(invBlob);
+
+    // 3) open the invoice in the pre-opened tab
+    if (winInv && !winInv.closed) {
+      winInv.location = invURL;
+      // optional: revoke after the new tab has loaded the blob
+      // setTimeout(() => URL.revokeObjectURL(invURL), 30000);
+    }
+
+    // 4) (optional) export the separate withholding certificate silently
+    if (shouldOpenWH) {
       const htmlWH = window.PDFWH.build(state, assets);
       const cssWH  = window.PDFWH.css;
-      const invNumWH   = slugForFile(state.meta.number || "");
-      const baseNameWH = invNumWH ? `Retenue à la source - ${invNumWH}` : `Retenue à la source`;
-      const fileNameWH = ensurePdfExt(baseNameWH);
-      outWH = await window.smartwebify?.exportPDFFromHTML?.({
-        html: htmlWH,
-        css:  cssWH,
-        meta: { number: state.meta.number, type: "retenue", filename: fileNameWH, silent: true, useSameDirAs: outInv }
+      const base   = invNum ? `Retenue à la source ${invNum}` : `Retenue à la source`;
+      const whOut  = await window.smartwebify?.exportPDFFromHTML?.({
+        html: htmlWH, css: cssWH, meta: { number: state.meta.number, type: "retenue", filename: ensurePdfExt(base) }
       });
-    }
-
-    const msg =
-      `PDF exporté :\n${outInv}` +
-      (outWH ? `\nCertificat exporté :\n${outWH}` : "") +
-      `\n\nVoulez-vous l'ouvrir maintenant ?`;
-
-    const openNow = await showConfirm(msg);
-    if (openNow) {
-      const okInv = await openPDFFile(outInv);
-      if (!okInv) await showDialog("Le PDF de la facture a été exporté, mais l'ouverture automatique a échoué.", { title: "Information" });
-      if (outWH) {
-        const okWH = await openPDFFile(outWH);
-        if (!okWH) await showDialog("Le PDF de la retenue a été exporté, mais l'ouverture automatique a échoué.", { title: "Information" });
+      if (whOut) {
+        const whBlob = whOut.blob || whOut;
+        const whURL  = URL.createObjectURL(whBlob);
+        if (winWH && !winWH.closed) {
+          winWH.location = whURL;
+          // setTimeout(() => URL.revokeObjectURL(whURL), 30000);
+        }
+      } else {
+        // didn’t produce a second PDF → close the extra tab
+        winWH?.close();
       }
     }
-  });
+
+    // 5) (optional) keep your dialog as an extra “Open again” action
+    showOpenDialog({ file1: invName /* … */ });
+
+  } catch (e) {
+    // In case of error, close any blank tabs we opened
+    try { winInv?.close(); } catch {}
+    try { winWH?.close(); } catch {}
+    console.error(e);
+    devToast("Échec de l'export PDF. Vérifiez la console.");
+  }
+});
+
 
   getEl("btnSubmitItem")?.addEventListener("click", () => { submitItemForm(); });
   getEl("btnNewItem")?.addEventListener("click", () => { clearAddFormAndMode(); focusFirstEmptyAddField(); });
