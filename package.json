@@ -1,70 +1,68 @@
 {
-  "name": "smartwebify-invoice-maker",
-  "version": "1.0.0",
-  "description": "Smartwebify Invoice Maker (Windows) – create, save and export invoices to PDF for development, marketing, graphics and design services.",
-  "main": "main.js",
-  "author": "Smartwebify",
-  "license": "MIT",
-  "scripts": {
-    "dev:site": "http-server ./site -p 8080 -c-1",
-    "dev:renderer": "http-server ./src/renderer -p 8081 -c-1",
-    "start": "electron .",
-    "dist": "electron-builder --win nsis",
-    "dist:nsis": "electron-builder --win nsis",
-    "dist:portable": "electron-builder --win portable",
-    "pack:dir": "electron-builder --win dir"
-  },
-  "devDependencies": {
-    "chokidar": "^4.0.3",
-    "electron": "^31.2.0",
-    "electron-builder": "^24.13.3",
-    "electronmon": "^2.0.3",
-    "http-server": "^14.1.1"
-  },
+"name": "smartwebify-invoice-maker",
+"version": "1.0.0",
+"description": "Smartwebify Invoice Maker (Windows) – create, save and export invoices to PDF for development, marketing, graphics and design services.",
+"main": "main.js",
+"author": "Smartwebify",
+"license": "MIT",
+"scripts": {
+"dev:site": "http-server ./site -p 8080 -c-1",
+"dev:renderer": "http-server ./src/renderer -p 8081 -c-1",
+"start": "electron .",
+"dist": "electron-builder --win nsis",
+  "dist:mac": "electron-builder --mac dmg,zip",
+  "dist:mac:arm64": "electron-builder --mac dmg,zip --arm64",
+  "dist:mac:x64": "electron-builder --mac dmg,zip --x64"
+},
+"devDependencies": {
+"chokidar": "^4.0.3",
+"electron": "^31.2.0",
+"electron-builder": "^24.13.3",
+"electronmon": "^2.0.3",
+"http-server": "^14.1.1"
+},
+"dependencies": {
+"html2canvas": "^1.4.1",
+"jspdf": "^3.0.3"
+},
 "build": {
+   "afterAllArtifactBuild": "scripts/trim-artifacts.js",
   "appId": "com.smartwebify.invoice",
   "productName": "Smartwebify Invoice Maker",
   "directories": { "output": "dist" },
-
-  "files": [
-    "main.js",
-    "preload.js",
-    "src/renderer/**",
-    "package.json"
-  ],
+  "files": ["main.js","preload.js","src/renderer/**","package.json"],
   "asar": true,
   "asarUnpack": ["**/*.node"],
 
-  "win": {
-    "icon": "build/icon.ico",
-    "target": ["nsis"],
-    "artifactName": "Smartwebify-Invoice-Maker-Setup-${version}.exe"
+  "win": { "target": ["nsis"], "artifactName": "Smartwebify-Invoice-Maker-Setup-${version}.exe" },
+
+  "mac": {
+    "icon": "build/icon.icns",
+    "category": "public.app-category.productivity",
+    "hardenedRuntime": true,
+    "entitlements": "build/entitlements.mac.plist",
+    "entitlementsInherit": "build/entitlements.mac.plist",
+    "target": [
+      { "target": "dmg", "arch": ["x64","arm64"] },
+      { "target": "zip", "arch": ["x64","arm64"] }
+    ]
   },
-  "nsis": {
-    "installerIcon": "build/icon.ico",
-    "uninstallerIcon": "build/icon.ico",
-    "oneClick": false,
-    "allowToChangeInstallationDirectory": true,
-    "displayLanguageSelector": true,
-    "installerLanguages": ["en_US","fr_FR","ar_SA"],
-    "createDesktopShortcut": true,
-    "createStartMenuShortcut": true,
-    "shortcutName": "Smartwebify Invoice Maker",
-    "perMachine": false
+  "dmg": {
+    "sign": true
   },
 
-
-  "extraResources": [
-    { "from": "site/assets", "to": "assets", "filter": ["**/*"] }
-  ],
-
-
-  "compression": "maximum",
-  "artifactBuildNumber": 1
+"nsis": {
+"oneClick": false,
+"allowToChangeInstallationDirectory": true,
+"displayLanguageSelector": true,
+"installerLanguages": [
+"fr_FR"
+],
+"createDesktopShortcut": true,
+"createStartMenuShortcut": true,
+"shortcutName": "Smartwebify Invoice Maker",
+"perMachine": false
 },
-
-  "dependencies": {
-    "html2canvas": "^1.4.1",
-    "jspdf": "^3.0.3"
-  }
+"compression": "maximum"
+}
 }
