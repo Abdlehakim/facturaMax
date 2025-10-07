@@ -57,6 +57,10 @@ const state = {
 const COMPANY_LOCKED = true;
 let selectedItemIndex = null;
 
+// Detect web vs desktop
+const IS_DESKTOP = !!(window.smartwebify && typeof window.smartwebify.openPath === "function");
+const IS_WEB = !IS_DESKTOP;
+
 function formatMoney(v, currency) {
   const n = Number(v || 0);
   try { return new Intl.NumberFormat(undefined, { style: "currency", currency }).format(n); }
@@ -547,9 +551,9 @@ function renderItems(){
     };
     const base = it.qty * it.price;
     const disc = base * (it.discount / 100);
-    const taxedBase = Math.max(0, base - disc);
-    const tax = taxedBase * (it.tva / 100);
-    const lineTotal = taxedBase + tax;
+    theTaxed = Math.max(0, base - disc);
+    const tax = theTaxed * (it.tva / 100);
+    const lineTotal = theTaxed + tax;
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td class="cell-ref">${escapeHTML(it.ref)}</td>
@@ -766,137 +770,89 @@ function init(){
     bind();
   });
 
-getEl("btnPDF")?.addEventListener("click", async () => {
-  readInputs();
-  computeTotals();
-
-  const assets = window.smartwebify?.assets || {};
-
-  // Build main invoice HTML/CSS
-  const htmlInv = window.PDFView.build(state, assets);
-  const cssInv  = window.PDFView.css;
-
-  const invNum     = slugForFile(state.meta.number || "");
-  const typeLabel  = docTypeLabel(state.meta.docType);
-  const baseName   = [typeLabel, invNum].filter(Boolean).join(" ");
-  const fileName   = ensurePdfExt(baseName);
-
-  // Export main invoice
-  const resInv = await window.smartwebify?.exportPDFFromHTML?.({
-    html: htmlInv,
-    css:  cssInv,
-    meta: { number: state.meta.number, type: state.meta.docType, filename: fileName }
-  });
-  if (!resInv) return;
-
-  // Export withholding (if enabled)
-  let resWH = null;
-  if (state.meta?.withholding?.enabled && window.PDFWH) {
-    const htmlWH = window.PDFWH.build(state, assets);
-    const cssWH  = window.PDFWH.css;
-
-    const invNumWH    = slugForFile(state.meta.number || "");
-    const baseNameWH  = invNumWH ? `Retenue à la source - ${invNumWH}` : `Retenue à la source`;
-    const fileNameWH  = ensurePdfExt(baseNameWH);
-
-    resWH = await window.smartwebify?.exportPDFFromHTML?.({
-      html: htmlWH,
-      css:  cssWH,
-      meta: { number: state.meta.number, type: "retenue", filename: fileNameWH, silent: true, useSameDirAs: resInv?.path || resInv }
-    });
-  }
-
-  // Build a friendly message
-  const invLabel = resInv?.name || (typeof resInv === "string" ? resInv : fileName);
-  const whLabel  = resWH ? (resWH?.name || (typeof resWH === "string" ? resWH : "Retenue à la source.pdf")) : null;
-
-  const msg =
-    `PDF exporté :\n${invLabel}` +
-    (whLabel ? `\nCertificat exporté :\n${whLabel}` : "") +
-    `\n\nVoulez-vous l'ouvrir maintenant ?`;
-
-  const openNow = await showConfirm(msg);
-  if (!openNow) return;
-
-  // Open depending on environment
-  // Web: open Blob URL in new tab; Desktop: open file path
-  const openOne = async (res) => {
-    if (!res) return false;
-
-    // WEB: web-shim returns { ok, name, url }
-    if (IS_WEB && res.url) {
-      try { window.open(res.url, "_blank", "noopener"); return true; } catch { return false; }
-    }
-
-    // DESKTOP: main returns a file path string; or sometimes an object with a path-like value
-    const pathLike = typeof res === "string" ? res : (res.path || res.name || "");
-    if (pathLike) {
-      const ok = await openPDFFile(pathLike);
-      return !!ok;
-    }
-    return false;
-  };
-
-  const okInv = await openOne(resInv);
-  if (!okInv) {
-    await showDialog("Le PDF de la facture a été exporté, mais l'ouverture automatique a échoué.", { title: "Information" });
-  }
-
-  if (resWH) {
-    const okWH = await openOne(resWH);
-    if (!okWH) {
-      await showDialog("Le PDF de la retenue a été exporté, mais l'ouverture automatique a échoué.", { title: "Information" });
-    }
-  }
-});
-
-
+  // ------- SINGLE handler for Exporter PDF (works Web + Desktop) -------
   getEl("btnPDF")?.addEventListener("click", async () => {
     readInputs();
     computeTotals();
+
     const assets = window.smartwebify?.assets || {};
 
+    // Build main invoice HTML/CSS
     const htmlInv = window.PDFView.build(state, assets);
     const cssInv  = window.PDFView.css;
 
-    const invNum  = slugForFile(state.meta.number || "");
+    const invNum    = slugForFile(state.meta.number || "");
     const typeLabel = docTypeLabel(state.meta.docType);
     const baseName  = [typeLabel, invNum].filter(Boolean).join(" ");
-    const filename  = ensurePdfExt(baseName);
+    const fileName  = ensurePdfExt(baseName);
 
-    const outInv  = await window.smartwebify?.exportPDFFromHTML?.({
+    // WEB: pre-open a tab synchronously so the shim can stream the blob
+    const preopen = IS_WEB ? window.open("", "_blank", "noopener") : null;
+
+    const resInv = await window.smartwebify?.exportPDFFromHTML?.({
       html: htmlInv,
       css:  cssInv,
-      meta: { number: state.meta.number, type: state.meta.docType, filename }
+      meta: { number: state.meta.number, docType: state.meta.docType, filename: fileName, preopen }
     });
-    if (!outInv) return;
+    if (!resInv) return;
 
-    let outWH = null;
+    // Withholding (second PDF) if enabled
+    let resWH = null;
     if (state.meta?.withholding?.enabled && window.PDFWH) {
       const htmlWH = window.PDFWH.build(state, assets);
       const cssWH  = window.PDFWH.css;
+
       const invNumWH   = slugForFile(state.meta.number || "");
       const baseNameWH = invNumWH ? `Retenue à la source - ${invNumWH}` : `Retenue à la source`;
       const fileNameWH = ensurePdfExt(baseNameWH);
-      outWH = await window.smartwebify?.exportPDFFromHTML?.({
+
+      const preopenWH = IS_WEB ? window.open("", "_blank", "noopener") : null;
+
+      resWH = await window.smartwebify?.exportPDFFromHTML?.({
         html: htmlWH,
         css:  cssWH,
-        meta: { number: state.meta.number, type: "retenue", filename: fileNameWH, silent: true, useSameDirAs: outInv }
+        meta: { number: state.meta.number, docType: "retenue", filename: fileNameWH, preopen: preopenWH }
       });
     }
 
+    // If we already opened the tab(s), we're done
+    if (resInv.opened && (!resWH || resWH.opened)) return;
+
+    // Otherwise offer to open (Desktop path or Web download tab)
+    const invLabel = resInv?.name || fileName;
+    const whLabel  = resWH ? (resWH?.name || "Retenue à la source.pdf") : null;
+
     const msg =
-      `PDF exporté :\n${outInv}` +
-      (outWH ? `\nCertificat exporté :\n${outWH}` : "") +
+      `PDF exporté :\n${invLabel}` +
+      (whLabel ? `\nCertificat exporté :\n${whLabel}` : "") +
       `\n\nVoulez-vous l'ouvrir maintenant ?`;
 
     const openNow = await showConfirm(msg);
-    if (openNow) {
-      const okInv = await openPDFFile(outInv);
-      if (!okInv) await showDialog("Le PDF de la facture a été exporté, mais l'ouverture automatique a échoué.", { title: "Information" });
-      if (outWH) {
-        const okWH = await openPDFFile(outWH);
-        if (!okWH) await showDialog("Le PDF de la retenue a été exporté, mais l'ouverture automatique a échoué.", { title: "Information" });
+    if (!openNow) return;
+
+    const openOne = async (res) => {
+      if (!res) return false;
+      if (IS_WEB) {
+        // In web fallback (download), try a new tab with just the name hint
+        // (there's no file path—user sees it in browser downloads)
+        window.open("", "_blank", "noopener"); // best-effort UX
+        return true;
+      }
+      // Desktop: open saved path
+      const pathLike = typeof res === "string" ? res : (res.path || res.name || "");
+      if (pathLike) return !!(await openPDFFile(pathLike));
+      return false;
+    };
+
+    const okInv = await openOne(resInv);
+    if (!okInv) {
+      await showDialog("Le PDF de la facture a été exporté, mais l'ouverture automatique a échoué.", { title: "Information" });
+    }
+
+    if (resWH) {
+      const okWH = await openOne(resWH);
+      if (!okWH) {
+        await showDialog("Le PDF de la retenue a été exporté, mais l'ouverture automatique a échoué.", { title: "Information" });
       }
     }
   });

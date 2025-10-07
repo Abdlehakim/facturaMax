@@ -1,13 +1,17 @@
 // site/web-shim.js
-// Web shim: generate a PDF directly (no print dialog) using html2canvas + jsPDF,
-// and provide JSON save/open helpers for the web demo.
+// Web shim for the browser build.
+// - Generates a PDF with html2canvas + jsPDF (no print dialog).
+// - If a window is pre-opened by the click handler, streams the PDF into it
+//   so the viewer opens in a new tab without being blocked by pop-up rules.
+// - Falls back to a normal file download if needed.
+// - Also provides JSON save/open helpers for the web demo.
 
-// -------------------- small helpers --------------------
+// ---------- small utils ----------
 function docTypeText(v = "") {
   v = String(v).toLowerCase();
   if (v === "devis") return "Devis";
-  if (v === "bl")    return "Bon de livraison";
-  if (v === "bc")    return "Bon de commande";
+  if (v === "bl") return "Bon de livraison";
+  if (v === "bc") return "Bon de commande";
   return "Facture";
 }
 function sanitize(name = "") {
@@ -17,111 +21,104 @@ function today() {
   return new Date().toISOString().slice(0, 10);
 }
 
-// Build a tiny host so the invoice HTML gets your CSS applied off-screen
+// Host snippet so the HTML has your CSS applied while rendering off-screen
 function buildHost(html, css) {
   return `
     <style>
-      /* ensure colors print/render as on screen */
       @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
       ${css || ""}
       html, body { margin: 0; padding: 0; background: #fff; }
-      #root { width: 100%; }
+      #root { width: 794px; } /* ~A4 width @96dpi */
     </style>
     <div id="root">${html || ""}</div>
   `;
 }
 
-// Render a node to a tall canvas (html2canvas must be loaded globally)
+// Render a DOM node to a (tall) canvas using html2canvas
 async function renderNodeToCanvas(node, scale = 2) {
+  // html2canvas must be included on the page globally
   return await html2canvas(node, {
     scale,
     useCORS: true,
     allowTaint: true,
     backgroundColor: "#ffffff",
-    windowWidth:  node.scrollWidth,
+    windowWidth: node.scrollWidth,
     windowHeight: node.scrollHeight
   });
 }
 
-// Slice a tall canvas into A4 pages, create a PDF Blob + URL, trigger download, and return {ok,name,url}
-async function canvasToA4PdfAndDownload(canvas, filename) {
-  const { jsPDF } = window.jspdf; // from UMD bundle
+// Slice the tall canvas into A4 pages and return a PDF Blob (jsPDF UMD)
+async function canvasToA4PdfBlob(canvas) {
+  // jsPDF UMD must be included globally: window.jspdf.jsPDF
+  const { jsPDF } = window.jspdf;
 
-  // A4 in millimeters
   const pdf = new jsPDF({ orientation: "p", unit: "mm", format: "a4" });
-  const pageWidth  = pdf.internal.pageSize.getWidth();
-  const pageHeight = pdf.internal.pageSize.getHeight();
+  const pageW = pdf.internal.pageSize.getWidth();
+  const pageH = pdf.internal.pageSize.getHeight();
 
-  // Fit canvas to page width; compute resulting height
-  const imgWidth  = pageWidth;
-  const imgHeight = (canvas.height * pageWidth) / canvas.width;
+  // Image size when fitted to page width
+  const imgW = pageW;
+  const imgH = (canvas.height * pageW) / canvas.width;
 
-  // How many pixels correspond to 1mm at that scaling:
-  const pxPerMM      = canvas.height / imgHeight;
-  const pageHeightPx = pageHeight * pxPerMM;
+  // Pixels per millimeter in the fitted image
+  const pxPerMM = canvas.height / imgH;
+  const pageHPx = pageH * pxPerMM;
 
+  let y = 0;
   let pageIndex = 0;
-  while (true) {
-    const srcY = pageIndex * pageHeightPx;
-    if (srcY >= canvas.height) break;
 
-    const sliceHeightPx = Math.min(pageHeightPx, canvas.height - srcY);
-    const sliceCanvas = document.createElement("canvas");
-    sliceCanvas.width  = canvas.width;
-    sliceCanvas.height = sliceHeightPx;
+  while (y < canvas.height) {
+    const sliceH = Math.min(pageHPx, canvas.height - y);
 
-    const ctx = sliceCanvas.getContext("2d");
+    const slice = document.createElement("canvas");
+    slice.width = canvas.width;
+    slice.height = sliceH;
+
+    const ctx = slice.getContext("2d");
     ctx.drawImage(
       canvas,
-      0, srcY, canvas.width, sliceHeightPx,   // source
-      0, 0,   canvas.width, sliceHeightPx     // destination
+      0, y, canvas.width, sliceH, // src
+      0, 0, slice.width, slice.height // dst
     );
 
-    const imgData = sliceCanvas.toDataURL("image/jpeg", 0.95);
+    const img = slice.toDataURL("image/jpeg", 0.95);
     if (pageIndex > 0) pdf.addPage();
-    pdf.addImage(imgData, "JPEG", 0, 0, pageWidth, (sliceHeightPx / pxPerMM), undefined, "FAST");
+    pdf.addImage(img, "JPEG", 0, 0, pageW, sliceH / pxPerMM, undefined, "FAST");
 
-    pageIndex++;
+    y += sliceH;
+    pageIndex += 1;
   }
 
-  // Make a Blob + object URL so we can open it in a new tab
-  const blob = pdf.output("blob");
-  const url  = URL.createObjectURL(blob);
-
-  // Also trigger a download for convenience
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-
-  // Revoke after a while (keep long enough for “Open”)
-  setTimeout(() => URL.revokeObjectURL(url), 5 * 60 * 1000);
-
-  return { ok: true, name: filename, url };
+  return pdf.output("blob");
 }
 
-// -------------------- default logo for the demo --------------------
+// Ensure demo has a logo if none was set
 window.addEventListener("DOMContentLoaded", () => {
   const img = document.getElementById("companyLogo");
   if (img && !img.src) img.src = "./logoSW.png";
 });
 
-// Ensure namespace
+// Prepare namespace
 window.smartwebify = window.smartwebify || {};
-window.smartwebify.assets = window.smartwebify.assets || {};
 
-// -------------------- PDF export API (web) --------------------
 /**
- * Export PDF directly (no print dialog) on the web.
- * Expects: { html, css, meta }
- * Returns: { ok:true, name: '...', url: 'blob:...' }  (or null on failure)
+ * Export PDF directly (no print dialog) and optionally open it in a pre-opened tab.
+ * Params:
+ *   {
+ *     html, css,
+ *     meta: {
+ *       number, docType, filename,
+ *       // If provided, MUST be opened synchronously by the click handler:
+ *       preopen: Window
+ *     }
+ *   }
+ * Returns:
+ *   { ok: true, name: string, opened: boolean } | null
  */
 window.smartwebify.exportPDFFromHTML = async ({ html, css, meta = {} }) => {
-  const baseName = `${docTypeText(meta.docType)} - ${sanitize(meta.number || today())}.pdf`;
+  const name = meta.filename || `${docTypeText(meta.docType)} - ${sanitize(meta.number || today())}.pdf`;
 
-  // Host element off-screen (A4 ≈ 794px @ 96dpi)
+  // Host element off-screen
   const host = document.createElement("div");
   host.style.position = "fixed";
   host.style.left = "-99999px";
@@ -133,8 +130,27 @@ window.smartwebify.exportPDFFromHTML = async ({ html, css, meta = {} }) => {
 
   try {
     const root = host.querySelector("#root");
-    const canvas = await renderNodeToCanvas(root, 2);         // scale=2 for sharper output
-    return await canvasToA4PdfAndDownload(canvas, baseName);  // -> {ok,name,url}
+    const canvas = await renderNodeToCanvas(root, 2);
+    const blob = await canvasToA4PdfBlob(canvas);
+    const url = URL.createObjectURL(blob);
+
+    // If a tab was pre-opened in the click handler, stream the blob into it
+    const w = meta.preopen || null;
+    if (w && !w.closed) {
+      w.location.href = url;
+      // Revoke the URL later
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      return { ok: true, name, opened: true };
+    }
+
+    // Fallback: download
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 0);
+    return { ok: true, name, opened: false };
   } catch (e) {
     console.error("PDF export (web) failed:", e);
     alert("Impossible de générer le PDF dans le navigateur.");
@@ -144,17 +160,15 @@ window.smartwebify.exportPDFFromHTML = async ({ html, css, meta = {} }) => {
   }
 };
 
-// -------------------- JSON save / open (web) --------------------
-/**
- * Save JSON to user-chosen location (File System Access API when available),
- * otherwise fall back to a normal download to the default folder.
- */
+/* ------------------------ JSON save/open (web) ------------------------ */
+
 window.smartwebify.saveInvoiceJSONToDesktop = async (payload = {}) => {
   const meta = payload.meta || {};
   const name = `${docTypeText(meta.docType)} - ${sanitize(meta.number || today())}.json`;
   const json = JSON.stringify(payload, null, 2);
   const blob = new Blob([json], { type: "application/json" });
 
+  // Modern browsers: showSaveFilePicker
   if (window.showSaveFilePicker) {
     try {
       const handle = await window.showSaveFilePicker({
@@ -170,19 +184,19 @@ window.smartwebify.saveInvoiceJSONToDesktop = async (payload = {}) => {
     }
   }
 
-  // Fallback: download
+  // Fallback: trigger download
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
   a.download = name;
   document.body.appendChild(a);
   a.click();
-  document.body.removeChild(a);
-  setTimeout(() => URL.revokeObjectURL(url), 30_000);
+  setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 0);
   return { ok: true, name };
 };
 
 window.smartwebify.openInvoiceJSON = async () => {
+  // Modern file picker
   if (window.showOpenFilePicker) {
     try {
       const [handle] = await window.showOpenFilePicker({
@@ -196,7 +210,7 @@ window.smartwebify.openInvoiceJSON = async () => {
     } catch { return null; }
   }
 
-  // Fallback: classic <input type="file">
+  // Fallback: hidden <input type="file">
   return new Promise((resolve) => {
     const input = document.createElement("input");
     input.type = "file";
@@ -207,19 +221,29 @@ window.smartwebify.openInvoiceJSON = async () => {
       const f = input.files && input.files[0];
       input.remove();
       if (!f) return resolve(null);
-      try { resolve(JSON.parse(await f.text())); }
-      catch { resolve(null); }
+      try { resolve(JSON.parse(await f.text())); } catch { resolve(null); }
     };
     input.click();
   });
 };
 
-// -------------------- stubs to match desktop API surface --------------------
-window.smartwebify.saveInvoiceJSON              = async (data) => window.smartwebify.saveInvoiceJSONToDesktop(data);
-window.smartwebify.exportPDFFromHTMLWithDialog  = async (p)    => window.smartwebify.exportPDFFromHTML(p);
-window.smartwebify.pickLogo                     = async ()     => null;
-window.smartwebify.openPath                     = async ()     => false;
-window.smartwebify.showInFolder                 = async ()     => false;
-window.smartwebify.openExternal                 = async (url)  => { try { window.open(url, "_blank", "noopener"); return true; } catch { return false; } };
-window.smartwebify.onEnterPrintMode             = () => () => {};
-window.smartwebify.onExitPrintMode              = () => () => {};
+/* -------- stubs to keep renderer API compatible on the web -------- */
+window.smartwebify.saveInvoiceJSON = async (data) =>
+  window.smartwebify.saveInvoiceJSONToDesktop(data);
+
+window.smartwebify.exportPDFFromHTMLWithDialog = async (p) =>
+  window.smartwebify.exportPDFFromHTML(p);
+
+window.smartwebify.pickLogo = async () => null;
+
+window.smartwebify.openPath = async () => false;
+window.smartwebify.showInFolder = async () => false;
+window.smartwebify.openExternal = async (url) => {
+  try { window.open(url, "_blank", "noopener"); return true; }
+  catch { return false; }
+};
+
+window.smartwebify.onEnterPrintMode = () => () => {};
+window.smartwebify.onExitPrintMode  = () => () => {};
+
+window.smartwebify.assets = window.smartwebify.assets || {};
