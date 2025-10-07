@@ -820,10 +820,16 @@ function init(){
   });
 
 getEl("btnPDF")?.addEventListener("click", async () => {
-  // 1) make sure state/totals are up to date
+  // 0) pré-ouvrir les onglets sous le même user gesture
+  let tabInv = null, tabWH = null;
+  try { tabInv = window.open("about:blank", "_blank"); } catch {}
+  if (state.meta?.withholding?.enabled && window.PDFWH) {
+    try { tabWH = window.open("about:blank", "_blank"); } catch {}
+  }
+
+  // 1) maj état & HTML/CSS
   readInputs();
   computeTotals();
-
   const assets  = window.smartwebify?.assets || {};
   const htmlInv = window.PDFView.build(state, assets);
   const cssInv  = window.PDFView.css;
@@ -832,15 +838,15 @@ getEl("btnPDF")?.addEventListener("click", async () => {
   const typeLabel = docTypeLabel(state.meta.docType);
   const fileName  = ensurePdfExt([typeLabel, invNum].filter(Boolean).join(" "));
 
-  // 2) export main invoice
+  // 2) exporter la facture en streamant vers l’onglet pré-ouvert
   const resInv = await window.smartwebify?.exportPDFFromHTML?.({
     html: htmlInv,
     css:  cssInv,
-    meta: { number: state.meta.number, type: state.meta.docType, filename: fileName }
+    meta: { number: state.meta.number, type: state.meta.docType, filename: fileName, preopen: tabInv }
   });
   if (!resInv) return;
 
-  // 3) export withholding certificate (optional)
+  // 3) exporter la retenue (si activée) dans son 2ᵉ onglet
   let resWH = null;
   if (state.meta?.withholding?.enabled && window.PDFWH) {
     const htmlWH = window.PDFWH.build(state, assets);
@@ -850,73 +856,40 @@ getEl("btnPDF")?.addEventListener("click", async () => {
     resWH = await window.smartwebify?.exportPDFFromHTML?.({
       html: htmlWH,
       css:  cssWH,
-      meta: {
-        number: state.meta.number,
-        type:   "retenue",
-        filename: baseWH,
-        silent: true,
-        // if desktop, place next to the invoice
-        useSameDirAs: resInv?.path || resInv
-      }
+      meta: { number: state.meta.number, type: "retenue", filename: baseWH, preopen: tabWH, silent: true }
     });
   }
 
-  // 4) build message shown to the user
-  const invLabel = resInv?.name || (typeof resInv === "string" ? resInv : fileName);
-  const whLabel  = resWH ? (resWH?.name || (typeof resWH === "string" ? resWH : "Retenue à la source.pdf")) : null;
-
+  // 4) message + focus des onglets déjà chargés
+  const invLabel = resInv?.name || fileName;
+  const whLabel  = resWH?.name || null;
   const msg =
     `PDF exporté :\n${invLabel}` +
     (whLabel ? `\nCertificat exporté :\n${whLabel}` : "") +
     `\n\nVoulez-vous l'ouvrir maintenant ?`;
 
-  // 5) opening logic that must run INSIDE the dialog's button click
-  const openWithUserGesture = () => {
-    // helper: open a URL in a new tab via <a target="_blank"> to satisfy popup policies
-    const openUrlInNewTab = (url) => {
-      if (!url) return false;
-      const a = document.createElement("a");
-      a.href = url;
-      a.target = "_blank";
-      a.rel = "noopener";
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      return true;
-    };
-
-    // Try opening the invoice (web first, then desktop fallback)
-    if (resInv?.url) {
-      openUrlInNewTab(resInv.url);
-    } else {
-      const p = typeof resInv === "string" ? resInv : (resInv?.path || resInv?.name || "");
-      if (p) {
-        // Electron/desktop: this will open with the system PDF viewer
-        // We don't await here; being synchronous isn't required for native open
-        window.smartwebify?.openPath?.(p) || window.smartwebify?.showInFolder?.(p);
-      }
-    }
-
-    // OPTIONAL: also try to open the withholding certificate.
-    // Many browsers allow only one popup per click; the second may be blocked.
-    if (resWH?.url) {
-      openUrlInNewTab(resWH.url);
-    } else if (resWH) {
-      const p2 = typeof resWH === "string" ? resWH : (resWH?.path || resWH?.name || "");
-      if (p2) {
-        window.smartwebify?.openPath?.(p2) || window.smartwebify?.showInFolder?.(p2);
-      }
-    }
-  };
-
-  // 6) show dialog; when user clicks "Ouvrir", we open inside that same click handler
   await showConfirm(msg, {
-    // If your dialog API uses a different prop name, change this to that name (e.g. onOpen)
-    onOk: openWithUserGesture,
     okText: "Ouvrir",
-    cancelText: "Fermer"
+    cancelText: "Fermer",
+    onOk: () => {
+      // Donner le focus aux deux onglets (ils contiennent déjà les PDFs)
+      try { if (tabInv && !tabInv.closed) tabInv.focus(); } catch {}
+      try { if (tabWH && !tabWH.closed) tabWH.focus(); } catch {}
+
+      // Fallback (au cas où la pré-ouverture n’a pas marché)
+      const openUrlInNewTab = (url) => {
+        if (!url) return false;
+        const a = document.createElement("a");
+        a.href = url; a.target = "_blank"; a.rel = "noopener";
+        document.body.appendChild(a); a.click(); a.remove();
+        return true;
+      };
+      if (resInv?.url && (!tabInv || tabInv.closed)) openUrlInNewTab(resInv.url);
+      if (resWH?.url && (!tabWH || tabWH.closed))   openUrlInNewTab(resWH.url);
+    }
   });
 });
+
 
 
   getEl("btnSubmitItem")?.addEventListener("click", () => { submitItemForm(); });
