@@ -1,5 +1,5 @@
 (function (global) {
-  const PDF_CSS = `
+const PDF_CSS = `
 :root{
   --invoice-font: -apple-system, BlinkMacSystemFont, "Segoe UI",
                   Arial, "Helvetica Neue", Helvetica, "Liberation Sans", Roboto, "Noto Sans", sans-serif;
@@ -14,27 +14,31 @@ body.print-mode #pdfRoot {
   inset:0;
   background:#ffffff;
 }
+
+/* KEY FIXES */
+@page { size:A4; margin:0; }
 .pdf-page{
   position:relative;
   width:210mm;
-  min-height:297mm;
-  background:#ffffff;
-  color:#000000;
+  height:296.5mm;            /* <— slightly under 297mm to avoid rounding spill */
+  background:#ffffff; color:#000000;
   padding:16mm 14mm;
   box-sizing:border-box;
-  -webkit-print-color-adjust:exact;
-  print-color-adjust:exact;
+  -webkit-print-color-adjust:exact; print-color-adjust:exact;
   font-family: var(--invoice-font);
   font-variant-numeric: tabular-nums;
   letter-spacing:0.02em;
-  overflow:hidden;
-  break-after:auto;
-  page-break-after:auto;
+  overflow:hidden;            /* clip anything that might poke out */
+  page-break-inside: avoid;   /* don’t split this node */
+  break-inside: avoid-page;
+  page-break-after: avoid;    /* don’t force a following blank page */
+  break-after: avoid-page;
 }
 .pdf-page:last-child{
-  break-after:auto;
-  page-break-after:auto;
+  page-break-after: avoid;    /* extra safety: no blank after last */
+  break-after: avoid-page;
 }
+
 .pdf-head{display:flex;justify-content:space-between;align-items:center}
 .pdf-title{font-size:18px;font-weight:700;margin:0;color:#111827; font-family: var(--invoice-font);}
 .pdf-logo-wrap{width:298px;height:40px;display:flex;align-items:center;justify-content:flex-end}
@@ -58,6 +62,7 @@ body.print-mode #pdfRoot {
 .pdf-table tbody td:nth-child(3){ text-align:left; }
 .pdf-table tbody tr td { border-bottom: 1px solid #15335e; }
 .pdf-table tbody tr:last-child td { border-bottom: 0; }
+
 .pdf-mini-sum{
   border:2px solid #15335e;
   min-width:200px;
@@ -79,6 +84,7 @@ body.print-mode #pdfRoot {
 .pdf-mini-table .head th{ background:#15335e; color:#fff; }
 .pdf-mini-table .grand th{ background:#15335e; font-size:10px; font-weight:600; color:#fff; }
 .pdf-mini-table .right{ text-align:center; }
+
 .pdf-footer{
   position:absolute;
   left:14mm;
@@ -91,7 +97,8 @@ body.print-mode #pdfRoot {
 .pdf-company{ font-size:9px; line-height:1.2; max-width:40%; }
 .pdf-sign{ text-align:left; font-size:12px; }
 .pdf-sign-line{ font-size:9px; margin:0; border-top:1px solid #000; width:150px; }
-@page { size:A4; margin:0; }
+
+/* Keep this block from growing too tall */
 .pdf-amount-words{
   position: absolute;
   display: flex;
@@ -99,12 +106,13 @@ body.print-mode #pdfRoot {
   left: 15mm;
   top: 210mm;
   max-width: 45%;
-  max-height: 70mm;
+  max-height: 68mm;          /* cap height so it never reaches footer */
   overflow: hidden;
   font-size: 12px;
   line-height: 1.25;
   font-weight: 500;
 }
+
 .section-box {
   border: 1px solid #15335e;
   border-radius: 5px;
@@ -131,6 +139,7 @@ body.print-mode #pdfRoot {
   letter-spacing: .02em;
 }
 `;
+
 
   const CURRENCY_WORDS = {
     TND: { major: "dinars", minor: "millimes", minorFactor: 1000 },
