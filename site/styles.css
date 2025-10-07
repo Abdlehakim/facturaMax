@@ -341,7 +341,7 @@ td .del:hover{
   .logo-wrap img{ width:138px; height:38px; }
 
   .actions{
-    width:100%; justify-content:flex-start; gap:8px; row-gap:8px; flex-wrap:wrap;
+    width:100%; justify-content:center; gap:8px; row-gap:8px; flex-wrap:wrap;
   }
   .btn{ padding:.3rem .8rem; font-size:.85rem; }
 
