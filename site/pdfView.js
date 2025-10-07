@@ -132,19 +132,22 @@ body.print-mode #pdfRoot {
   pointer-events: none;
 }
 
-/* put the legend text ON the border line */
+/* put the legend text ON the border line and mask the border under it */
 .section-box > legend{
   position: absolute;
-  top: 0;                    /* align to top edge */
+  top: 0;
   left: 14px;
-  transform: translateY(-50%); /* sits centered on the border line */
+  transform: translateY(-50%);
   margin: 0;
-  padding: 0 6px;            /* small side padding only */
+  padding: 0 8px;           /* a bit more side padding to create the gap */
   font-weight: 700;
-  color: #15335e;            /* your blue */
-  background: transparent;   /* let the border cross the letters */
-  z-index: 1;                /* above the border */
+  color: #15335e;
+  background: #ffffff;      /* << mask the border behind the label */
+  line-height: 1.1;         /* ensures enough white height for the mask */
+  z-index: 1;
+  display: inline-block;    /* make the background box take effect */
 }
+
 
 
 .pdf-notes{
