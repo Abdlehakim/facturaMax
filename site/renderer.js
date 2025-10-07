@@ -460,7 +460,11 @@ function showDialog(message, { title = "Information" } = {}) {
   });
 }
 
-function showConfirm(message, { title = "Export terminé", okText = "Ouvrir", cancelText = "Fermer" } = {}) {
+// replace your showConfirm with this version
+function showConfirm(
+  message,
+  { title = "Export terminé", okText = "Ouvrir", cancelText = "Fermer", onOpen } = {}
+) {
   const overlay = ensureDialog();
   const msg = getEl("swbDialogMsg");
   const ok = getEl("swbDialogOk");
@@ -472,10 +476,8 @@ function showConfirm(message, { title = "Export terminé", okText = "Ouvrir", ca
     cancel.id = "swbDialogCancel";
     cancel.type = "button";
     cancel.className = "swbDialog__cancel";
-    cancel.textContent = cancelText;
     ok.parentElement.insertBefore(cancel, ok);
   }
-  cancel.style.display = "";
   ok.textContent = okText;
   cancel.textContent = cancelText;
 
@@ -495,12 +497,19 @@ function showConfirm(message, { title = "Export terminé", okText = "Ouvrir", ca
       recoverFocus();
       resolve(result);
     }
-    function onOk() { close(true); }
-    function onCancel() { close(false); }
-    function onBackdrop(e) { if (e.target === overlay) close(false); }
+
+    function onOk() {
+      // ✅ run the opener inside the direct click handler (user gesture)
+      if (typeof onOpen === "function") {
+        try { onOpen(); } catch {}
+      }
+      close(true);
+    }
+    function onCancel()  { close(false); }
+    function onBackdrop(e){ if (e.target === overlay) close(false); }
     function onKey(e) {
-      if (e.key === "Enter") close(true);
-      else if (e.key === "Escape") close(false);
+      if (e.key === "Enter")  onOk();
+      if (e.key === "Escape") onCancel();
     }
 
     ok.addEventListener("click", onOk);
@@ -510,6 +519,7 @@ function showConfirm(message, { title = "Export terminé", okText = "Ouvrir", ca
     ok.focus();
   });
 }
+
 
 async function submitItemForm(){
   recoverFocus();
@@ -771,91 +781,71 @@ function init(){
   });
 
   // ------- SINGLE handler for Exporter PDF (works Web + Desktop) -------
-  getEl("btnPDF")?.addEventListener("click", async () => {
-    readInputs();
-    computeTotals();
+getEl("btnPDF")?.addEventListener("click", async () => {
+  readInputs();
+  computeTotals();
 
-    const assets = window.smartwebify?.assets || {};
+  const assets = window.smartwebify?.assets || {};
+  const htmlInv = window.PDFView.build(state, assets);
+  const cssInv  = window.PDFView.css;
 
-    // Build main invoice HTML/CSS
-    const htmlInv = window.PDFView.build(state, assets);
-    const cssInv  = window.PDFView.css;
+  const invNum    = slugForFile(state.meta.number || "");
+  const typeLabel = docTypeLabel(state.meta.docType);
+  const fileName  = ensurePdfExt([typeLabel, invNum].filter(Boolean).join(" "));
 
-    const invNum    = slugForFile(state.meta.number || "");
-    const typeLabel = docTypeLabel(state.meta.docType);
-    const baseName  = [typeLabel, invNum].filter(Boolean).join(" ");
-    const fileName  = ensurePdfExt(baseName);
+  // 1) Export main
+  const resInv = await window.smartwebify?.exportPDFFromHTML?.({
+    html: htmlInv, css: cssInv,
+    meta: { number: state.meta.number, type: state.meta.docType, filename: fileName }
+  });
+  if (!resInv) return;
 
-    // WEB: pre-open a tab synchronously so the shim can stream the blob
-    const preopen = IS_WEB ? window.open("", "_blank", "noopener") : null;
-
-    const resInv = await window.smartwebify?.exportPDFFromHTML?.({
-      html: htmlInv,
-      css:  cssInv,
-      meta: { number: state.meta.number, docType: state.meta.docType, filename: fileName, preopen }
+  // 2) Export withholding (optional)
+  let resWH = null;
+  if (state.meta?.withholding?.enabled && window.PDFWH) {
+    const htmlWH = window.PDFWH.build(state, assets);
+    const cssWH  = window.PDFWH.css;
+    const baseWH = ensurePdfExt(
+      (invNum ? `Retenue à la source - ${invNum}` : `Retenue à la source`)
+    );
+    resWH = await window.smartwebify?.exportPDFFromHTML?.({
+      html: htmlWH, css: cssWH,
+      meta: { number: state.meta.number, type: "retenue", filename: baseWH, silent: true, useSameDirAs: resInv?.path || resInv }
     });
-    if (!resInv) return;
+  }
 
-    // Withholding (second PDF) if enabled
-    let resWH = null;
-    if (state.meta?.withholding?.enabled && window.PDFWH) {
-      const htmlWH = window.PDFWH.build(state, assets);
-      const cssWH  = window.PDFWH.css;
+  // 3) Build message
+  const invLabel = resInv?.name || (typeof resInv === "string" ? resInv : fileName);
+  const whLabel  = resWH ? (resWH?.name || (typeof resWH === "string" ? resWH : "Retenue à la source.pdf")) : null;
+  const msg =
+    `PDF exporté :\n${invLabel}` +
+    (whLabel ? `\nCertificat exporté :\n${whLabel}` : "") +
+    `\n\nVoulez-vous l'ouvrir maintenant ?`;
 
-      const invNumWH   = slugForFile(state.meta.number || "");
-      const baseNameWH = invNumWH ? `Retenue à la source - ${invNumWH}` : `Retenue à la source`;
-      const fileNameWH = ensurePdfExt(baseNameWH);
-
-      const preopenWH = IS_WEB ? window.open("", "_blank", "noopener") : null;
-
-      resWH = await window.smartwebify?.exportPDFFromHTML?.({
-        html: htmlWH,
-        css:  cssWH,
-        meta: { number: state.meta.number, docType: "retenue", filename: fileNameWH, preopen: preopenWH }
-      });
-    }
-
-    // If we already opened the tab(s), we're done
-    if (resInv.opened && (!resWH || resWH.opened)) return;
-
-    // Otherwise offer to open (Desktop path or Web download tab)
-    const invLabel = resInv?.name || fileName;
-    const whLabel  = resWH ? (resWH?.name || "Retenue à la source.pdf") : null;
-
-    const msg =
-      `PDF exporté :\n${invLabel}` +
-      (whLabel ? `\nCertificat exporté :\n${whLabel}` : "") +
-      `\n\nVoulez-vous l'ouvrir maintenant ?`;
-
-    const openNow = await showConfirm(msg);
-    if (!openNow) return;
-
-    const openOne = async (res) => {
-      if (!res) return false;
-      if (IS_WEB) {
-        // In web fallback (download), try a new tab with just the name hint
-        // (there's no file path—user sees it in browser downloads)
-        window.open("", "_blank", "noopener"); // best-effort UX
-        return true;
-      }
-      // Desktop: open saved path
-      const pathLike = typeof res === "string" ? res : (res.path || res.name || "");
-      if (pathLike) return !!(await openPDFFile(pathLike));
-      return false;
+  // 4) Tell the dialog how to open, synchronously on click
+  const openWithUserGesture = () => {
+    // WEB case: web-shim returns { ok, name, url }
+    const tryOpenUrl = (u) => {
+      if (!u) return false;
+      // Use an anchor click for best compatibility with popup policies
+      const a = document.createElement("a");
+      a.href = u; a.target = "_blank"; a.rel = "noopener";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      return true;
     };
 
-    const okInv = await openOne(resInv);
-    if (!okInv) {
-      await showDialog("Le PDF de la facture a été exporté, mais l'ouverture automatique a échoué.", { title: "Information" });
-    }
+    if (resInv?.url) { tryOpenUrl(resInv.url); }
+    else if (typeof resInv === "string") { window.open(resInv, "_blank", "noopener"); }
 
-    if (resWH) {
-      const okWH = await openOne(resWH);
-      if (!okWH) {
-        await showDialog("Le PDF de la retenue a été exporté, mais l'ouverture automatique a échoué.", { title: "Information" });
-      }
-    }
-  });
+    if (resWH?.url) { tryOpenUrl(resWH.url); }
+    else if (typeof resWH === "string") { window.open(resWH, "_blank", "noopener"); }
+  };
+
+  await showConfirm(msg, { onOpen: openWithUserGesture });
+});
+
 
   getEl("btnSubmitItem")?.addEventListener("click", () => { submitItemForm(); });
   getEl("btnNewItem")?.addEventListener("click", () => { clearAddFormAndMode(); focusFirstEmptyAddField(); });
