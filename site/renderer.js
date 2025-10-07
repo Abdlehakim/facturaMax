@@ -906,26 +906,36 @@ await showConfirm(msg, {
   cancelText: "Fermer",
 onOk: () => {
   const invUrl  = resInv?.url || null;
-  const certUrl = resWH?.url || null;
-  const delayMs = 600;
+  const certUrl = resWH?.url  || null;
+  const delayMs = 800; // 0.8s is safe; tweak if you like
 
+  // 1) open the invoice now (this is inside the user's click)
   if (invUrl) {
-    try { window.open(invUrl, "_blank", "noopener,noreferrer"); } catch {}
+    try { window.open(invUrl, "_blank", "noopener"); } catch {}
   }
 
+  // 2) pre-open a tab for the certificate in the SAME click
   if (certUrl) {
     let certTab = null;
-    try { certTab = window.open("about:blank", "_blank", "noopener,noreferrer"); } catch {}
-
-    if (certTab) {
-      setTimeout(() => {
+    try {
+      certTab = window.open("", "_blank", "noopener");  // no 'noreferrer'
+      if (certTab) {
+        // Keep it alive so the browser doesn't discard it
         try {
-          if (!certTab.closed) certTab.location.replace(certUrl);
+          certTab.document.write("<!doctype html><title>Certificat…</title><p style='font:14px sans-serif;margin:2rem'>Chargement du certificat…</p>");
+          certTab.document.close();
         } catch {}
-      }, delayMs);
-    } else {
-      // Fallback: if pre-open was blocked, try direct open during the same click
-      try { window.open(certUrl, "_blank", "noopener,noreferrer"); } catch {}
+        // Navigate after a small delay
+        setTimeout(() => {
+          try { if (!certTab.closed) certTab.location.replace(certUrl); } catch {}
+        }, delayMs);
+      } else {
+        // Fallback: attempt to open the certificate directly while we're still in the click
+        try { window.open(certUrl, "_blank", "noopener"); } catch {}
+      }
+    } catch {
+      // Final fallback (won't work if popups are blocked)
+      try { window.open(certUrl, "_blank", "noopener"); } catch {}
     }
   }
 }
