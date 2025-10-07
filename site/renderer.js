@@ -557,12 +557,22 @@ function showConfirm(
       resolve(result);
     }
 
-    function runOpeners() {
-      try { onOk && onOk(); } catch {}
-      for (const u of urls) {
-        try { openUrlInNewTab(u); } catch {}
-      }
+  function runOpeners() {
+  try { onOk && onOk(); } catch {}
+
+  // Open N blank tabs inside this same user gesture, then navigate them.
+  const list = urls.slice();                 // blob/http(s) URLs to open
+  const wins = list.map(() => {
+    try { return window.open("", "_blank", "noopener"); } catch { return null; }
+  });
+
+  wins.forEach((w, i) => {
+    const u = list[i];
+    if (w && !w.closed && u) {
+      try { w.location.href = u; } catch {}
     }
+  });
+}
 
     function onOkClick() {
       // All actions happen inside this user-gesture
