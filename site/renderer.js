@@ -501,8 +501,10 @@ function showConfirm(
     title = "Export terminé",
     okText = "Ouvrir",
     cancelText = "Fermer",
-    onOk,                 // optional: extra work to run inside the click
-    openUrls              // NEW: string | string[] of blob/http(s) URLs to open on OK
+    onOk,
+    openUrls,
+    // EXTRA BUTTON support
+    extra // { text: string, onClick: fn } optional
   } = {}
 ) {
   const overlay = ensureDialog();
@@ -518,30 +520,33 @@ function showConfirm(
     cancel.className = "swbDialog__cancel";
     ok.parentElement.insertBefore(cancel, ok);
   }
+
+  // EXTRA BUTTON (ghost/secondary)
+  let extraBtn = overlay.querySelector("#swbDialogExtra");
+  if (!extraBtn) {
+    extraBtn = document.createElement("button");
+    extraBtn.id = "swbDialogExtra";
+    extraBtn.type = "button";
+    extraBtn.className = "swbDialog__extra";
+    ok.parentElement.insertBefore(extraBtn, ok); // place to the left of OK
+  }
+  extraBtn.style.display = extra ? "" : "none";
+
   ok.textContent = okText;
   cancel.textContent = cancelText;
   cancel.style.display = "";
 
   const previouslyFocused = document.activeElement;
 
-  // Helper: robustly open a URL in a new tab within the same user gesture
   function openUrlInNewTab(url) {
     if (!url) return false;
-    const a = document.createElement("a");
-    a.href = url;
-    a.target = "_blank";
-    a.rel = "noopener";
-    // Do NOT set a.download — we want the viewer
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    return true;
+    try {
+      const w = window.open(url, "_blank", "noopener,noreferrer");
+      return !!w;
+    } catch { return false; }
   }
 
-  // Normalize openUrls to an array (or empty)
-  const urls = Array.isArray(openUrls)
-    ? openUrls.filter(Boolean)
-    : (openUrls ? [openUrls] : []);
+  const urls = Array.isArray(openUrls) ? openUrls.filter(Boolean) : (openUrls ? [openUrls] : []);
 
   return new Promise((resolve) => {
     msg.textContent = message || "";
@@ -552,53 +557,34 @@ function showConfirm(
       cancel.removeEventListener("click", onCancel);
       overlay.removeEventListener("click", onBackdrop);
       document.removeEventListener("keydown", onKey);
-      closeOverlayA11y(overlay, previouslyFocused, [ok, cancel]); // blur before hide
+      extraBtn.removeEventListener("click", onExtraClick);
+      closeOverlayA11y(overlay, previouslyFocused, [ok, cancel, extraBtn]);
       recoverFocus();
       resolve(result);
     }
 
-function runOpeners() {
-  try { onOk && onOk(); } catch {}
-
-  const list = urls.slice(); // array of blob/http(s) URLs
-
-  // 1) Try direct window.open for each URL (most reliable across browsers)
-  let opened = 0;
-  for (const u of list) {
-    if (!u) continue;
-    try {
-      const w = window.open(u, "_blank", "noopener,noreferrer");
-      if (w) opened++;
-    } catch {}
-  }
-  if (opened === list.length) return;
-
-  // 2) Fallback: programmatic <a target="_blank"> clicks
-  for (const u of list) {
-    if (!u) continue;
-    try {
-      const a = document.createElement("a");
-      a.href = u;
-      a.target = "_blank";
-      a.rel = "noopener";
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-    } catch {}
-  }
-}
-
-
-    function onOkClick() {
-      // All actions happen inside this user-gesture
-      runOpeners();
-      close(true);
+    function runOpeners() {
+      try { onOk && onOk(); } catch {}
+      for (const u of urls) { openUrlInNewTab(u); } // opens (likely only first)
     }
-    function onCancel() { close(false); }
+
+    function onOkClick() { runOpeners(); close(true); }
+    function onCancel()  { close(false); }
     function onBackdrop(e) { if (e.target === overlay) close(false); }
     function onKey(e) {
       if (e.key === "Enter") { runOpeners(); close(true); }
       else if (e.key === "Escape") close(false);
+    }
+
+    // EXTRA BUTTON handler (dedicated user gesture)
+    function onExtraClick() {
+      try { extra?.onClick && extra.onClick(); } catch {}
+    }
+
+    // Bind extra button if provided
+    if (extra && extra.text) {
+      extraBtn.textContent = extra.text;
+      extraBtn.addEventListener("click", onExtraClick);
     }
 
     openOverlayA11y(overlay, ok);
@@ -608,6 +594,7 @@ function runOpeners() {
     document.addEventListener("keydown", onKey);
   });
 }
+
 
 
 
@@ -915,11 +902,23 @@ getEl("btnPDF")?.addEventListener("click", async () => {
 
   // 4) Only open when user clicks "Ouvrir"
 await showConfirm(msg, {
-  okText: "Ouvrir",
+  okText: "Ouvrir la facture",
   cancelText: "Fermer",
-  // open BOTH tabs only when the user clicks "Ouvrir"
-  openUrls: [resInv?.url, resWH?.url].filter(Boolean)
+  openUrls: [resInv?.url], // only the invoice on the first click
+  extra: resWH?.url ? {
+    text: "Ouvrir le certificat",
+    onClick: () => {
+      const a = document.createElement("a");
+      a.href = resWH.url;
+      a.target = "_blank";
+      a.rel = "noopener";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    }
+  } : null
 });
+
 });
 
 
