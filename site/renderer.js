@@ -904,30 +904,32 @@ getEl("btnPDF")?.addEventListener("click", async () => {
 await showConfirm(msg, {
   okText: "Ouvrir",
   cancelText: "Fermer",
-  onOk: () => {
-    const invUrl = resInv?.url || null;
-    const certUrl = resWH?.url || null;
-    const delayMs = 600; // small delay before showing the certificate
+onOk: () => {
+  const invUrl  = resInv?.url || null;
+  const certUrl = resWH?.url || null;
+  const delayMs = 600;
 
-    // 1) open the invoice now (this is the user's click)
-    if (invUrl) {
-      try { window.open(invUrl, "_blank", "noopener,noreferrer"); } catch {}
-    }
+  if (invUrl) {
+    try { window.open(invUrl, "_blank", "noopener,noreferrer"); } catch {}
+  }
 
-    // 2) pre-open a blank tab *during the same click* so popup blockers allow it,
-    //    then navigate it to the certificate after a short delay.
-    if (certUrl) {
-      let certTab = null;
-      try { certTab = window.open("about:blank", "_blank", "noopener,noreferrer"); } catch {}
+  if (certUrl) {
+    let certTab = null;
+    try { certTab = window.open("about:blank", "_blank", "noopener,noreferrer"); } catch {}
 
-      // Navigate after a small delay
+    if (certTab) {
       setTimeout(() => {
         try {
-          if (certTab && !certTab.closed) certTab.location.href = certUrl;
+          if (!certTab.closed) certTab.location.replace(certUrl);
         } catch {}
       }, delayMs);
+    } else {
+      // Fallback: if pre-open was blocked, try direct open during the same click
+      try { window.open(certUrl, "_blank", "noopener,noreferrer"); } catch {}
     }
   }
+}
+
 });
 
 
