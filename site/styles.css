@@ -43,7 +43,7 @@ textarea{ resize: vertical; }
 /* --- Layout --- */
 .app{ max-width: 1820px; margin: 0 auto; padding: 16px; }
 .header{
-  display:flex; justify-content:space-between; align-items:center;
+  display:flex; justify-content:center; align-items:center;
   gap:16px; margin-bottom:16px;
 }
 .brand{ display:flex; justify-content: center; gap:12px; align-items:center; }
