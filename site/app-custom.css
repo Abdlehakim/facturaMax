@@ -163,12 +163,24 @@
 
 /* ensure both groups can stretch to edges nicely */
 .swbDialog__group--left,
+/* Keep the two open buttons on one line */
 .swbDialog__group--right{
-  flex: 1 1 0;
+  display: flex;
+  gap: 8px;
+  flex-wrap: nowrap;     /* no wrapping */
+  white-space: nowrap;   /* keep button labels on one line */
+  flex: 0 1 auto;        /* don’t force extra shrinking that could wrap */
+  align-items: center;
 }
 
+/* Ensure the buttons themselves don't wrap text */
+.swbDialog__ok,
+#swbDialogExtra{
+  white-space: nowrap;
+}
+
+
 .swbDialog__group--left  { justify-content:flex-start; }
-.swbDialog__group--right { justify-content:flex-end; }
 
 /* small gap between the two right-side open buttons */
 #swbDialogExtra { margin-left:8px; }
