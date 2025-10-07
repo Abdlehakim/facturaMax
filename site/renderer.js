@@ -766,19 +766,90 @@ function init(){
     bind();
   });
 
-  getEl("btnSave")?.addEventListener("click", async ()=>{
-    const payload = captureForm();
-    const label   = docTypeLabel(payload.meta?.docType || state.meta.docType);
-    const number  = (payload.meta?.number || "").trim() || "";
-    const dateStr = (payload.meta?.date || new Date().toISOString().slice(0,10));
-    const base    = slugForFile(number ? `${label} - ${number}` : `${label} - ${dateStr}`);
-    const filename = ensureJsonExt(base);
-    payload.meta = { ...(payload.meta || {}), type: payload.meta?.docType || state.meta.docType, typeLabel: label, filename };
-    const saved = await window.smartwebify?.saveInvoiceJSON?.(payload);
-    if (saved) {
-      await showDialog(`Enregistré : ${saved}`, { title: "Sauvegarde" });
-    }
+getEl("btnPDF")?.addEventListener("click", async () => {
+  readInputs();
+  computeTotals();
+
+  const assets = window.smartwebify?.assets || {};
+
+  // Build main invoice HTML/CSS
+  const htmlInv = window.PDFView.build(state, assets);
+  const cssInv  = window.PDFView.css;
+
+  const invNum     = slugForFile(state.meta.number || "");
+  const typeLabel  = docTypeLabel(state.meta.docType);
+  const baseName   = [typeLabel, invNum].filter(Boolean).join(" ");
+  const fileName   = ensurePdfExt(baseName);
+
+  // Export main invoice
+  const resInv = await window.smartwebify?.exportPDFFromHTML?.({
+    html: htmlInv,
+    css:  cssInv,
+    meta: { number: state.meta.number, type: state.meta.docType, filename: fileName }
   });
+  if (!resInv) return;
+
+  // Export withholding (if enabled)
+  let resWH = null;
+  if (state.meta?.withholding?.enabled && window.PDFWH) {
+    const htmlWH = window.PDFWH.build(state, assets);
+    const cssWH  = window.PDFWH.css;
+
+    const invNumWH    = slugForFile(state.meta.number || "");
+    const baseNameWH  = invNumWH ? `Retenue à la source - ${invNumWH}` : `Retenue à la source`;
+    const fileNameWH  = ensurePdfExt(baseNameWH);
+
+    resWH = await window.smartwebify?.exportPDFFromHTML?.({
+      html: htmlWH,
+      css:  cssWH,
+      meta: { number: state.meta.number, type: "retenue", filename: fileNameWH, silent: true, useSameDirAs: resInv?.path || resInv }
+    });
+  }
+
+  // Build a friendly message
+  const invLabel = resInv?.name || (typeof resInv === "string" ? resInv : fileName);
+  const whLabel  = resWH ? (resWH?.name || (typeof resWH === "string" ? resWH : "Retenue à la source.pdf")) : null;
+
+  const msg =
+    `PDF exporté :\n${invLabel}` +
+    (whLabel ? `\nCertificat exporté :\n${whLabel}` : "") +
+    `\n\nVoulez-vous l'ouvrir maintenant ?`;
+
+  const openNow = await showConfirm(msg);
+  if (!openNow) return;
+
+  // Open depending on environment
+  // Web: open Blob URL in new tab; Desktop: open file path
+  const openOne = async (res) => {
+    if (!res) return false;
+
+    // WEB: web-shim returns { ok, name, url }
+    if (IS_WEB && res.url) {
+      try { window.open(res.url, "_blank", "noopener"); return true; } catch { return false; }
+    }
+
+    // DESKTOP: main returns a file path string; or sometimes an object with a path-like value
+    const pathLike = typeof res === "string" ? res : (res.path || res.name || "");
+    if (pathLike) {
+      const ok = await openPDFFile(pathLike);
+      return !!ok;
+    }
+    return false;
+  };
+
+  const okInv = await openOne(resInv);
+  if (!okInv) {
+    await showDialog("Le PDF de la facture a été exporté, mais l'ouverture automatique a échoué.", { title: "Information" });
+  }
+
+  if (resWH) {
+    const okWH = await openOne(resWH);
+    if (!okWH) {
+      await showDialog("Le PDF de la retenue a été exporté, mais l'ouverture automatique a échoué.", { title: "Information" });
+    }
+  }
+});
+
 
   getEl("btnPDF")?.addEventListener("click", async () => {
     readInputs();
