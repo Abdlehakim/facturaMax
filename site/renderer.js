@@ -426,6 +426,39 @@ function ensureDialog() {
   return overlay;
 }
 
+// --- helpers shared by both functions ---
+function setSiblingsInert(exceptEl, inertOn) {
+  const kids = Array.from(document.body.children);
+  for (const el of kids) {
+    if (el === exceptEl) continue;
+    if (inertOn) el.setAttribute('inert', '');
+    else el.removeAttribute('inert');
+  }
+}
+
+function openOverlayA11y(overlay, focusEl) {
+  // make sure panel has proper role/aria
+  const panel = overlay.querySelector('.swbDialog__panel');
+  if (panel) { panel.setAttribute('role', 'dialog'); panel.setAttribute('aria-modal', 'true'); }
+
+  overlay.style.display = 'flex';
+  overlay.removeAttribute('aria-hidden');
+  setSiblingsInert(overlay, true);     // disable background (no focus / pointer)
+  if (focusEl) try { focusEl.focus(); } catch {}
+}
+
+function closeOverlayA11y(overlay, prevFocusEl, buttonsToBlur = []) {
+  // blur any focused dialog control BEFORE hiding it to avoid the warning
+  buttonsToBlur.forEach(btn => { try { btn.blur(); } catch {} });
+  overlay.setAttribute('aria-hidden', 'true');
+  overlay.style.display = 'none';
+  setSiblingsInert(overlay, false);    // re-enable background
+  if (prevFocusEl && typeof prevFocusEl.focus === 'function') {
+    try { prevFocusEl.focus(); } catch {}
+  }
+}
+
+// --- showDialog (alert-style) ---
 function showDialog(message, { title = "Information" } = {}) {
   return new Promise((resolve) => {
     const overlay = ensureDialog();
@@ -433,40 +466,42 @@ function showDialog(message, { title = "Information" } = {}) {
     const ok = getEl("swbDialogOk");
     const ttl = getEl("swbDialogTitle");
 
+    // hide cancel if present (alert style)
     const cancel = overlay.querySelector("#swbDialogCancel");
     if (cancel) cancel.style.display = "none";
 
-    overlay.style.display = "flex";
-    overlay.setAttribute("aria-hidden","false");
+    const previouslyFocused = document.activeElement;
+
     msg.textContent = message || "";
     ttl.textContent = title;
 
     function close() {
-      overlay.style.display = "none";
-      overlay.setAttribute("aria-hidden","true");
       ok.removeEventListener("click", onOk);
       overlay.removeEventListener("click", onBackdrop);
       document.removeEventListener("keydown", onKey);
+      closeOverlayA11y(overlay, previouslyFocused, [ok]); // <— blur before aria-hidden
       resolve();
       recoverFocus();
     }
     function onOk() { close(); }
     function onBackdrop(e) { if (e.target === overlay) close(); }
     function onKey(e) { if (e.key === "Enter" || e.key === "Escape") close(); }
+
+    openOverlayA11y(overlay, ok);
     ok.addEventListener("click", onOk);
     overlay.addEventListener("click", onBackdrop);
     document.addEventListener("keydown", onKey);
-    ok.focus();
   });
 }
 
+// --- showConfirm (confirm-style) ---
 function showConfirm(
   message,
   {
     title = "Export terminé",
     okText = "Ouvrir",
     cancelText = "Fermer",
-    onOk // <-- NEW: function to run synchronously in the click handler
+    onOk // optional synchronous callback run inside the click handler
   } = {}
 ) {
   const overlay = ensureDialog();
@@ -480,32 +515,30 @@ function showConfirm(
     cancel.id = "swbDialogCancel";
     cancel.type = "button";
     cancel.className = "swbDialog__cancel";
-    cancel.textContent = cancelText;
     ok.parentElement.insertBefore(cancel, ok);
   }
-  cancel.style.display = "";
   ok.textContent = okText;
   cancel.textContent = cancelText;
+  cancel.style.display = "";
+
+  const previouslyFocused = document.activeElement;
 
   return new Promise((resolve) => {
-    overlay.style.display = "flex";
-    overlay.setAttribute("aria-hidden", "false");
     msg.textContent = message || "";
     ttl.textContent = title;
 
     function close(result) {
-      overlay.style.display = "none";
-      overlay.setAttribute("aria-hidden", "true");
       ok.removeEventListener("click", onOkClick);
       cancel.removeEventListener("click", onCancel);
       overlay.removeEventListener("click", onBackdrop);
       document.removeEventListener("keydown", onKey);
+      closeOverlayA11y(overlay, previouslyFocused, [ok, cancel]); // blur before hide
       recoverFocus();
       resolve(result);
     }
 
     function onOkClick() {
-      // IMPORTANT: run the callback while we're still in the user click handler
+      // Run callback while still in the user-gesture click handler (helps with popup blockers)
       try { onOk && onOk(); } catch {}
       close(true);
     }
@@ -516,11 +549,11 @@ function showConfirm(
       else if (e.key === "Escape") close(false);
     }
 
+    openOverlayA11y(overlay, ok);
     ok.addEventListener("click", onOkClick);
     cancel.addEventListener("click", onCancel);
     overlay.addEventListener("click", onBackdrop);
     document.addEventListener("keydown", onKey);
-    ok.focus();
   });
 }
 
