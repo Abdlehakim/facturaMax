@@ -197,19 +197,19 @@ td .del:hover{
 .col-toggle{ cursor:pointer; }
 
 .hide-col-ref      #items thead th:nth-child(1),
-.hide-col-ref      #items tbody td:nth-child(1){ display:none; }
+.hide-col-ref      #items tbody td:nth-child(1){ display:none; white-space: nowrap;}
 .hide-col-product  #items thead th:nth-child(2),
-.hide-col-product  #items tbody td:nth-child(2){ display:none; }
+.hide-col-product  #items tbody td:nth-child(2){ display:none;white-space: nowrap; }
 .hide-col-desc     #items thead th:nth-child(3),
-.hide-col-desc     #items tbody td:nth-child(3){ display:none; }
+.hide-col-desc     #items tbody td:nth-child(3){ display:none;white-space: nowrap; }
 .hide-col-qty      #items thead th:nth-child(4),
-.hide-col-qty      #items tbody td:nth-child(4){ display:none; }
+.hide-col-qty      #items tbody td:nth-child(4){ display:none;white-space: nowrap; }
 .hide-col-price    #items thead th:nth-child(5),
-.hide-col-price    #items tbody td:nth-child(5){ display:none; }
+.hide-col-price    #items tbody td:nth-child(5){ display:none; white-space: nowrap; }
 .hide-col-tva      #items thead th:nth-child(6),
-.hide-col-tva      #items tbody td:nth-child(6){ display:none; }
+.hide-col-tva      #items tbody td:nth-child(6){ display:none;white-space: nowrap; }
 .hide-col-discount #items thead th:nth-child(7),
-.hide-col-discount #items tbody td:nth-child(7){ display:none; }
+.hide-col-discount #items tbody td:nth-child(7){ display:none;white-space: nowrap; }
 /* TTC col toggle handled in JS for nth-child(8) */
 
 /* =========================
