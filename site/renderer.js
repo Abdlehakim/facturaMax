@@ -820,7 +820,15 @@ function init(){
   });
 
 getEl("btnPDF")?.addEventListener("click", async () => {
-  // 1) compute
+  // keep everything synchronous up-front
+  const wantsWH = !!(state.meta?.withholding?.enabled && window.PDFWH);
+
+  // Pre-open BOTH tabs in the same user gesture
+  // (some browsers block the 2nd popup if you don't open it right here)
+  const tabInv = window.open("about:blank", "_blank", "noopener");
+  const tabWH  = wantsWH ? window.open("about:blank", "_blank", "noopener") : null;
+
+  // 1) update state
   readInputs();
   computeTotals();
 
@@ -832,17 +840,17 @@ getEl("btnPDF")?.addEventListener("click", async () => {
   const typeLabel = docTypeLabel(state.meta.docType);
   const fileName  = ensurePdfExt([typeLabel, invNum].filter(Boolean).join(" "));
 
-  // 2) export facture
+  // 2) export main invoice -> stream into tabInv
   const resInv = await window.smartwebify?.exportPDFFromHTML?.({
     html: htmlInv,
     css:  cssInv,
-    meta: { number: state.meta.number, type: state.meta.docType, filename: fileName }
+    meta: { number: state.meta.number, docType: state.meta.docType, filename: fileName, preopen: tabInv }
   });
   if (!resInv) return;
 
-  // 3) export retenue (optional)
+  // 3) export WH certificate (optional) -> stream into tabWH
   let resWH = null;
-  if (state.meta?.withholding?.enabled && window.PDFWH) {
+  if (wantsWH) {
     const htmlWH = window.PDFWH.build(state, assets);
     const cssWH  = window.PDFWH.css;
     const baseWH = ensurePdfExt(invNum ? `Retenue à la source - ${invNum}` : `Retenue à la source`);
@@ -850,59 +858,20 @@ getEl("btnPDF")?.addEventListener("click", async () => {
     resWH = await window.smartwebify?.exportPDFFromHTML?.({
       html: htmlWH,
       css:  cssWH,
-      meta: {
-        number: state.meta.number,
-        type:   "retenue",
-        filename: baseWH,
-        silent: true,
-        useSameDirAs: resInv?.path || resInv
-      }
+      meta: { number: state.meta.number, docType: "retenue", filename: baseWH, preopen: tabWH, silent: true, useSameDirAs: resInv?.path || resInv }
     });
   }
 
-  const invLabel = resInv?.name || (typeof resInv === "string" ? resInv : fileName);
-  const whLabel  = resWH ? (resWH?.name || (typeof resWH === "string" ? resWH : "Retenue à la source.pdf")) : null;
+  // 4) Optional: show the summary dialog (opening already happened)
+  const invLabel = resInv?.name || fileName;
+  const whLabel  = resWH ? (resWH?.name || "Retenue à la source.pdf") : null;
 
-  // Prepare a visible link for the retenue so the user can click it (2nd gesture)
-  const extraLines = [];
-  if (resWH?.url) {
-    extraLines.push(`<a href="${resWH.url}" target="_blank" rel="noopener" class="swbDialog__link">
-      Ouvrir la retenue dans un nouvel onglet
-    </a>`);
-  }
   const msg =
-    `PDF exporté :<br>${invLabel}` +
-    (whLabel ? `<br>Certificat exporté :<br>${whLabel}` : "") +
-    `<br><br>Voulez-vous l’ouvrir maintenant ?` +
-    (extraLines.length ? `<div class="swbDialog__extra" style="margin-top:.75rem">${extraLines.join("")}</div>` : "");
+    `PDF exporté :\n${invLabel}` +
+    (whLabel ? `\nCertificat exporté :\n${whLabel}` : "") +
+    `\n\nLes onglets ont été ouverts dans votre navigateur.`;
 
-  // Helper: open a URL in a new tab from this very click
-  const openUrlInNewTab = (url) => {
-    const a = document.createElement("a");
-    a.href = url; a.target = "_blank"; a.rel = "noopener";
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-  };
-
-  await showConfirm(msg, {
-    okText: "Ouvrir",
-    cancelText: "Fermer",
-    // IMPORTANT: run inside the OK button's click (user activation)
-    onOk: () => {
-      // open the facture
-      if (resInv?.url) openUrlInNewTab(resInv.url);
-      // If you *really* want to try opening both automatically,
-      // uncomment the next line — but some browsers will block the 2nd popup.
-      // if (resWH?.url) openUrlInNewTab(resWH.url);
-      //
-      // With the visible <a> link in the dialog, the user can click to open the retenue.
-    },
-    // Optional: let showConfirm inject HTML (if your dialog supports it).
-    // If your dialog escapes HTML, you can instead add a small “after open”
-    // hook to append the anchor node programmatically.
-    allowHtml: true
-  });
+  await showDialog(msg, { title: "Export terminé" });
 });
 
 
