@@ -60,6 +60,7 @@ body.print-mode #pdfRoot {
 .pdf-table tbody td:nth-child(1),
 .pdf-table tbody td:nth-child(2),
 .pdf-table tbody td:nth-child(3){ text-align:left; }
+.pdf-table tbody td:nth-child(6),  tbody td:nth-child(7){  white-space: nowrap; }
 .pdf-table tbody tr td { border-bottom: 1px solid #15335e; }
 .pdf-table tbody tr:last-child td { border-bottom: 0; }
 
@@ -138,7 +139,7 @@ body.print-mode #pdfRoot {
   background: transparent;      /* allow the border to be visible across it */
   letter-spacing: 0.02em;
 }
-  
+
 .pdf-notes{
   margin-top:10px;
   font-size:10px;
