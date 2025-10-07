@@ -265,7 +265,7 @@ body.print-mode #pdfRoot {
     const stampTTC     = stampHT + stampTVA;
 
     const cur   = meta.currency || "TND";
-    const logo  = assets?.logo || company.logo || "";
+    const logo = assets?.logo || company.logo || "./assets/logoSW.png";
     const type  = getDocType(meta);
 
     const MAP = {

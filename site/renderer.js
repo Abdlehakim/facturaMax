@@ -83,9 +83,15 @@ function bind(){
   setVal("stampAmount", String(t.amount ?? 1));
   setVal("stampTva",    String(t.tva ?? 0));
   toggleStampFields(!!t.enabled);
-  const bundled = "./assets/logoSW.png";
+const bundled = "./assets/logoSW.png";
 const logo = window.smartwebify?.assets?.logo || state.company.logo || bundled;
-setSrc("companyLogo", logo)
+
+// keep the UI image in sync
+setSrc("companyLogo", logo);
+
+// IMPORTANT: if there was no logo in state, persist the fallback
+if (!state.company.logo) state.company.logo = bundled;
+
   setVal("notes", state.notes);
   setText("year", new Date().getFullYear());
   ["colToggleRef","colToggleProduct","colToggleDesc","colToggleQty","colTogglePrice","colToggleTva","colToggleDiscount"].forEach(id => { const el = getEl(id); if (el) el.checked = true; });
