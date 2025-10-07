@@ -1,6 +1,6 @@
 // site/web-shim.js
-// Web shim: generate a PDF directly (no print dialog) using html2canvas + jsPDF,
-// and provide JSON save/open helpers for the web demo.
+// Web shim: direct PDF generation (no print dialog) using html2canvas + jsPDF,
+// plus JSON save/open helpers for the web demo.
 
 function docTypeText(v = "") {
   v = String(v).toLowerCase();
@@ -16,14 +16,14 @@ function today() {
   return new Date().toISOString().slice(0, 10);
 }
 
-// A tiny host document so the HTML has your CSS applied
+// Build a host with your CSS applied to the provided invoice HTML
 function buildHost(html, css) {
   return `
     <style>
-      /* ensure colors print/render as on screen */
+      /* make colors render as on screen */
       @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
       ${css || ""}
-      body { margin: 0; }
+      html, body { margin: 0; padding: 0; background: #fff; }
     </style>
     <div id="root">${html || ""}</div>
   `;
@@ -31,9 +31,11 @@ function buildHost(html, css) {
 
 // Render node to a tall canvas
 async function renderNodeToCanvas(node, scale = 2) {
-  // html2canvas is loaded globally (html2canvas)
+  if (typeof window.html2canvas !== "function") {
+    throw new Error("html2canvas is not loaded. Include site/lib/html2canvas.min.js first.");
+  }
   return await html2canvas(node, {
-    scale,
+    scale,           // 2 = sharper, larger file. 3 if you want even sharper.
     useCORS: true,
     allowTaint: true,
     backgroundColor: "#ffffff",
@@ -42,94 +44,95 @@ async function renderNodeToCanvas(node, scale = 2) {
   });
 }
 
-// Slice the tall canvas into A4 pages and emit a PDF download
-async function canvasToA4PdfAndDownload(canvas, filename) {
-  // jsPDF UMD is loaded globally at window.jspdf.jsPDF
+// Slice the tall canvas into A4 pages and return a jsPDF instance
+function canvasToA4Pdf(canvas) {
+  if (!(window.jspdf && window.jspdf.jsPDF)) {
+    throw new Error("jsPDF is not loaded. Include site/lib/jspdf.umd.min.js first.");
+  }
   const { jsPDF } = window.jspdf;
-
-  // A4 size in millimeters
   const pdf = new jsPDF({ orientation: "p", unit: "mm", format: "a4" });
-  const pageWidth = pdf.internal.pageSize.getWidth();
-  const pageHeight = pdf.internal.pageSize.getHeight();
 
-  // Convert canvas to JPEG at a good quality
-  const imgWidth = pageWidth; // we scale image to fit width
+  const pageWidth  = pdf.internal.pageSize.getWidth();   // 210mm
+  const pageHeight = pdf.internal.pageSize.getHeight();  // 297mm
+
+  // Target image width = page width
+  const imgWidth  = pageWidth;
   const imgHeight = (canvas.height * pageWidth) / canvas.width; // keep aspect
 
-  // How many PDF pages?
-  let remainingHeight = imgHeight;
-  let position = 0;
-
-  // We draw from the canvas in chunks by shifting a viewport
-  // But jsPDF can accept the whole image each page by offsetting via 'position'
-  // The simpler approach: draw the full image each time and move the viewport with 'position' (negative Y)
-  // However, jsPDF doesn't support y-offset for images directly. So we create page slices.
-  // We'll slice the canvas into page-height chunks first.
-
-  const pxPerMM = canvas.height / imgHeight; // pixels per millimeter after scaling to fit width
+  // Pixels per mm for the scaled image
+  const pxPerMM = canvas.height / imgHeight;
   const pageHeightPx = pageHeight * pxPerMM;
 
   let pageIndex = 0;
-  while (remainingHeight > 0) {
-    const sliceCanvas = document.createElement("canvas");
+  let remaining = canvas.height;
+
+  while (remaining > 0) {
     const sliceHeightPx = Math.min(pageHeightPx, canvas.height - pageIndex * pageHeightPx);
 
+    const sliceCanvas = document.createElement("canvas");
     sliceCanvas.width = canvas.width;
     sliceCanvas.height = sliceHeightPx;
 
     const ctx = sliceCanvas.getContext("2d");
     ctx.drawImage(
       canvas,
-      0, pageIndex * pageHeightPx,              // source x,y
-      canvas.width, sliceHeightPx,              // source w,h
-      0, 0,                                     // dest x,y
-      sliceCanvas.width, sliceCanvas.height     // dest w,h
+      0, pageIndex * pageHeightPx,           // src x,y
+      canvas.width, sliceHeightPx,           // src w,h
+      0, 0,                                   // dst x,y
+      sliceCanvas.width, sliceCanvas.height  // dst w,h
     );
 
     const imgData = sliceCanvas.toDataURL("image/jpeg", 0.95);
-
     if (pageIndex > 0) pdf.addPage();
-    pdf.addImage(imgData, "JPEG", 0, 0, pageWidth, (sliceHeightPx / pxPerMM), undefined, "FAST");
+    pdf.addImage(imgData, "JPEG", 0, 0, imgWidth, (sliceHeightPx / pxPerMM), undefined, "FAST");
 
-    remainingHeight -= pageHeight;
-    pageIndex += 1;
+    remaining -= sliceHeightPx;
+    pageIndex++;
   }
 
-  pdf.save(filename);
+  return pdf;
 }
 
+// Ensure demo shows a logo if the user didn't pick one
 window.addEventListener("DOMContentLoaded", () => {
-  // Ensure demo has a logo if user didn't upload one
   const img = document.getElementById("companyLogo");
   if (img && !img.src) img.src = "./logoSW.png";
 });
 
-// Public API used by your renderer (same signature as desktop)
+// Public API (mirrors desktop preload API)
 window.smartwebify = window.smartwebify || {};
 
 /**
  * Export PDF directly (no print dialog).
- * Expect: { html, css, meta }
+ * Returns:
+ *  - { ok: true, name, url } on web (Blob URL + auto download)
+ *  - In desktop, your preload/main return a file path string (handled separately)
  */
 window.smartwebify.exportPDFFromHTML = async ({ html, css, meta = {} }) => {
   const baseName = `${docTypeText(meta.docType)} - ${sanitize(meta.number || today())}.pdf`;
 
-  // Host element off-screen
+  // Host element off-screen so computed styles/layout are applied
   const host = document.createElement("div");
   host.style.position = "fixed";
   host.style.left = "-99999px";
   host.style.top = "0";
-  host.style.width = "794px";  // A4 width at 96dpi ≈ 794px
+  host.style.width = "794px"; // ≈ A4 width @96dpi for more consistent sizing
   host.style.background = "#fff";
   host.innerHTML = buildHost(html, css);
   document.body.appendChild(host);
 
   try {
     const root = host.querySelector("#root");
-    // Increase scale for sharper output; 2 is a good balance
-    const canvas = await renderNodeToCanvas(root, 2);
-    await canvasToA4PdfAndDownload(canvas, baseName);
-    return { ok: true, name: baseName };
+    const canvas = await renderNodeToCanvas(root, 2); // scale 2 => good quality
+    const pdf = canvasToA4Pdf(canvas);
+
+    // 1) Return a Blob URL so UI can "Open" in new tab if desired
+    const url = pdf.output("bloburl");
+
+    // 2) Also trigger a download automatically
+    pdf.save(baseName);
+
+    return { ok: true, name: baseName, url };
   } catch (e) {
     console.error("PDF export (web) failed:", e);
     alert("Impossible de générer le PDF dans le navigateur.");
@@ -146,6 +149,7 @@ window.smartwebify.saveInvoiceJSONToDesktop = async (payload = {}) => {
   const json = JSON.stringify(payload, null, 2);
   const blob = new Blob([json], { type: "application/json" });
 
+  // Best UX on Chromium (lets the user pick Desktop)
   if (window.showSaveFilePicker) {
     try {
       const handle = await window.showSaveFilePicker({
@@ -161,7 +165,7 @@ window.smartwebify.saveInvoiceJSONToDesktop = async (payload = {}) => {
     }
   }
 
-  // Fallback: download to default folder
+  // Fallback: force a download
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url; a.download = name; document.body.appendChild(a); a.click();
@@ -183,9 +187,12 @@ window.smartwebify.openInvoiceJSON = async () => {
     } catch { return null; }
   }
 
+  // Input fallback
   return new Promise((resolve) => {
     const input = document.createElement("input");
-    input.type = "file"; input.accept = "application/json"; input.style.display = "none";
+    input.type = "file";
+    input.accept = "application/json";
+    input.style.display = "none";
     document.body.appendChild(input);
     input.onchange = async () => {
       const f = input.files && input.files[0]; input.remove();
