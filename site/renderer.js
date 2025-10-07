@@ -494,69 +494,35 @@ function showDialog(message, { title = "Information" } = {}) {
   });
 }
 
-// --- showConfirm (confirm-style) ---
-function showConfirm(
-  message,
-  {
-    title = "Export terminé",
-    okText = "Ouvrir",
-    cancelText = "Fermer",
-    onOk // optional synchronous callback run inside the click handler
-  } = {}
-) {
-  const overlay = ensureDialog();
-  const msg = getEl("swbDialogMsg");
-  const ok = getEl("swbDialogOk");
-  const ttl = getEl("swbDialogTitle");
+await showConfirm(msg, {
+  okText: "Ouvrir",
+  cancelText: "Fermer",
+  onOk: () => {
+    // Helper: open one URL in a new tab (must be called inside this click)
+    const openNow = (url) => {
+      if (!url) return false;
+      try {
+        // Two synchronous calls in the same user gesture → both tabs allowed
+        window.open(url, "_blank", "noopener");
+        return true;
+      } catch { return false; }
+    };
 
-  let cancel = overlay.querySelector("#swbDialogCancel");
-  if (!cancel) {
-    cancel = document.createElement("button");
-    cancel.id = "swbDialogCancel";
-    cancel.type = "button";
-    cancel.className = "swbDialog__cancel";
-    ok.parentElement.insertBefore(cancel, ok);
+    // WEB (blob URLs)
+    const opened1 = resInv?.url ? openNow(resInv.url) : false;
+    const opened2 = resWH?.url ? openNow(resWH.url) : false;
+
+    // DESKTOP/ELECTRON fallback (no URLs, only file paths)
+    if (!opened1 && (resInv?.path || typeof resInv === "string")) {
+      const p1 = resInv?.path || (typeof resInv === "string" ? resInv : "");
+      try { window.smartwebify?.openPath?.(p1); } catch {}
+    }
+    if (!opened2 && resWH && (resWH?.path || typeof resWH === "string")) {
+      const p2 = resWH?.path || (typeof resWH === "string" ? resWH : "");
+      try { window.smartwebify?.openPath?.(p2); } catch {}
+    }
   }
-  ok.textContent = okText;
-  cancel.textContent = cancelText;
-  cancel.style.display = "";
-
-  const previouslyFocused = document.activeElement;
-
-  return new Promise((resolve) => {
-    msg.textContent = message || "";
-    ttl.textContent = title;
-
-    function close(result) {
-      ok.removeEventListener("click", onOkClick);
-      cancel.removeEventListener("click", onCancel);
-      overlay.removeEventListener("click", onBackdrop);
-      document.removeEventListener("keydown", onKey);
-      closeOverlayA11y(overlay, previouslyFocused, [ok, cancel]); // blur before hide
-      recoverFocus();
-      resolve(result);
-    }
-
-    function onOkClick() {
-      // Run callback while still in the user-gesture click handler (helps with popup blockers)
-      try { onOk && onOk(); } catch {}
-      close(true);
-    }
-    function onCancel() { close(false); }
-    function onBackdrop(e) { if (e.target === overlay) close(false); }
-    function onKey(e) {
-      if (e.key === "Enter") { try { onOk && onOk(); } catch {} close(true); }
-      else if (e.key === "Escape") close(false);
-    }
-
-    openOverlayA11y(overlay, ok);
-    ok.addEventListener("click", onOkClick);
-    cancel.addEventListener("click", onCancel);
-    overlay.addEventListener("click", onBackdrop);
-    document.addEventListener("keydown", onKey);
-  });
-}
-
+});
 
 
 
