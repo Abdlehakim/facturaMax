@@ -49,7 +49,6 @@
 .hide-col-tva      #items tbody td:nth-child(6){ display:none; }
 .hide-col-discount #items thead th:nth-child(7),
 .hide-col-discount #items tbody td:nth-child(7){ display:none; }
-
 /* TTC column is toggled in JS on the 8th column */
 
 /* ----- Extras (shipping & stamp) and WH fields layout ----- */
@@ -144,7 +143,7 @@
   word-break:break-word;
 }
 
-/* Actions bar with left/right groups */
+/* ===== Actions bar: left & right groups ===== */
 .swbDialog__actions{
   display:flex;
   justify-content:space-between;   /* pushes groups to edges */
@@ -161,16 +160,14 @@
   gap:8px;
 }
 
-/* ensure both groups can stretch to edges nicely */
-.swbDialog__group--left,
-/* Keep the two open buttons on one line */
+.swbDialog__group--left  { justify-content:flex-start; }
 .swbDialog__group--right{
-  display: flex;
-  gap: 8px;
-  flex-wrap: nowrap;     /* no wrapping */
-  white-space: nowrap;   /* keep button labels on one line */
-  flex: 0 1 auto;        /* don’t force extra shrinking that could wrap */
-  align-items: center;
+  display:flex;
+  gap:8px;
+  flex-wrap:nowrap;      /* keep the two right buttons on one line */
+  white-space:nowrap;
+  justify-content:flex-end;
+  align-items:center;
 }
 
 /* Ensure the buttons themselves don't wrap text */
@@ -179,47 +176,51 @@
   white-space: nowrap;
 }
 
+/* If extra button is hidden, remove its left margin */
+#swbDialogExtra[style*="display: none"]{
+  margin-left: 0 !important;
+}
 
-.swbDialog__group--left  { justify-content:flex-start; }
-
-/* small gap between the two right-side open buttons */
-#swbDialogExtra { margin-left:8px; }
-
-/* buttons */
+/* ===== Buttons (white by default, brand on hover) ===== */
 .swbDialog__ok,
-.swbDialog__cancel{
+.swbDialog__cancel,
+#swbDialogExtra{
   appearance:none;
-  border:1px solid transparent;
-  border-radius:8px;
+  background:#fff;
+  color:#0b1220;
+  border:1px solid rgba(15,23,42,.12);
+  border-radius:5px;
   padding:8px 14px;
   font-weight:600;
   font-size:13px;
   cursor:pointer;
+  transition: background .15s ease, color .15s ease, border-color .15s ease, box-shadow .15s ease;
 }
 
-.swbDialog__ok{
+.swbDialog__ok:hover,
+.swbDialog__cancel:hover,
+#swbDialogExtra:hover,
+.swbDialog__ok:active,
+.swbDialog__cancel:active,
+#swbDialogExtra:active{
   background:#15335e;
   color:#fff;
+  border-color:#15335e;
 }
-.swbDialog__ok:hover{ filter:brightness(1.05); }
 
-.swbDialog__cancel{
-  background:#fff;
-  color:#0b1220;
-  border-color:rgba(15,23,42,.12);
+/* Focus ring */
+.swbDialog__ok:focus-visible,
+.swbDialog__cancel:focus-visible,
+#swbDialogExtra:focus-visible{
+  outline:none;
+  box-shadow:0 0 0 3px rgba(21,51,94,.25);
 }
-.swbDialog__cancel:hover{ background:#f3f4f6; }
 
-/* Optional: smaller button variant sometimes used */
+/* Optional: tiny button variant */
 .swbDialog .btn.tiny{
   font-size:12px;
   padding:6px 10px;
-  border-radius:7px;
-}
-
-/* If extra button is hidden, remove its left margin */
-#swbDialogExtra[style*="display: none"]{
-  margin-left: 0 !important;
+  border-radius:5px;
 }
 
 /* Mobile: stack groups and keep right buttons aligned right */
