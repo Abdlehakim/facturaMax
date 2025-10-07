@@ -819,104 +819,84 @@ function init(){
     bind();
   });
 
+// --- Export & open in tabs (invoice + optional withholding) ---
 getEl("btnPDF")?.addEventListener("click", async () => {
-  // 1) make sure state/totals are up to date
+  // 1) Build state and HTML/CSS once
   readInputs();
   computeTotals();
 
-  const assets  = window.smartwebify?.assets || {};
+  const assets = window.smartwebify?.assets || {};
+
+  // Invoice
   const htmlInv = window.PDFView.build(state, assets);
   const cssInv  = window.PDFView.css;
-
   const invNum    = slugForFile(state.meta.number || "");
   const typeLabel = docTypeLabel(state.meta.docType);
   const fileName  = ensurePdfExt([typeLabel, invNum].filter(Boolean).join(" "));
 
-  // 2) export main invoice
+  // Withholding (maybe)
+  const hasWH = !!(state.meta?.withholding?.enabled && window.PDFWH);
+  const htmlWH = hasWH ? window.PDFWH.build(state, assets) : null;
+  const cssWH  = hasWH ? window.PDFWH.css : null;
+  const whName = hasWH
+    ? ensurePdfExt(invNum ? `Retenue à la source - ${invNum}` : `Retenue à la source`)
+    : null;
+
+  // 2) Export now (no tabs yet). We just want to ensure generation succeeds and
+  //    to show the confirmation dialog with filenames.
   const resInv = await window.smartwebify?.exportPDFFromHTML?.({
     html: htmlInv,
     css:  cssInv,
-    meta: { number: state.meta.number, type: state.meta.docType, filename: fileName }
+    meta: { number: state.meta.number, docType: state.meta.docType, filename: fileName }
   });
   if (!resInv) return;
 
-  // 3) export withholding certificate (optional)
   let resWH = null;
-  if (state.meta?.withholding?.enabled && window.PDFWH) {
-    const htmlWH = window.PDFWH.build(state, assets);
-    const cssWH  = window.PDFWH.css;
-    const baseWH = ensurePdfExt(invNum ? `Retenue à la source - ${invNum}` : `Retenue à la source`);
-
+  if (hasWH) {
     resWH = await window.smartwebify?.exportPDFFromHTML?.({
       html: htmlWH,
       css:  cssWH,
-      meta: {
-        number: state.meta.number,
-        type:   "retenue",
-        filename: baseWH,
-        silent: true,
-        // if desktop, place next to the invoice
-        useSameDirAs: resInv?.path || resInv
-      }
+      meta: { number: state.meta.number, docType: "retenue", filename: whName, silent: true, useSameDirAs: resInv?.path || resInv }
     });
   }
 
-  // 4) build message shown to the user
-  const invLabel = resInv?.name || (typeof resInv === "string" ? resInv : fileName);
-  const whLabel  = resWH ? (resWH?.name || (typeof resWH === "string" ? resWH : "Retenue à la source.pdf")) : null;
+  // 3) Confirmation UI
+  const invLabel = resInv?.name || fileName;
+  const whLabel  = resWH ? (resWH?.name || whName) : null;
 
   const msg =
     `PDF exporté :\n${invLabel}` +
     (whLabel ? `\nCertificat exporté :\n${whLabel}` : "") +
     `\n\nVoulez-vous l'ouvrir maintenant ?`;
 
-  // 5) opening logic that must run INSIDE the dialog's button click
-  const openWithUserGesture = () => {
-    // helper: open a URL in a new tab via <a target="_blank"> to satisfy popup policies
-    const openUrlInNewTab = (url) => {
-      if (!url) return false;
-      const a = document.createElement("a");
-      a.href = url;
-      a.target = "_blank";
-      a.rel = "noopener";
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      return true;
-    };
+  // 4) On user click "Ouvrir": pre-open tabs and stream PDFs into them
+  const openBothTabs = async () => {
+    // Pre-open tabs while we're still in the user gesture
+    const winInv = window.open("about:blank", "_blank", "noopener");
+    const winWH  = hasWH ? window.open("about:blank", "_blank", "noopener") : null;
 
-    // Try opening the invoice (web first, then desktop fallback)
-    if (resInv?.url) {
-      openUrlInNewTab(resInv.url);
-    } else {
-      const p = typeof resInv === "string" ? resInv : (resInv?.path || resInv?.name || "");
-      if (p) {
-        // Electron/desktop: this will open with the system PDF viewer
-        // We don't await here; being synchronous isn't required for native open
-        window.smartwebify?.openPath?.(p) || window.smartwebify?.showInFolder?.(p);
-      }
-    }
+    // If popups were blocked, just stop silently (the files were already downloaded)
+    if (!winInv && hasWH && !winWH) return;
 
-    // OPTIONAL: also try to open the withholding certificate.
-    // Many browsers allow only one popup per click; the second may be blocked.
-    if (resWH?.url) {
-      openUrlInNewTab(resWH.url);
-    } else if (resWH) {
-      const p2 = typeof resWH === "string" ? resWH : (resWH?.path || resWH?.name || "");
-      if (p2) {
-        window.smartwebify?.openPath?.(p2) || window.smartwebify?.showInFolder?.(p2);
-      }
+    // Re-export, this time streaming into the pre-opened tabs
+    await window.smartwebify.exportPDFFromHTML({
+      html: htmlInv,
+      css:  cssInv,
+      meta: { number: state.meta.number, docType: state.meta.docType, filename: fileName, preopen: winInv }
+    });
+
+    if (hasWH && winWH && !winWH.closed) {
+      await window.smartwebify.exportPDFFromHTML({
+        html: htmlWH,
+        css:  cssWH,
+        meta: { number: state.meta.number, docType: "retenue", filename: whName, preopen: winWH }
+      });
     }
   };
 
-  // 6) show dialog; when user clicks "Ouvrir", we open inside that same click handler
-  await showConfirm(msg, {
-    // If your dialog API uses a different prop name, change this to that name (e.g. onOpen)
-    onOk: openWithUserGesture,
-    okText: "Ouvrir",
-    cancelText: "Fermer"
-  });
+  await showConfirm(msg, { onOk: openBothTabs });
 });
+
 
 
   getEl("btnSubmitItem")?.addEventListener("click", () => { submitItemForm(); });
