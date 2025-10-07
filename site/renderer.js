@@ -296,11 +296,12 @@ function showConfirm(
     extraBtn = document.createElement("button");
     extraBtn.id = "swbDialogExtra";
     extraBtn.type = "button";
-    ok.parentElement.insertBefore(extraBtn, ok);
+    // ⬇️ place AFTER OK so order is: cancel | OK | extra
+    ok.insertAdjacentElement("afterend", extraBtn);
   }
 
-  // make BOTH primary actions look the same
-  extraBtn.className = ok.className;   // same classes as OK
+  // make extra look like OK
+  extraBtn.className = ok.className;
   extraBtn.style.display = extra ? "" : "none";
 
   ok.textContent = okText;
@@ -309,7 +310,7 @@ function showConfirm(
 
   const previouslyFocused = document.activeElement;
 
-  function openUrlInNewTab(url) {
+  function openUrlInNewTab(url){
     if (!url) return false;
     try { return !!window.open(url, "_blank", "noopener,noreferrer"); }
     catch { return false; }
@@ -320,7 +321,7 @@ function showConfirm(
     msg.textContent = message || "";
     ttl.textContent = title;
 
-    function close(result) {
+    function close(result){
       ok.removeEventListener("click", onOkClick);
       cancel.removeEventListener("click", onCancel);
       overlay.removeEventListener("click", onBackdrop);
@@ -331,27 +332,19 @@ function showConfirm(
       resolve(result);
     }
 
-    function runOpeners() {
+    function runOpeners(){
       try { onOk && onOk(); } catch {}
       for (const u of urls) openUrlInNewTab(u);
     }
 
-    function onOkClick() {
-      runOpeners();
-      if (!okKeepsOpen) close(true);   // <-- keep dialog if requested
-    }
-    function onCancel()  { close(false); }
-    function onBackdrop(e) { if (e.target === overlay) close(false); }
-    function onKey(e) {
-      if (e.key === "Enter") { onOkClick(); }
-      else if (e.key === "Escape") close(false);
-    }
+    function onOkClick(){ runOpeners(); if (!okKeepsOpen) close(true); }
+    function onCancel(){ close(false); }
+    function onBackdrop(e){ if (e.target === overlay) close(false); }
+    function onKey(e){ if (e.key === "Enter") onOkClick(); else if (e.key === "Escape") close(false); }
 
-    function onExtraClick() {
-      try { extra?.onClick && extra.onClick(); } catch {}
-    }
+    function onExtraClick(){ try { extra?.onClick && extra.onClick(); } catch {} }
 
-    if (extra && extra.text) {
+    if (extra && extra.text){
       extraBtn.textContent = extra.text;
       extraBtn.addEventListener("click", onExtraClick);
     }
