@@ -50,7 +50,7 @@
 .hide-col-discount #items thead th:nth-child(7),
 .hide-col-discount #items tbody td:nth-child(7){ display:none; }
 
-/* TTC column toggled in JS on the 8th column; rule not needed here */
+/* TTC column is toggled in JS on the 8th column */
 
 /* ----- Extras (shipping & stamp) and WH fields layout ----- */
 #extrasBox #shipFields,
@@ -144,23 +144,36 @@
   word-break:break-word;
 }
 
+/* Actions bar with left/right groups */
 .swbDialog__actions{
   display:flex;
-  justify-content:flex-end;    /* right-align by default */
-  gap:8px;
+  justify-content:space-between;   /* pushes groups to edges */
+  align-items:center;
+  gap:12px;
   padding:10px 14px 14px;
   background:#f9fafb;
   border-top:1px solid rgba(15,23,42,.08);
 }
 
-/* push “Fermer” to the far left */
-.swbDialog__cancel{
-  margin-right:auto;           /* ← puts cancel at left */
+.swbDialog__group{
+  display:flex;
+  align-items:center;
+  gap:8px;
 }
+
+/* ensure both groups can stretch to edges nicely */
+.swbDialog__group--left,
+.swbDialog__group--right{
+  flex: 1 1 0;
+}
+
+.swbDialog__group--left  { justify-content:flex-start; }
+.swbDialog__group--right { justify-content:flex-end; }
 
 /* small gap between the two right-side open buttons */
 #swbDialogExtra { margin-left:8px; }
 
+/* buttons */
 .swbDialog__ok,
 .swbDialog__cancel{
   appearance:none;
@@ -190,4 +203,20 @@
   font-size:12px;
   padding:6px 10px;
   border-radius:7px;
+}
+
+/* If extra button is hidden, remove its left margin */
+#swbDialogExtra[style*="display: none"]{
+  margin-left: 0 !important;
+}
+
+/* Mobile: stack groups and keep right buttons aligned right */
+@media (max-width: 420px){
+  .swbDialog__actions{
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+  .swbDialog__group{ justify-content: space-between; }
+  .swbDialog__group--right{ justify-content: flex-end; gap: 8px; }
 }

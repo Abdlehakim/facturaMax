@@ -209,42 +209,85 @@ function enterUpdateMode(i){ selectedItemIndex=i; fillAddFormFromItem(state.item
 function ensureDialog() {
   let overlay = getEl("swbDialog");
   if (overlay) return overlay;
+
   overlay = document.createElement("div");
   overlay.id = "swbDialog";
   overlay.className = "swbDialog";
   overlay.setAttribute("aria-hidden", "true");
+
   const panel = document.createElement("div");
   panel.className = "swbDialog__panel";
+
   const header = document.createElement("div");
   header.className = "swbDialog__header";
+
   const title = document.createElement("div");
   title.id = "swbDialogTitle";
   title.className = "swbDialog__title";
+
   const closeX = document.createElement("button");
   closeX.type = "button";
   closeX.className = "swbDialog__close";
   closeX.textContent = "×";
+
   header.appendChild(title);
   header.appendChild(closeX);
+
   const msg = document.createElement("div");
   msg.id = "swbDialogMsg";
   msg.className = "swbDialog__msg";
+
   const actions = document.createElement("div");
   actions.className = "swbDialog__actions";
+
+  // ⬇️ two groups
+  const groupLeft  = document.createElement("div");
+  groupLeft.className = "swbDialog__group swbDialog__group--left";
+
+  const groupRight = document.createElement("div");
+  groupRight.className = "swbDialog__group swbDialog__group--right";
+
+  // left: Fermer (cancel)
+  const cancel = document.createElement("button");
+  cancel.id = "swbDialogCancel";
+  cancel.type = "button";
+  cancel.className = "swbDialog__cancel";
+  cancel.textContent = "Fermer";
+  groupLeft.appendChild(cancel);
+
+  // right: OK + Extra
   const ok = document.createElement("button");
   ok.id = "swbDialogOk";
   ok.type = "button";
   ok.className = "swbDialog__ok";
   ok.textContent = "OK";
-  actions.appendChild(ok);
+
+  const extra = document.createElement("button");
+  extra.id = "swbDialogExtra";
+  extra.type = "button";
+  extra.className = "swbDialog__ok";   // same style as OK
+  extra.style.display = "none";
+
+  groupRight.appendChild(ok);
+  groupRight.appendChild(extra);
+
+  actions.appendChild(groupLeft);
+  actions.appendChild(groupRight);
+
   panel.appendChild(header);
   panel.appendChild(msg);
   panel.appendChild(actions);
   overlay.appendChild(panel);
   document.body.appendChild(overlay);
-  closeX.addEventListener("click", () => { const evt = new KeyboardEvent("keydown", { key: "Escape" }); document.dispatchEvent(evt); });
+
+  closeX.addEventListener("click", () => {
+    const evt = new KeyboardEvent("keydown", { key: "Escape" });
+    document.dispatchEvent(evt);
+  });
+
   return overlay;
 }
+
 
 function setSiblingsInert(exceptEl, inertOn) { const kids = Array.from(document.body.children); for (const el of kids) { if (el === exceptEl) continue; if (inertOn) el.setAttribute('inert', ''); else el.removeAttribute('inert'); } }
 function openOverlayA11y(overlay, focusEl) { const panel = overlay.querySelector('.swbDialog__panel'); if (panel) { panel.setAttribute('role', 'dialog'); panel.setAttribute('aria-modal', 'true'); } overlay.style.display = 'flex'; overlay.removeAttribute('aria-hidden'); setSiblingsInert(overlay, true); if (focusEl) try { focusEl.focus(); } catch {} }
@@ -256,15 +299,32 @@ function showDialog(message, { title = "Information" } = {}) {
     const msg = getEl("swbDialogMsg");
     const ok = getEl("swbDialogOk");
     const ttl = getEl("swbDialogTitle");
+
+    // hide any buttons created by showConfirm
     const cancel = overlay.querySelector("#swbDialogCancel");
     if (cancel) cancel.style.display = "none";
+    const extra = overlay.querySelector("#swbDialogExtra");
+    if (extra) extra.style.display = "none";
+
+    // single-action alert -> “Fermer”
+    ok.textContent = "Fermer";
+
     const previouslyFocused = document.activeElement;
     msg.textContent = message || "";
     ttl.textContent = title;
-    function close() { ok.removeEventListener("click", onOk); overlay.removeEventListener("click", onBackdrop); document.removeEventListener("keydown", onKey); closeOverlayA11y(overlay, previouslyFocused, [ok]); resolve(); recoverFocus(); }
+
+    function close() {
+      ok.removeEventListener("click", onOk);
+      overlay.removeEventListener("click", onBackdrop);
+      document.removeEventListener("keydown", onKey);
+      closeOverlayA11y(overlay, previouslyFocused, [ok]);
+      resolve();
+      recoverFocus();
+    }
     function onOk() { close(); }
     function onBackdrop(e) { if (e.target === overlay) close(); }
     function onKey(e) { if (e.key === "Enter" || e.key === "Escape") close(); }
+
     openOverlayA11y(overlay, ok);
     ok.addEventListener("click", onOk);
     overlay.addEventListener("click", onBackdrop);
@@ -272,62 +332,38 @@ function showDialog(message, { title = "Information" } = {}) {
   });
 }
 
+
 function showConfirm(
   message,
-  {
-    title = "Export terminé",
-    okText = "Ouvrir",
-    cancelText = "Fermer",
-    onOk,
-    openUrls,
-    extra,            // { text, onClick }
-    okKeepsOpen = false
-  } = {}
-) {
+  { title="Export terminé", okText="Ouvrir", cancelText="Fermer",
+    onOk, openUrls, extra, okKeepsOpen=false } = {}
+){
   const overlay = ensureDialog();
-  const msg = getEl("swbDialogMsg");
-  const ok = getEl("swbDialogOk");
-  const ttl = getEl("swbDialogTitle");
+  const msg   = getEl("swbDialogMsg");
+  const ok    = getEl("swbDialogOk");
+  const ttl   = getEl("swbDialogTitle");
+  const cancel= getEl("swbDialogCancel");
+  const extraBtn = getEl("swbDialogExtra");
 
-  let cancel = overlay.querySelector("#swbDialogCancel");
-  if (!cancel) {
-    cancel = document.createElement("button");
-    cancel.id = "swbDialogCancel";
-    cancel.type = "button";
-    cancel.className = "swbDialog__cancel";
-    ok.parentElement.insertBefore(cancel, ok);
-  }
-
-  let extraBtn = overlay.querySelector("#swbDialogExtra");
-  if (!extraBtn) {
-    extraBtn = document.createElement("button");
-    extraBtn.id = "swbDialogExtra";
-    extraBtn.type = "button";
-    // ⬇️ place AFTER OK so order is: cancel | OK | extra
-    ok.insertAdjacentElement("afterend", extraBtn);
-  }
-
-  // make extra look like OK
-  extraBtn.className = ok.className;
-  extraBtn.style.display = extra ? "" : "none";
-
+  // config labels + visibility
   ok.textContent = okText;
   cancel.textContent = cancelText;
-  cancel.style.display = "";
+  cancel.style.display = "";                 // always show Fermer on confirm
+  if (extra && extra.text){
+    extraBtn.textContent = extra.text;
+    extraBtn.style.display = "";
+  } else {
+    extraBtn.style.display = "none";
+  }
 
   const previouslyFocused = document.activeElement;
+  msg.textContent = message || "";
+  ttl.textContent = title;
 
-  function openUrlInNewTab(url){
-    if (!url) return false;
-    try { return !!window.open(url, "_blank", "noopener,noreferrer"); }
-    catch { return false; }
-  }
+  const openUrlInNewTab = (u) => { if (!u) return false; try { return !!window.open(u,"_blank","noopener,noreferrer"); } catch { return false; } };
   const urls = Array.isArray(openUrls) ? openUrls.filter(Boolean) : (openUrls ? [openUrls] : []);
 
   return new Promise((resolve) => {
-    msg.textContent = message || "";
-    ttl.textContent = title;
-
     function close(result){
       ok.removeEventListener("click", onOkClick);
       cancel.removeEventListener("click", onCancel);
@@ -338,23 +374,14 @@ function showConfirm(
       recoverFocus();
       resolve(result);
     }
-
-    function runOpeners(){
-      try { onOk && onOk(); } catch {}
-      for (const u of urls) openUrlInNewTab(u);
-    }
-
+    function runOpeners(){ try { onOk && onOk(); } catch {} urls.forEach(openUrlInNewTab); }
     function onOkClick(){ runOpeners(); if (!okKeepsOpen) close(true); }
     function onCancel(){ close(false); }
     function onBackdrop(e){ if (e.target === overlay) close(false); }
     function onKey(e){ if (e.key === "Enter") onOkClick(); else if (e.key === "Escape") close(false); }
-
     function onExtraClick(){ try { extra?.onClick && extra.onClick(); } catch {} }
 
-    if (extra && extra.text){
-      extraBtn.textContent = extra.text;
-      extraBtn.addEventListener("click", onExtraClick);
-    }
+    if (extra && extra.text) extraBtn.addEventListener("click", onExtraClick);
 
     openOverlayA11y(overlay, ok);
     ok.addEventListener("click", onOkClick);
@@ -363,6 +390,7 @@ function showConfirm(
     document.addEventListener("keydown", onKey);
   });
 }
+
 
 
 async function submitItemForm(){
