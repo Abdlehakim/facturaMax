@@ -1,28 +1,39 @@
-// pdfView.js — Document PDF renderer (Facture / Devis / BL / BC) — no WH inside the invoice PDF
 (function (global) {
   const PDF_CSS = `
 :root{
   --invoice-font: -apple-system, BlinkMacSystemFont, "Segoe UI",
                   Arial, "Helvetica Neue", Helvetica, "Liberation Sans", Roboto, "Noto Sans", sans-serif;
 }
+html, body { margin:0; padding:0; }
 body.printing, body.print-mode { background:#ffffff !important; }
 body.printing .app, body.print-mode .app { display:none !important; }
 body.printing #pdfRoot,
 body.print-mode #pdfRoot {
   display:block !important;
   position:fixed;
+  inset:0;
   background:#ffffff;
 }
 .pdf-page{
   position:relative;
-  width:210mm; min-height:297mm;
-  background:#ffffff; color:#000000;
+  width:210mm;
+  min-height:297mm;
+  background:#ffffff;
+  color:#000000;
   padding:16mm 14mm;
   box-sizing:border-box;
-  -webkit-print-color-adjust:exact; print-color-adjust:exact;
+  -webkit-print-color-adjust:exact;
+  print-color-adjust:exact;
   font-family: var(--invoice-font);
   font-variant-numeric: tabular-nums;
   letter-spacing:0.02em;
+  overflow:hidden;
+  break-after:auto;
+  page-break-after:auto;
+}
+.pdf-page:last-child{
+  break-after:auto;
+  page-break-after:auto;
 }
 .pdf-head{display:flex;justify-content:space-between;align-items:center}
 .pdf-title{font-size:18px;font-weight:700;margin:0;color:#111827; font-family: var(--invoice-font);}
@@ -80,7 +91,6 @@ body.print-mode #pdfRoot {
 .pdf-company{ font-size:9px; line-height:1.2; max-width:40%; }
 .pdf-sign{ text-align:left; font-size:12px; }
 .pdf-sign-line{ font-size:9px; margin:0; border-top:1px solid #000; width:150px; }
-
 @page { size:A4; margin:0; }
 .pdf-amount-words{
   position: absolute;
@@ -89,6 +99,8 @@ body.print-mode #pdfRoot {
   left: 15mm;
   top: 210mm;
   max-width: 45%;
+  max-height: 70mm;
+  overflow: hidden;
   font-size: 12px;
   line-height: 1.25;
   font-weight: 500;
@@ -149,7 +161,6 @@ body.print-mode #pdfRoot {
     cssInjected = true;
   }
 
-  // Lightweight FR numbers-to-words (fallback if n2words not present)
   function wordsFR(n) {
     if (typeof window !== "undefined" && window.n2words) return window.n2words(n, { lang: "fr" });
     const UNITS = ["zéro","un","deux","trois","quatre","cinq","six","sept","huit","neuf","dix","onze","douze","treize","quatorze","quinze","seize"];
@@ -209,7 +220,6 @@ body.print-mode #pdfRoot {
     return root;
   }
 
-  // Mirror current UI column visibility
   function hiddenColumnsFromDOM() {
     const b = document.body.classList;
     return {
@@ -224,9 +234,6 @@ body.print-mode #pdfRoot {
     };
   }
 
-  // ==========================
-  // BUILD (NO retenue in PDF)
-  // ==========================
   function build(state, assets) {
     const company = state?.company || {};
     const client  = state?.client  || {};
@@ -234,7 +241,6 @@ body.print-mode #pdfRoot {
     const items   = Array.isArray(state?.items) ? state.items : [];
     const ex      = meta?.extras || {};
 
-    // ---- Extras (shipping & stamp) ----
     const shipEnabled = !!ex?.shipping?.enabled;
     const shipLabel   = (ex?.shipping?.label || "Frais de livraison");
     const shipHT      = Number(ex?.shipping?.amount) || 0;
@@ -266,7 +272,6 @@ body.print-mode #pdfRoot {
     : type === "facture" ? "Arrêté la présente facture à la somme de&nbsp;:"
     : "";
 
-    // ---- Column hiding (PDF mirrors current UI toggles) ----
     const hide = hiddenColumnsFromDOM();
     const hideTTC = hide.ttc || hide.price;
 
@@ -281,7 +286,6 @@ body.print-mode #pdfRoot {
     if (!hideTTC)       headerParts.push("Total TTC");
     const HEADERS = headerParts;
 
-    // ---- Line rows ----
     const rows = items.map((raw) => {
       const it = {
         ref:      raw.ref || "",
@@ -311,7 +315,6 @@ body.print-mode #pdfRoot {
       return `<tr class="pdf-row">${cells.join("")}</tr>`;
     }).join("");
 
-    // ---- Totals (NO retenue à la source in PDF) ----
     let subtotalItems = 0, totalDisc = 0, totalTVA_items = 0;
     items.forEach((raw) => {
       const qty   = Number(raw.qty || 0);
@@ -332,12 +335,10 @@ body.print-mode #pdfRoot {
     const totalTVA_disp   = totalTVA_items + (shipEnabled ? shipTVA : 0);
     const totalTTC_all    = totalHT_display + totalTVA_disp + (stampEnabled ? stampTTC : 0);
 
-    // Amount in words always uses Total TTC (no WH / no Net)
     const wordsTarget       = totalTTC_all;
     const wordsTgtText      = SHOW_WORDS ? amountInWords(wordsTarget, cur) : "";
     const wordsHeaderFinal  = wordsHeader;
 
-    // ---- Mini summary table (NO WH row, NO Net à payer row) ----
     const miniRows = [];
     if (shipEnabled && shipHT > 0) {
       miniRows.push(`<tr><td>${esc(shipLabel)}</td><td class="right">${fmtMoney(shipTTC, cur)}</td></tr>`);
