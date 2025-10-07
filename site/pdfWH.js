@@ -1,5 +1,6 @@
 // pdfWH.js — Certificat de Retenue d'Impôt (style officiel, sans logo)
-
+// Règle demandée : ne jamais masquer la section "IDENTIFIANT" du bénéficiaire.
+// Si aucune donnée (ex. client = Particulier), afficher la grille vide.
 (function (global) {
   const PDF_CSS = `
 :root{
