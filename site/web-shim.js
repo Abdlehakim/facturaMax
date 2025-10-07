@@ -6,7 +6,7 @@
 // - Falls back to a normal file download if needed.
 // - Also provides JSON save/open helpers for the web demo.
 
-// ---------- small utils ----------
+//////////////////////// small utils ////////////////////////
 function docTypeText(v = "") {
   v = String(v).toLowerCase();
   if (v === "devis") return "Devis";
@@ -20,6 +20,17 @@ function sanitize(name = "") {
 function today() {
   return new Date().toISOString().slice(0, 10);
 }
+
+// Keep created object URLs alive until page unload (prevents “Ouvrir” no-op)
+const __swb_keptUrls = new Set();
+function keepObjectUrl(url) {
+  if (url) __swb_keptUrls.add(url);
+  return url;
+}
+window.addEventListener("pagehide", () => {
+  for (const u of __swb_keptUrls) { try { URL.revokeObjectURL(u); } catch {} }
+  __swb_keptUrls.clear();
+});
 
 // Host snippet so the HTML has your CSS applied while rendering off-screen
 function buildHost(html, css) {
@@ -36,7 +47,6 @@ function buildHost(html, css) {
 
 // Render a DOM node to a (tall) canvas using html2canvas
 async function renderNodeToCanvas(node, scale = 2) {
-  // html2canvas must be included on the page globally
   return await html2canvas(node, {
     scale,
     useCORS: true,
@@ -49,7 +59,6 @@ async function renderNodeToCanvas(node, scale = 2) {
 
 // Slice the tall canvas into A4 pages and return a PDF Blob (jsPDF UMD)
 async function canvasToA4PdfBlob(canvas) {
-  // jsPDF UMD must be included globally: window.jspdf.jsPDF
   const { jsPDF } = window.jspdf;
 
   const pdf = new jsPDF({ orientation: "p", unit: "mm", format: "a4" });
@@ -113,7 +122,7 @@ window.smartwebify = window.smartwebify || {};
  *     }
  *   }
  * Returns:
- *   { ok: true, name: string, opened: boolean } | null
+ *   { ok: true, name: string, url?: string, opened: boolean } | null
  */
 window.smartwebify.exportPDFFromHTML = async ({ html, css, meta = {} }) => {
   const name = meta.filename || `${docTypeText(meta.docType)} - ${sanitize(meta.number || today())}.pdf`;
@@ -132,15 +141,13 @@ window.smartwebify.exportPDFFromHTML = async ({ html, css, meta = {} }) => {
     const root = host.querySelector("#root");
     const canvas = await renderNodeToCanvas(root, 2);
     const blob = await canvasToA4PdfBlob(canvas);
-    const url = URL.createObjectURL(blob);
+    const url = keepObjectUrl(URL.createObjectURL(blob));
 
     // If a tab was pre-opened in the click handler, stream the blob into it
     const w = meta.preopen || null;
     if (w && !w.closed) {
-      w.location.href = url;
-      // Revoke the URL later
-      setTimeout(() => URL.revokeObjectURL(url), 60_000);
-      return { ok: true, name, opened: true };
+      w.location.href = url;              // navigation succeeds under the original user gesture
+      return { ok: true, name, url, opened: true };
     }
 
     // Fallback: download
@@ -149,8 +156,9 @@ window.smartwebify.exportPDFFromHTML = async ({ html, css, meta = {} }) => {
     a.download = name;
     document.body.appendChild(a);
     a.click();
-    setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 0);
-    return { ok: true, name, opened: false };
+    a.remove();
+    // (URL is kept alive so "Ouvrir" can still use it if you show a dialog after)
+    return { ok: true, name, url, opened: false };
   } catch (e) {
     console.error("PDF export (web) failed:", e);
     alert("Impossible de générer le PDF dans le navigateur.");
@@ -160,15 +168,13 @@ window.smartwebify.exportPDFFromHTML = async ({ html, css, meta = {} }) => {
   }
 };
 
-/* ------------------------ JSON save/open (web) ------------------------ */
-
+//////////////////// JSON save/open (web) ////////////////////
 window.smartwebify.saveInvoiceJSONToDesktop = async (payload = {}) => {
   const meta = payload.meta || {};
   const name = `${docTypeText(meta.docType)} - ${sanitize(meta.number || today())}.json`;
   const json = JSON.stringify(payload, null, 2);
   const blob = new Blob([json], { type: "application/json" });
 
-  // Modern browsers: showSaveFilePicker
   if (window.showSaveFilePicker) {
     try {
       const handle = await window.showSaveFilePicker({
@@ -184,19 +190,18 @@ window.smartwebify.saveInvoiceJSONToDesktop = async (payload = {}) => {
     }
   }
 
-  // Fallback: trigger download
-  const url = URL.createObjectURL(blob);
+  // Fallback: download (keep URL alive briefly just in case)
+  const url = keepObjectUrl(URL.createObjectURL(blob));
   const a = document.createElement("a");
   a.href = url;
   a.download = name;
   document.body.appendChild(a);
   a.click();
-  setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 0);
+  a.remove();
   return { ok: true, name };
 };
 
 window.smartwebify.openInvoiceJSON = async () => {
-  // Modern file picker
   if (window.showOpenFilePicker) {
     try {
       const [handle] = await window.showOpenFilePicker({
@@ -210,7 +215,6 @@ window.smartwebify.openInvoiceJSON = async () => {
     } catch { return null; }
   }
 
-  // Fallback: hidden <input type="file">
   return new Promise((resolve) => {
     const input = document.createElement("input");
     input.type = "file";
@@ -227,7 +231,7 @@ window.smartwebify.openInvoiceJSON = async () => {
   });
 };
 
-/* -------- stubs to keep renderer API compatible on the web -------- */
+//////////////////// renderer API stubs (web) ////////////////////
 window.smartwebify.saveInvoiceJSON = async (data) =>
   window.smartwebify.saveInvoiceJSONToDesktop(data);
 
