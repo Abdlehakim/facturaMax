@@ -381,7 +381,7 @@ td .del:hover{
 
   .swbDialog__panel{ width: min(92vw, 520px); padding:14px 12px 10px; }
   .swbDialog__msg{ font-size:14px; }
-  .swbDialog__actions{ flex-direction:column; align-items:stretch; gap:10px; }
+  .swbDialog__actions{ flex-direction:column-reverse; align-items:center; gap:10px; }
   .swbDialog__group{ justify-content: space-between; }
   .swbDialog__group--right{ justify-content:flex-end; gap:8px; }
 }
