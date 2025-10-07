@@ -821,14 +821,7 @@ function init(){
   });
 
 getEl("btnPDF")?.addEventListener("click", async () => {
-  // 0) pré-ouvrir les onglets sous le même user gesture
-  let tabInv = null, tabWH = null;
-  try { tabInv = window.open("about:blank", "_blank"); } catch {}
-  if (state.meta?.withholding?.enabled && window.PDFWH) {
-    try { tabWH = window.open("about:blank", "_blank"); } catch {}
-  }
-
-  // 1) maj état & HTML/CSS
+  // 1) refresh state & build HTML/CSS
   readInputs();
   computeTotals();
   const assets  = window.smartwebify?.assets || {};
@@ -839,15 +832,14 @@ getEl("btnPDF")?.addEventListener("click", async () => {
   const typeLabel = docTypeLabel(state.meta.docType);
   const fileName  = ensurePdfExt([typeLabel, invNum].filter(Boolean).join(" "));
 
-  // 2) exporter la facture en streamant vers l’onglet pré-ouvert
+  // 2) Export WITHOUT opening (just get blob URLs)
   const resInv = await window.smartwebify?.exportPDFFromHTML?.({
     html: htmlInv,
     css:  cssInv,
-    meta: { number: state.meta.number, type: state.meta.docType, filename: fileName, preopen: tabInv }
+    meta: { number: state.meta.number, type: state.meta.docType, filename: fileName, deferOpen: true }
   });
   if (!resInv) return;
 
-  // 3) exporter la retenue (si activée) dans son 2ᵉ onglet
   let resWH = null;
   if (state.meta?.withholding?.enabled && window.PDFWH) {
     const htmlWH = window.PDFWH.build(state, assets);
@@ -857,36 +849,32 @@ getEl("btnPDF")?.addEventListener("click", async () => {
     resWH = await window.smartwebify?.exportPDFFromHTML?.({
       html: htmlWH,
       css:  cssWH,
-      meta: { number: state.meta.number, type: "retenue", filename: baseWH, preopen: tabWH, silent: true }
+      meta: { number: state.meta.number, type: "retenue", filename: baseWH, deferOpen: true }
     });
   }
 
-  // 4) message + focus des onglets déjà chargés
+  // 3) Dialog text
   const invLabel = resInv?.name || fileName;
-  const whLabel  = resWH?.name || null;
+  const whLabel  = resWH ? (resWH?.name || "Retenue à la source.pdf") : null;
   const msg =
     `PDF exporté :\n${invLabel}` +
     (whLabel ? `\nCertificat exporté :\n${whLabel}` : "") +
     `\n\nVoulez-vous l'ouvrir maintenant ?`;
 
+  // 4) Only open when user clicks "Ouvrir"
   await showConfirm(msg, {
     okText: "Ouvrir",
     cancelText: "Fermer",
     onOk: () => {
-      // Donner le focus aux deux onglets (ils contiennent déjà les PDFs)
-      try { if (tabInv && !tabInv.closed) tabInv.focus(); } catch {}
-      try { if (tabWH && !tabWH.closed) tabWH.focus(); } catch {}
-
-      // Fallback (au cas où la pré-ouverture n’a pas marché)
       const openUrlInNewTab = (url) => {
         if (!url) return false;
-        const a = document.createElement("a");
-        a.href = url; a.target = "_blank"; a.rel = "noopener";
-        document.body.appendChild(a); a.click(); a.remove();
+        const w = window.open("about:blank", "_blank", "noopener"); // created inside this click
+        if (!w) return false;
+        w.location.href = url; // navigate immediately
         return true;
       };
-      if (resInv?.url && (!tabInv || tabInv.closed)) openUrlInNewTab(resInv.url);
-      if (resWH?.url && (!tabWH || tabWH.closed))   openUrlInNewTab(resWH.url);
+      openUrlInNewTab(resInv?.url);
+      if (resWH?.url) openUrlInNewTab(resWH.url);
     }
   });
 });

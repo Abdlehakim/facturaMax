@@ -118,7 +118,9 @@ window.smartwebify = window.smartwebify || {};
  *     meta: {
  *       number, docType, filename,
  *       // If provided, MUST be opened synchronously by the click handler:
- *       preopen: Window
+ *       preopen: Window,
+ *       // If true, DO NOT open or download. Just return {url, name}.
+ *       deferOpen: boolean
  *     }
  *   }
  * Returns:
@@ -142,6 +144,11 @@ window.smartwebify.exportPDFFromHTML = async ({ html, css, meta = {} }) => {
     const canvas = await renderNodeToCanvas(root, 2);
     const blob = await canvasToA4PdfBlob(canvas);
     const url = keepObjectUrl(URL.createObjectURL(blob));
+
+    // NEW: caller wants to control when to open (no navigation, no download)
+    if (meta.deferOpen) {
+      return { ok: true, name, url, opened: false };
+    }
 
     // If a tab was pre-opened in the click handler, stream the blob into it
     const w = meta.preopen || null;
