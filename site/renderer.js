@@ -494,13 +494,14 @@ function showDialog(message, { title = "Information" } = {}) {
   });
 }
 
+// --- showConfirm (confirm-style) ---
 function showConfirm(
   message,
   {
     title = "Export terminé",
     okText = "Ouvrir",
     cancelText = "Fermer",
-    onOk
+    onOk // optional synchronous callback run inside the click handler
   } = {}
 ) {
   const overlay = ensureDialog();
@@ -526,27 +527,25 @@ function showConfirm(
     msg.textContent = message || "";
     ttl.textContent = title;
 
-    let done = false;
     function close(result) {
-      if (done) return;
-      done = true;
       ok.removeEventListener("click", onOkClick);
       cancel.removeEventListener("click", onCancel);
       overlay.removeEventListener("click", onBackdrop);
       document.removeEventListener("keydown", onKey);
-      closeOverlayA11y(overlay, previouslyFocused, [ok, cancel]);
+      closeOverlayA11y(overlay, previouslyFocused, [ok, cancel]); // blur before hide
       recoverFocus();
       resolve(result);
     }
 
     function onOkClick() {
-      if (done) return;
-      try { onOk && onOk(); } finally { close(true); }
+      // Run callback while still in the user-gesture click handler (helps with popup blockers)
+      try { onOk && onOk(); } catch {}
+      close(true);
     }
     function onCancel() { close(false); }
     function onBackdrop(e) { if (e.target === overlay) close(false); }
     function onKey(e) {
-      if (e.key === "Enter") onOkClick();
+      if (e.key === "Enter") { try { onOk && onOk(); } catch {} close(true); }
       else if (e.key === "Escape") close(false);
     }
 
@@ -821,7 +820,14 @@ function init(){
   });
 
 getEl("btnPDF")?.addEventListener("click", async () => {
-  // 1) refresh state & build HTML/CSS
+  // 0) pré-ouvrir les onglets sous le même user gesture
+  let tabInv = null, tabWH = null;
+  try { tabInv = window.open("about:blank", "_blank"); } catch {}
+  if (state.meta?.withholding?.enabled && window.PDFWH) {
+    try { tabWH = window.open("about:blank", "_blank"); } catch {}
+  }
+
+  // 1) maj état & HTML/CSS
   readInputs();
   computeTotals();
   const assets  = window.smartwebify?.assets || {};
@@ -832,14 +838,15 @@ getEl("btnPDF")?.addEventListener("click", async () => {
   const typeLabel = docTypeLabel(state.meta.docType);
   const fileName  = ensurePdfExt([typeLabel, invNum].filter(Boolean).join(" "));
 
-  // 2) Export WITHOUT opening (just get blob URLs)
+  // 2) exporter la facture en streamant vers l’onglet pré-ouvert
   const resInv = await window.smartwebify?.exportPDFFromHTML?.({
     html: htmlInv,
     css:  cssInv,
-    meta: { number: state.meta.number, type: state.meta.docType, filename: fileName, deferOpen: true }
+    meta: { number: state.meta.number, type: state.meta.docType, filename: fileName, preopen: tabInv }
   });
   if (!resInv) return;
 
+  // 3) exporter la retenue (si activée) dans son 2ᵉ onglet
   let resWH = null;
   if (state.meta?.withholding?.enabled && window.PDFWH) {
     const htmlWH = window.PDFWH.build(state, assets);
@@ -849,32 +856,36 @@ getEl("btnPDF")?.addEventListener("click", async () => {
     resWH = await window.smartwebify?.exportPDFFromHTML?.({
       html: htmlWH,
       css:  cssWH,
-      meta: { number: state.meta.number, type: "retenue", filename: baseWH, deferOpen: true }
+      meta: { number: state.meta.number, type: "retenue", filename: baseWH, preopen: tabWH, silent: true }
     });
   }
 
-  // 3) Dialog text
+  // 4) message + focus des onglets déjà chargés
   const invLabel = resInv?.name || fileName;
-  const whLabel  = resWH ? (resWH?.name || "Retenue à la source.pdf") : null;
+  const whLabel  = resWH?.name || null;
   const msg =
     `PDF exporté :\n${invLabel}` +
     (whLabel ? `\nCertificat exporté :\n${whLabel}` : "") +
     `\n\nVoulez-vous l'ouvrir maintenant ?`;
 
-  // 4) Only open when user clicks "Ouvrir"
   await showConfirm(msg, {
     okText: "Ouvrir",
     cancelText: "Fermer",
     onOk: () => {
+      // Donner le focus aux deux onglets (ils contiennent déjà les PDFs)
+      try { if (tabInv && !tabInv.closed) tabInv.focus(); } catch {}
+      try { if (tabWH && !tabWH.closed) tabWH.focus(); } catch {}
+
+      // Fallback (au cas où la pré-ouverture n’a pas marché)
       const openUrlInNewTab = (url) => {
         if (!url) return false;
-        const w = window.open("about:blank", "_blank", "noopener"); // created inside this click
-        if (!w) return false;
-        w.location.href = url; // navigate immediately
+        const a = document.createElement("a");
+        a.href = url; a.target = "_blank"; a.rel = "noopener";
+        document.body.appendChild(a); a.click(); a.remove();
         return true;
       };
-      openUrlInNewTab(resInv?.url);
-      if (resWH?.url) openUrlInNewTab(resWH.url);
+      if (resInv?.url && (!tabInv || tabInv.closed)) openUrlInNewTab(resInv.url);
+      if (resWH?.url && (!tabWH || tabWH.closed))   openUrlInNewTab(resWH.url);
     }
   });
 });
