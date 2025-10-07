@@ -557,22 +557,37 @@ function showConfirm(
       resolve(result);
     }
 
-  function runOpeners() {
+function runOpeners() {
   try { onOk && onOk(); } catch {}
 
-  // Open N blank tabs inside this same user gesture, then navigate them.
-  const list = urls.slice();                 // blob/http(s) URLs to open
-  const wins = list.map(() => {
-    try { return window.open("", "_blank", "noopener"); } catch { return null; }
-  });
+  const list = urls.slice(); // array of blob/http(s) URLs
 
-  wins.forEach((w, i) => {
-    const u = list[i];
-    if (w && !w.closed && u) {
-      try { w.location.href = u; } catch {}
-    }
-  });
+  // 1) Try direct window.open for each URL (most reliable across browsers)
+  let opened = 0;
+  for (const u of list) {
+    if (!u) continue;
+    try {
+      const w = window.open(u, "_blank", "noopener,noreferrer");
+      if (w) opened++;
+    } catch {}
+  }
+  if (opened === list.length) return;
+
+  // 2) Fallback: programmatic <a target="_blank"> clicks
+  for (const u of list) {
+    if (!u) continue;
+    try {
+      const a = document.createElement("a");
+      a.href = u;
+      a.target = "_blank";
+      a.rel = "noopener";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    } catch {}
+  }
 }
+
 
     function onOkClick() {
       // All actions happen inside this user-gesture
@@ -836,7 +851,7 @@ async function openPDFFile(path) {
   if (window.smartwebify?.openPath) { try { return !!(await window.smartwebify.openPath(path)); } catch {} }
   if (window.smartwebify?.showInFolder) { try { await window.smartwebify.showInFolder(path); return true; } catch {} }
   if (window.smartwebify?.openExternal) { try { const url = toFileURL(path); await window.smartwebify.openExternal(url); return true; } catch {} }
-  try { const url = toFileURL(path); window.open(url, "_blank", "noopener"); return true; } catch { return false; }
+  try { const url = toFileURL(path); return true; } catch { return false; }
 }
 
 function onReady(fn){ if(document.readyState === "loading") { document.addEventListener("DOMContentLoaded", fn, {once:true}); } else { fn(); } }
