@@ -49,3 +49,5 @@ npm run dist:portable
 ---
 
 © Smartwebify
+
+npm run dev:site

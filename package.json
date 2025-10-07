@@ -21,47 +21,48 @@
     "electronmon": "^2.0.3",
     "http-server": "^14.1.1"
   },
-  "build": {
-    "appId": "com.smartwebify.invoice",
-    "productName": "Smartwebify Invoice Maker",
-    "directories": {
-      "output": "dist"
-    },
-    "files": [
-      "main.js",
-      "preload.js",
-      "src/renderer/**",
-      "package.json"
-    ],
-    "asar": true,
-    "win": {
-      "target": [
-        "nsis"
-      ],
-      "artifactName": "Smartwebify-Invoice-Maker-Setup-${version}.exe"
-    },
-    "nsis": {
-      "oneClick": false,
-      "allowToChangeInstallationDirectory": true,
-      "displayLanguageSelector": true,
-      "installerLanguages": [
-        "en_US",
-        "fr_FR",
-        "ar_SA"
-      ],
-      "createDesktopShortcut": true,
-      "createStartMenuShortcut": true,
-      "shortcutName": "Smartwebify Invoice Maker",
-      "perMachine": false
-    },
-    "publish": [
-      {
-        "provider": "github",
-        "owner": "YOUR_USER",
-        "repo": "smartwebify-invoice-maker"
-      }
-    ]
+"build": {
+  "appId": "com.smartwebify.invoice",
+  "productName": "Smartwebify Invoice Maker",
+  "directories": { "output": "dist" },
+
+  "files": [
+    "main.js",
+    "preload.js",
+    "src/renderer/**",
+    "package.json"
+  ],
+  "asar": true,
+  "asarUnpack": ["**/*.node"],
+
+  "win": {
+    "icon": "build/icon.ico",
+    "target": ["nsis"],
+    "artifactName": "Smartwebify-Invoice-Maker-Setup-${version}.exe"
   },
+  "nsis": {
+    "installerIcon": "build/icon.ico",
+    "uninstallerIcon": "build/icon.ico",
+    "oneClick": false,
+    "allowToChangeInstallationDirectory": true,
+    "displayLanguageSelector": true,
+    "installerLanguages": ["en_US","fr_FR","ar_SA"],
+    "createDesktopShortcut": true,
+    "createStartMenuShortcut": true,
+    "shortcutName": "Smartwebify Invoice Maker",
+    "perMachine": false
+  },
+
+
+  "extraResources": [
+    { "from": "site/assets", "to": "assets", "filter": ["**/*"] }
+  ],
+
+
+  "compression": "maximum",
+  "artifactBuildNumber": 1
+},
+
   "dependencies": {
     "html2canvas": "^1.4.1",
     "jspdf": "^3.0.3"

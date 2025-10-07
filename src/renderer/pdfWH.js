@@ -2,17 +2,26 @@
 // Règle demandée : ne jamais masquer la section "IDENTIFIANT" du bénéficiaire.
 // Si aucune donnée (ex. client = Particulier), afficher la grille vide.
 (function (global) {
-  const PDF_CSS = `
+const PDF_CSS = `
 :root{
   --invoice-font: -apple-system, BlinkMacSystemFont, "Segoe UI",
                   Arial, "Helvetica Neue", Helvetica, "Liberation Sans", Roboto, "Noto Sans", sans-serif;
 }
+html, body { margin:0; padding:0; }
 body.printing, body.print-mode { background:#ffffff !important; }
-body.printing #pdfRoot, body.print-mode #pdfRoot { display:block !important; }
+body.printing #pdfRoot, body.print-mode #pdfRoot {
+  display:block !important;
+  position:fixed;
+  inset:0;
+  background:#ffffff;
+}
 
+/* KEY FIXES */
+@page { size:A4; margin:0; }
 .wh-page{
   position:relative;
-  width:210mm; min-height:297mm;
+  width:210mm;
+  height:296.5mm;           /* slightly under 297mm to avoid spillover */
   background:#ffffff; color:#000;
   padding:12mm 12mm;
   box-sizing:border-box;
@@ -20,6 +29,15 @@ body.printing #pdfRoot, body.print-mode #pdfRoot { display:block !important; }
   font-family: var(--invoice-font);
   font-variant-numeric: tabular-nums;
   letter-spacing:.01em;
+  overflow:hidden;           /* clip anything poking out */
+  page-break-inside: avoid;
+  break-inside: avoid-page;
+  page-break-after: avoid;
+  break-after: avoid-page;
+}
+.wh-page:last-child{
+  page-break-after: avoid;
+  break-after: avoid-page;
 }
 
 /* Header bloc at left + centered title */
@@ -58,6 +76,8 @@ body.printing #pdfRoot, body.print-mode #pdfRoot { display:block !important; }
   border-radius:2px;
   margin-top:6mm;
   padding:0;
+  page-break-inside: avoid;  /* keep frames intact */
+  break-inside: avoid-page;
 }
 .wh-frame .legend{
   display:inline-block;
@@ -128,6 +148,7 @@ body.printing #pdfRoot, body.print-mode #pdfRoot { display:block !important; }
 .place-date{ margin-top:20mm; text-align:center; font-size:12.5px; font-weight:600; }
 .signature{text-align:center; font-size:12px; }
 `;
+
 
   // ---------- helpers ----------
   const esc = (s = "") =>

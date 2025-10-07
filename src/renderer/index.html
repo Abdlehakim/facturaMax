@@ -2,12 +2,17 @@
 <html lang="fr">
   <head>
     <meta charset="UTF-8" />
-    <meta
-      http-equiv="Content-Security-Policy"
-      content="default-src 'self' data:; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: file:; font-src 'self' data:;"
-    />
+    <meta http-equiv="Content-Security-Policy"
+  content="
+    default-src 'self' data: blob:;
+    script-src 'self';
+    style-src 'self' 'unsafe-inline';
+    img-src 'self' data: blob: file:;
+    font-src 'self' data:;
+    connect-src 'self';
+  ">
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Smartwebify – Créateur de factures</title>
+    <title>Smartwebify – Gestionnaire de société</title>
     <link rel="stylesheet" href="./styles.css" />
 
     <style>
@@ -192,7 +197,7 @@
       <header class="header">
         <div class="brand">
           <div class="logo-wrap">
-            <img id="companyLogo" alt="Logo Smartwebify" />
+            <img id="companyLogo" src="./assets/logoSW.png" alt="Logo Smartwebify" />
           </div>
           <div><h1>Smartwebify – Créateur de factures</h1></div>
         </div>
@@ -679,9 +684,11 @@
       </footer>
     </div>
 
-    <script src="./pdfView.js"></script>
-    <script src="./pdfWH.js"></script>
-    <script src="./renderer.js"></script>
-    <link rel="stylesheet" href="./app-custom.css" />
+<script src="./lib/html2canvas.min.js" defer></script>
+<script src="./lib/jspdf.umd.min.js" defer></script>
+<script src="./web-shim.js" defer></script>
+<script src="./pdfView.js" defer></script>
+<script src="./pdfWH.js" defer></script>
+<script src="./renderer.js" defer></script>
   </body>
 </html>
