@@ -3,14 +3,15 @@
   <head>
     <meta charset="UTF-8" />
     <meta http-equiv="Content-Security-Policy"
-  content="
-    default-src 'self' data: blob:;
-    script-src 'self';
-    style-src 'self' 'unsafe-inline';
-    img-src 'self' data: blob: file:;
-    font-src 'self' data:;
-    connect-src 'self';
-  ">
+content="
+  default-src 'self' data: blob: file:;
+  script-src 'self' 'unsafe-eval';
+  style-src 'self' 'unsafe-inline';
+  img-src 'self' data: blob: file:;
+  font-src 'self' data:;
+  connect-src 'self';
+  worker-src 'self' blob:;
+">
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Smartwebify – Gestionnaire de société</title>
     <link rel="stylesheet" href="./styles.css" />
@@ -684,9 +685,6 @@
       </footer>
     </div>
 
-<script src="./lib/html2canvas.min.js" defer></script>
-<script src="./lib/jspdf.umd.min.js" defer></script>
-<script src="./web-shim.js" defer></script>
 <script src="./pdfView.js" defer></script>
 <script src="./pdfWH.js" defer></script>
 <script src="./renderer.js" defer></script>

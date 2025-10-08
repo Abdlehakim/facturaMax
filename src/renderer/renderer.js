@@ -83,15 +83,10 @@ function bind(){
   setVal("stampAmount", String(t.amount ?? 1));
   setVal("stampTva",    String(t.tva ?? 0));
   toggleStampFields(!!t.enabled);
-const bundled = "./assets/logoSW.png";
-const logo = window.smartwebify?.assets?.logo || state.company.logo || bundled;
-
-// keep the UI image in sync
-setSrc("companyLogo", logo);
-
-// IMPORTANT: if there was no logo in state, persist the fallback
-if (!state.company.logo) state.company.logo = bundled;
-
+  const bundled = "./assets/logoSW.png";
+  const logo = window.smartwebify?.assets?.logo || state.company.logo || bundled;
+  setSrc("companyLogo", logo);
+  if (!state.company.logo) state.company.logo = bundled;
   setVal("notes", state.notes);
   setText("year", new Date().getFullYear());
   ["colToggleRef","colToggleProduct","colToggleDesc","colToggleQty","colTogglePrice","colToggleTva","colToggleDiscount"].forEach(id => { const el = getEl(id); if (el) el.checked = true; });
@@ -209,85 +204,63 @@ function enterUpdateMode(i){ selectedItemIndex=i; fillAddFormFromItem(state.item
 function ensureDialog() {
   let overlay = getEl("swbDialog");
   if (overlay) return overlay;
-
   overlay = document.createElement("div");
   overlay.id = "swbDialog";
   overlay.className = "swbDialog";
   overlay.setAttribute("aria-hidden", "true");
-
   const panel = document.createElement("div");
   panel.className = "swbDialog__panel";
-
   const header = document.createElement("div");
   header.className = "swbDialog__header";
-
   const title = document.createElement("div");
   title.id = "swbDialogTitle";
   title.className = "swbDialog__title";
-
   const closeX = document.createElement("button");
   closeX.type = "button";
   closeX.className = "swbDialog__close";
   closeX.textContent = "×";
-
   header.appendChild(title);
   header.appendChild(closeX);
-
   const msg = document.createElement("div");
   msg.id = "swbDialogMsg";
   msg.className = "swbDialog__msg";
-
   const actions = document.createElement("div");
   actions.className = "swbDialog__actions";
-
-  // ⬇️ two groups
   const groupLeft  = document.createElement("div");
   groupLeft.className = "swbDialog__group swbDialog__group--left";
-
   const groupRight = document.createElement("div");
   groupRight.className = "swbDialog__group swbDialog__group--right";
-
-  // left: Fermer (cancel)
   const cancel = document.createElement("button");
   cancel.id = "swbDialogCancel";
   cancel.type = "button";
   cancel.className = "swbDialog__cancel";
   cancel.textContent = "Fermer";
   groupLeft.appendChild(cancel);
-
-  // right: OK + Extra
   const ok = document.createElement("button");
   ok.id = "swbDialogOk";
   ok.type = "button";
   ok.className = "swbDialog__ok";
   ok.textContent = "OK";
-
   const extra = document.createElement("button");
   extra.id = "swbDialogExtra";
   extra.type = "button";
-  extra.className = "swbDialog__ok";   // same style as OK
+  extra.className = "swbDialog__ok";
   extra.style.display = "none";
-
   groupRight.appendChild(ok);
   groupRight.appendChild(extra);
-
   actions.appendChild(groupLeft);
   actions.appendChild(groupRight);
-
   panel.appendChild(header);
   panel.appendChild(msg);
   panel.appendChild(actions);
   overlay.appendChild(panel);
   document.body.appendChild(overlay);
-
   closeX.addEventListener("click", () => {
     const evt = new KeyboardEvent("keydown", { key: "Escape" });
     document.dispatchEvent(evt);
   });
-
   return overlay;
 }
-
 
 function setSiblingsInert(exceptEl, inertOn) { const kids = Array.from(document.body.children); for (const el of kids) { if (el === exceptEl) continue; if (inertOn) el.setAttribute('inert', ''); else el.removeAttribute('inert'); } }
 function openOverlayA11y(overlay, focusEl) { const panel = overlay.querySelector('.swbDialog__panel'); if (panel) { panel.setAttribute('role', 'dialog'); panel.setAttribute('aria-modal', 'true'); } overlay.style.display = 'flex'; overlay.removeAttribute('aria-hidden'); setSiblingsInert(overlay, true); if (focusEl) try { focusEl.focus(); } catch {} }
@@ -299,20 +272,14 @@ function showDialog(message, { title = "Information" } = {}) {
     const msg = getEl("swbDialogMsg");
     const ok = getEl("swbDialogOk");
     const ttl = getEl("swbDialogTitle");
-
-    // hide any buttons created by showConfirm
     const cancel = overlay.querySelector("#swbDialogCancel");
     if (cancel) cancel.style.display = "none";
     const extra = overlay.querySelector("#swbDialogExtra");
     if (extra) extra.style.display = "none";
-
-    // single-action alert -> “Fermer”
     ok.textContent = "Fermer";
-
     const previouslyFocused = document.activeElement;
     msg.textContent = message || "";
     ttl.textContent = title;
-
     function close() {
       ok.removeEventListener("click", onOk);
       overlay.removeEventListener("click", onBackdrop);
@@ -324,7 +291,6 @@ function showDialog(message, { title = "Information" } = {}) {
     function onOk() { close(); }
     function onBackdrop(e) { if (e.target === overlay) close(); }
     function onKey(e) { if (e.key === "Enter" || e.key === "Escape") close(); }
-
     openOverlayA11y(overlay, ok);
     ok.addEventListener("click", onOk);
     overlay.addEventListener("click", onBackdrop);
@@ -332,37 +298,27 @@ function showDialog(message, { title = "Information" } = {}) {
   });
 }
 
-
-function showConfirm(
-  message,
-  { title="Export terminé", okText="Ouvrir", cancelText="Fermer",
-    onOk, openUrls, extra, okKeepsOpen=false } = {}
-){
+function showConfirm(message, { title="Export terminé", okText="Ouvrir", cancelText="Fermer", onOk, openUrls, extra, okKeepsOpen=false } = {}){
   const overlay = ensureDialog();
   const msg   = getEl("swbDialogMsg");
   const ok    = getEl("swbDialogOk");
   const ttl   = getEl("swbDialogTitle");
   const cancel= getEl("swbDialogCancel");
   const extraBtn = getEl("swbDialogExtra");
-
-  // config labels + visibility
   ok.textContent = okText;
   cancel.textContent = cancelText;
-  cancel.style.display = "";                 // always show Fermer on confirm
+  cancel.style.display = "";
   if (extra && extra.text){
     extraBtn.textContent = extra.text;
     extraBtn.style.display = "";
   } else {
     extraBtn.style.display = "none";
   }
-
   const previouslyFocused = document.activeElement;
   msg.textContent = message || "";
   ttl.textContent = title;
-
   const openUrlInNewTab = (u) => { if (!u) return false; try { return !!window.open(u,"_blank","noopener,noreferrer"); } catch { return false; } };
   const urls = Array.isArray(openUrls) ? openUrls.filter(Boolean) : (openUrls ? [openUrls] : []);
-
   return new Promise((resolve) => {
     function close(result){
       ok.removeEventListener("click", onOkClick);
@@ -380,9 +336,7 @@ function showConfirm(
     function onBackdrop(e){ if (e.target === overlay) close(false); }
     function onKey(e){ if (e.key === "Enter") onOkClick(); else if (e.key === "Escape") close(false); }
     function onExtraClick(){ try { extra?.onClick && extra.onClick(); } catch {} }
-
     if (extra && extra.text) extraBtn.addEventListener("click", onExtraClick);
-
     openOverlayA11y(overlay, ok);
     ok.addEventListener("click", onOkClick);
     cancel.addEventListener("click", onCancel);
@@ -390,8 +344,6 @@ function showConfirm(
     document.addEventListener("keydown", onKey);
   });
 }
-
-
 
 async function submitItemForm(){
   recoverFocus();
@@ -413,9 +365,9 @@ function renderItems(){
     const it = { ref: raw.ref ?? "", product: raw.product ?? (raw.desc ? String(raw.desc) : ""), desc: raw.product ? (raw.desc ?? "") : (raw.desc ?? ""), qty: Number(raw.qty ?? 0), price: Number(raw.price ?? 0), tva: Number(raw.tva ?? 0), discount: Number(raw.discount ?? 0) };
     const base = it.qty * it.price;
     const disc = base * (it.discount / 100);
-    theTaxed = Math.max(0, base - disc);
-    const tax = theTaxed * (it.tva / 100);
-    const lineTotal = theTaxed + tax;
+    const taxedBase = Math.max(0, base - disc);
+    const tax = taxedBase * (it.tva / 100);
+    const lineTotal = taxedBase + tax;
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td class="cell-ref">${escapeHTML(it.ref)}</td>
@@ -534,50 +486,69 @@ function init(){
   setSubmitMode("add");
   installFocusGuards();
   ["addPrice", "addQty", "addTva", "addDiscount"].forEach(id => enableFirstClickSelectSecondClickCaret(getEl(id)));
-  getEl("btnNew")?.addEventListener("click", newInvoice);
+  getEl("btnSave")?.addEventListener("click", async () => {
+    const snapshot = captureForm();
+    const savedPath = await window.smartwebify?.saveInvoiceJSON?.(snapshot);
+    if (savedPath) await showDialog("Facture enregistrée avec succès.", { title: "Enregistré" });
+  });
   getEl("btnOpen")?.addEventListener("click", async ()=>{ const data = await window.smartwebify?.openInvoiceJSON?.(); if(!data) return; Object.assign(state, data); bind(); });
 
-  getEl("btnPDF")?.addEventListener("click", async () => {
-    readInputs();
-    computeTotals();
-    const assets  = window.smartwebify?.assets || {};
-    const htmlInv = window.PDFView.build(state, assets);
-    const cssInv  = window.PDFView.css;
-    const invNum    = slugForFile(state.meta.number || "");
-    const typeLabel = docTypeLabel(state.meta.docType);
-    const fileName  = ensurePdfExt([typeLabel, invNum].filter(Boolean).join(" "));
-    const resInv = await window.smartwebify?.exportPDFFromHTML?.({ html: htmlInv, css: cssInv, meta: { number: state.meta.number, type: state.meta.docType, filename: fileName, deferOpen: true } });
-    if (!resInv) return;
-    let resWH = null;
-    if (state.meta?.withholding?.enabled && window.PDFWH) {
-      const htmlWH = window.PDFWH.build(state, assets);
-      const cssWH  = window.PDFWH.css;
-      const baseWH = ensurePdfExt(invNum ? `Retenue à la source - ${invNum}` : `Retenue à la source`);
-      resWH = await window.smartwebify?.exportPDFFromHTML?.({ html: htmlWH, css: cssWH, meta: { number: state.meta.number, type: "retenue", filename: baseWH, deferOpen: true } });
-    }
-    const invLabel = resInv?.name || fileName;
-    const whLabel  = resWH ? (resWH?.name || "Retenue à la source.pdf") : null;
-    const msg =
-  "PDF exporté : " + invLabel +
-  (whLabel ? "\nCertificat exporté : " + whLabel : "");
-    const openViaAnchor = (url) => { if (!url) return; const a = document.createElement("a"); a.href = url; a.target = "_blank"; a.rel = "noopener"; document.body.appendChild(a); a.click(); a.remove(); };
+getEl("btnNew")?.addEventListener("click", newInvoice);
 
-await showConfirm(msg, {
-  title: "Ouvrir les documents",
-  okText: "Ouvrir la facture",
-  cancelText: "Fermer",
-  okKeepsOpen: true, // <-- don't close on OK
-  extra: resWH?.url ? {
-    text: "Ouvrir le certificat",
-    onClick: () => { try { openViaAnchor(resWH.url); } catch {} }
-  } : undefined,
-  onOk: () => {
-    const invUrl = resInv?.url || null;
-    if (invUrl) openViaAnchor(invUrl);
-  }
-});
+getEl("btnPDF")?.addEventListener("click", async () => {
+  readInputs();
+  computeTotals();
 
+  const assets  = window.smartwebify?.assets || {};
+  const htmlInv = window.PDFView.build(state, assets);
+  const cssInv  = window.PDFView.css;
+
+  const invNum    = slugForFile(state.meta.number || "");
+  const typeLabel = docTypeLabel(state.meta.docType);
+  const fileName  = ensurePdfExt([typeLabel, invNum].filter(Boolean).join(" "));
+
+  // ⬇⬇ corrected: handle the object { ok, path, url, name }
+  const resInv = await window.smartwebify?.exportPDFFromHTML?.({
+    html: htmlInv,
+    css: cssInv,
+    meta: { number: state.meta.number, docType: state.meta.docType, filename: fileName, deferOpen: true }
   });
+
+  if (!resInv || !resInv.ok || !resInv.path) {
+    await showDialog("Échec de l'export PDF.", { title: "Erreur" });
+    return;
+  }
+
+  // WH certificate (optional)
+  let resWH = null;
+  if (state.meta?.withholding?.enabled && window.PDFWH) {
+    const htmlWH = window.PDFWH.build(state, assets);
+    const cssWH  = window.PDFWH.css;
+    const baseWH = ensurePdfExt(invNum ? `Retenue à la source - ${invNum}` : `Retenue à la source`);
+
+    resWH = await window.smartwebify?.exportPDFFromHTML?.({
+      html: htmlWH,
+      css: cssWH,
+      meta: { number: state.meta.number, docType: "retenue", filename: baseWH, deferOpen: true }
+    });
+  }
+
+  const msg =
+    "PDF exporté : " + (resInv.name || fileName) +
+    (resWH?.ok && resWH?.path ? "\nCertificat exporté : " + (resWH.name || "Retenue à la source.pdf") : "");
+
+  await showConfirm(msg, {
+    title: "Ouvrir les documents",
+    okText: "Ouvrir la facture",
+    cancelText: "Fermer",
+    okKeepsOpen: true,
+    onOk: () => openPDFFile(resInv.path),                  // ⬅ use .path
+    extra: (resWH?.ok && resWH?.path) ? {
+      text: "Ouvrir le certificat",
+      onClick: () => openPDFFile(resWH.path)               // ⬅ use .path
+    } : undefined
+  });
+});
 
   getEl("btnSubmitItem")?.addEventListener("click", () => { submitItemForm(); });
   getEl("btnNewItem")?.addEventListener("click", () => { clearAddFormAndMode(); focusFirstEmptyAddField(); });

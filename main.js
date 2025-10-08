@@ -1,27 +1,20 @@
-// main.js
 "use strict";
 
 const { app, BrowserWindow, ipcMain, dialog, shell } = require("electron");
 const path = require("path");
 const fs = require("fs");
-const fsp = require("fs/promises");
 
-/* ---------------- dev cache/location + gpu flags (must be before ready) ---------------- */
 if (!app.isPackaged) {
   const temp = process.env.TEMP || process.env.TMP || "C:\\Windows\\Temp";
   const devData = path.join(temp, "SmartwebifyInvoiceDev");
   app.setPath("userData", devData);
 }
 app.commandLine.appendSwitch("disable-gpu-shader-disk-cache");
-// app.commandLine.appendSwitch("disable-gpu"); // only if needed
 
-/* ---------------- squirrel guard (electron-builder) ---------------- */
 const isSquirrel =
   process.platform === "win32" &&
   process.argv.some((a) => a.startsWith("--squirrel"));
 if (isSquirrel) app.quit();
-
-const isDev = !app.isPackaged;
 
 let mainWindow;
 function createWindow() {
@@ -41,33 +34,6 @@ function createWindow() {
   mainWindow.loadFile(path.join(__dirname, "src", "renderer", "index.html"));
 }
 
-/* ---------------- live reload in dev ---------------- */
-function setupDevReload() {
-  let chokidar;
-  try {
-    chokidar = require("chokidar");
-  } catch {
-    console.warn("Live reload disabled (chokidar not installed).");
-    return;
-  }
-
-  const watchPaths = [
-    path.join(__dirname, "src", "renderer"),
-    path.join(__dirname, "main.js"),
-    path.join(__dirname, "preload.js"),
-  ];
-  const watcher = chokidar.watch(watchPaths, { ignoreInitial: true });
-  watcher.on("change", (p) => {
-    if (p.endsWith("main.js") || p.endsWith("preload.js")) {
-      app.relaunch();
-      app.exit(0);
-    } else if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.reloadIgnoringCache();
-    }
-  });
-}
-
-/* ---------------------------- utils ------------------------------- */
 function sanitizeFileName(name = "") {
   return String(name).replace(/[<>:"/\\|?*\u0000-\u001F]/g, "_").trim();
 }
@@ -78,7 +44,7 @@ function withJsonExt(name = "document") {
   return name.toLowerCase().endsWith(".json") ? name : `${name}.json`;
 }
 function todayStr() {
-  return new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+  return new Date().toISOString().slice(0, 10);
 }
 function docTypeLabelFromValue(val = "") {
   const v = String(val || "").toLowerCase();
@@ -87,8 +53,6 @@ function docTypeLabelFromValue(val = "") {
   if (v === "bc") return "Bon de commande";
   return "Facture";
 }
-
-/** Decide destination dir for silent exports (Desktop/Docs/Downloads/custom) */
 function resolveSaveDir(meta = {}) {
   if (meta.to === "desktop") return app.getPath("desktop");
   if (meta.to === "documents") return app.getPath("documents");
@@ -97,8 +61,6 @@ function resolveSaveDir(meta = {}) {
   if (meta.saveDir) return meta.saveDir;
   return app.getPath("downloads");
 }
-
-/** If file exists, return "name (2).ext", "name (3).ext", ... */
 function ensureUniquePath(filePath) {
   if (!fs.existsSync(filePath)) return filePath;
   const { dir, name, ext } = path.parse(filePath);
@@ -110,21 +72,20 @@ function ensureUniquePath(filePath) {
   }
   return candidate;
 }
-
-/** Build a minimal HTML shell for pdfView/pdfWH output */
 function buildHtmlDoc(html, css) {
   return `<!doctype html>
 <html>
 <head>
   <meta charset="utf-8">
-  <meta http-equiv="X-UA-Compatible" content="IE=edge">
-  <style>${css || ""}</style>
+  <style>
+    @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+    ${css || ""}
+    html, body { margin:0; padding:0; background:#fff; }
+  </style>
 </head>
 <body>${html || ""}</body>
 </html>`;
 }
-
-/** Render the given HTML/CSS to a PDF Buffer */
 async function renderToPdfBuffer(html, css) {
   const doc = buildHtmlDoc(html, css);
   let win;
@@ -133,19 +94,29 @@ async function renderToPdfBuffer(html, css) {
       show: false,
       backgroundColor: "#ffffff",
       width: 900,
-      height: 1273, // ~A4 portrait @ ~96dpi
-      webPreferences: { sandbox: true },
+      height: 1273,
+      webPreferences: {
+        sandbox: true,
+        offscreen: true,
+      },
     });
 
     const dataUrl =
       "data:text/html;base64," + Buffer.from(doc).toString("base64");
-    await win.loadURL(dataUrl);
+
+    const baseDir =
+      "file://" +
+      path.join(__dirname, "src", "renderer").replace(/\\/g, "/") +
+      "/";
+
+    await win.loadURL(dataUrl, { baseURLForDataURL: baseDir });
 
     const pdfBuffer = await win.webContents.printToPDF({
       printBackground: true,
       marginsType: 1,
       pageSize: "A4",
       landscape: false,
+      preferCSSPageSize: true,
     });
     return pdfBuffer;
   } finally {
@@ -153,11 +124,8 @@ async function renderToPdfBuffer(html, css) {
   }
 }
 
-/* ---------------- app lifecycle ---------------- */
 app.whenReady().then(() => {
   createWindow();
-  if (isDev) setupDevReload();
-
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
@@ -167,23 +135,17 @@ app.on("window-all-closed", () => {
   if (process.platform !== "darwin") app.quit();
 });
 
-/* ============================== IPC =============================== */
-
-/* Save invoice JSON — filename uses selected document type + number */
-// main.js (handler)
 ipcMain.handle("save-invoice-json", async (_evt, payload = {}) => {
   const meta = payload?.meta || {};
   const typeLabel = docTypeLabelFromValue(meta.docType);
   const numOrDate = sanitizeFileName(meta.number || todayStr());
-  const baseName  = withJsonExt(`${typeLabel} - ${numOrDate}`);
+  const baseName = withJsonExt(`${typeLabel} - ${numOrDate}`);
 
-  if (meta?.silent === true || meta?.to === "desktop" || meta?.saveDir) {
-    const dir = meta?.to === "desktop"
-      ? app.getPath("desktop")
-      : meta?.saveDir || resolveSaveDir({ to: "desktop" });
+  if (meta?.silent === true || meta?.to || meta?.saveDir) {
+    const dir = resolveSaveDir(meta);
     const target = ensureUniquePath(path.join(dir, baseName));
     fs.writeFileSync(target, JSON.stringify(payload, null, 2), "utf-8");
-    return target; // returns absolute path on desktop
+    return target;
   }
 
   const { canceled, filePath } = await dialog.showSaveDialog({
@@ -196,8 +158,6 @@ ipcMain.handle("save-invoice-json", async (_evt, payload = {}) => {
   return filePath;
 });
 
-
-/* Open invoice JSON */
 ipcMain.handle("open-invoice-json", async () => {
   const { canceled, filePaths } = await dialog.showOpenDialog({
     title: "Ouvrir",
@@ -217,66 +177,34 @@ ipcMain.handle("open-invoice-json", async () => {
   }
 });
 
-/* Pick logo → data URL (alias two channels for safety) */
-async function pickLogoImpl() {
+ipcMain.handle("smartwebify:pickLogo", async () => {
   const { canceled, filePaths } = await dialog.showOpenDialog({
     title: "Choisir un logo",
     filters: [
-      { name: "Images", extensions: ["png", "jpg", "jpeg", "webp", "bmp", "gif", "ico"] },
+      { name: "Images", extensions: ["png", "jpg", "jpeg", "webp", "bmp", "gif", "ico", "svg"] },
     ],
     properties: ["openFile"],
   });
   if (canceled || !filePaths?.[0]) return null;
   const filePath = filePaths[0];
-  const base64 = fs.readFileSync(filePath).toString("base64");
   const ext = path.extname(filePath).slice(1).toLowerCase();
-  return {
-    dataUrl: `data:image/${ext === "jpg" ? "jpeg" : ext};base64,${base64}`,
-  };
-}
-ipcMain.handle("pick-logo", pickLogoImpl);
-ipcMain.handle("smartwebify:pickLogo", pickLogoImpl);
-
-/* Legacy dialog-only PDF export (now defaults to Desktop path in dialog) */
-ipcMain.handle("export-pdf-from-html", async (_evt, payload) => {
-  const { html = "", css = "", meta } = payload || {};
-  const defaultName = withPdfExt(
-    `${docTypeLabelFromValue(meta?.docType)} - ${sanitizeFileName(
-      meta?.number || todayStr()
-    )}`
-  );
-
-  const save = await dialog.showSaveDialog({
-    title: "Exporter PDF",
-    defaultPath: path.join(app.getPath("desktop"), defaultName),
-    filters: [{ name: "PDF", extensions: ["pdf"] }],
-  });
-  if (save.canceled || !save.filePath) return null;
-
-  try {
-    const pdfBuffer = await renderToPdfBuffer(html, css);
-    fs.writeFileSync(save.filePath, pdfBuffer);
-    return save.filePath;
-  } catch (err) {
-    console.error("export-pdf-from-html error:", err);
-    dialog.showErrorBox("Erreur PDF", String(err?.message || err));
-    return null;
-  }
+  const base64 = fs.readFileSync(filePath).toString("base64");
+  const mime =
+    ext === "svg"
+      ? "image/svg+xml"
+      : ext === "jpg"
+      ? "image/jpeg"
+      : `image/${ext || "png"}`;
+  return { dataUrl: `data:${mime};base64,${base64}` };
 });
 
-/* New export with optional silent autosave and custom filename
-   - meta.to: "desktop" | "documents" | "downloads" | (folder path)
-   - meta.silent: true to skip dialog
-*/
 ipcMain.handle("smartwebify:exportPDFFromHTML", async (event, payload) => {
   const { html = "", css = "", meta = {}, silent } = payload || {};
   const isSilent =
-    meta.silent === true || silent === true || meta.to === "desktop";
+    meta.silent === true || silent === true || !!meta.to || !!meta.saveDir;
 
   try {
     const pdfBuffer = await renderToPdfBuffer(html, css);
-
-    // Build base filename: "<Type> - <Number>.pdf"
     const baseName =
       meta.filename ||
       `${docTypeLabelFromValue(meta.docType)} - ${sanitizeFileName(
@@ -285,14 +213,12 @@ ipcMain.handle("smartwebify:exportPDFFromHTML", async (event, payload) => {
     const fileName = withPdfExt(sanitizeFileName(baseName));
 
     if (isSilent) {
-      // Choose destination (Desktop if meta.to === 'desktop')
       const saveDir = resolveSaveDir(meta);
       const target = ensureUniquePath(path.join(saveDir, fileName));
       fs.writeFileSync(target, pdfBuffer);
-      return target;
+      return { ok: true, path: target };
     }
 
-    // Dialog flow (defaults to Desktop folder)
     const { canceled, filePath } = await dialog.showSaveDialog(
       BrowserWindow.fromWebContents(event.sender),
       {
@@ -304,15 +230,14 @@ ipcMain.handle("smartwebify:exportPDFFromHTML", async (event, payload) => {
     if (canceled || !filePath) return null;
 
     fs.writeFileSync(filePath, pdfBuffer);
-    return filePath;
+    return { ok: true, path: filePath };
   } catch (err) {
-    console.error("smartwebify:exportPDFFromHTML error:", err);
+    console.error("exportPDFFromHTML error:", err);
     dialog.showErrorBox("Erreur PDF", String(err?.message || err));
     return null;
   }
 });
 
-/* Openers used by renderer openPDFFile() */
 ipcMain.handle("smartwebify:openPath", async (_evt, absPath) => {
   try {
     const res = await shell.openPath(absPath);

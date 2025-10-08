@@ -34,7 +34,7 @@
   "asar": true,
   "asarUnpack": ["**/*.node"],
 
-  "win": { "target": ["nsis"], "artifactName": "Smartwebify-Invoice-Maker-Setup-${version}.exe" },
+  "win": { "icon": "build/icon.ico", "target": ["nsis"], "artifactName": "Smartwebify-Invoice-Maker-Setup-${version}.exe" },
 
   "mac": {
     "icon": "build/icon.icns",
@@ -52,16 +52,19 @@
   },
 
 "nsis": {
-"oneClick": false,
-"allowToChangeInstallationDirectory": true,
+"installerIcon": "build/icon.ico",
+"installerHeaderIcon": "build/icon.ico",
+    "uninstallerIcon": "build/icon.ico",
+    "oneClick": false,
+    "perMachine": false,
+    "allowToChangeInstallationDirectory": false,
 "displayLanguageSelector": true,
 "installerLanguages": [
 "fr_FR"
 ],
 "createDesktopShortcut": true,
 "createStartMenuShortcut": true,
-"shortcutName": "Smartwebify Invoice Maker",
-"perMachine": false
+"shortcutName": "Smartwebify Invoice Maker"
 },
 "compression": "maximum"
 }
