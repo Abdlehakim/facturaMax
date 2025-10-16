@@ -50,7 +50,7 @@ body.print-mode #pdfRoot {
 .pdf-small{font-size:12px}
 .pdf-meta{background:#f9fafb;padding:12px;border-radius:5px;margin-top:12px; width:280px}
 .pdf-meta-grid{display:grid;grid-template-columns:1fr 1fr;gap:3px;font-size:12px}
-.tableDiv{ margin-top:20px; border-radius:5px; border:2px solid #15335e; overflow-x:auto; height:400px }
+.tableDiv{ margin-top:20px; border-radius:5px; border:2px solid #15335e; overflow-x:auto; height:350px }
 .pdf-table{ width:100%; font-size:10px; table-layout:auto; font-family: var(--invoice-font); }
 .pdf-table th,.pdf-table td{ padding:4px; vertical-align:top }
 .pdf-table thead th{ font-weight:600; background-color:#15335e; color:#fff; text-align:right; }
@@ -66,7 +66,7 @@ body.print-mode #pdfRoot {
 
 .pdf-mini-sum{
   border:2px solid #15335e;
-  min-width:200px;
+  min-width:40%;
   max-width:280px;
   margin-left:auto;
   border-radius:5px;
@@ -77,23 +77,23 @@ body.print-mode #pdfRoot {
 .pdf-mini-table td{
   background:#fff;
   color:#0e1220;
-  font-size:8px; font-weight:600;
+  font-size:12px; font-weight:600;
   text-align:center;
   padding:4px;
   font-family: var(--invoice-font);
 }
 .pdf-mini-table .head th{ background:#15335e; color:#fff; }
-.pdf-mini-table .grand th{ background:#15335e; font-size:10px; font-weight:600; color:#fff; }
+.pdf-mini-table .grand th{ background:#15335e; font-size:12px; font-weight:600; color:#fff; }
 .pdf-mini-table .right{ text-align:center; }
 
 .pdf-footer{
   position:absolute;
   left:14mm;
   right:14mm;
-  bottom:5mm;
+  bottom:20mm;
   display:flex;
   justify-content:space-between;
-  align-items:flex-end;
+  align-items:flex-start;
 }
 .pdf-company{ font-size:9px; line-height:1.2; max-width:40%; }
 .pdf-sign{ text-align:left; font-size:12px; }
@@ -105,9 +105,8 @@ body.print-mode #pdfRoot {
   display: flex;
   flex-direction: column;
   left: 15mm;
-  top: 210mm;
-  max-width: 45%;
-  max-height: 68mm;          /* cap height so it never reaches footer */
+  top: 200mm;
+  max-width: 35%;
   overflow: hidden;
   font-size: 12px;
   line-height: 1.25;
@@ -148,8 +147,6 @@ body.print-mode #pdfRoot {
   display: inline-block;    /* make the background box take effect */
 }
 
-
-
 .pdf-notes{
   margin-top:10px;
   font-size:10px;
@@ -167,7 +164,6 @@ body.print-mode #pdfRoot {
   white-space: nowrap;
 }
 `;
-
 
   const CURRENCY_WORDS = {
     TND: { major: "dinars", minor: "millimes", minorFactor: 1000 },
@@ -234,7 +230,7 @@ body.print-mode #pdfRoot {
 
   function getDocType(meta) {
     const m = meta || {};
-    let t = (m.type ?? m.docType ?? "").toString().trim().toLowerCase();
+    let t = (m.docType ?? m.type ?? "").toString().trim().toLowerCase();
     if (!t) {
       const sel = document.getElementById("docType");
       if (sel && sel.value) t = String(sel.value).trim().toLowerCase();
@@ -278,6 +274,7 @@ body.print-mode #pdfRoot {
     const items   = Array.isArray(state?.items) ? state.items : [];
     const ex      = meta?.extras || {};
 
+    // Shipping
     const shipEnabled = !!ex?.shipping?.enabled;
     const shipLabel   = (ex?.shipping?.label || "Frais de livraison");
     const shipHT      = Number(ex?.shipping?.amount) || 0;
@@ -285,6 +282,7 @@ body.print-mode #pdfRoot {
     const shipTVA     = shipHT * (shipTVApc / 100);
     const shipTTC     = shipHT + shipTVA;
 
+    // Stamp
     const stampEnabled = !!ex?.stamp?.enabled;
     const stampLabel   = (ex?.stamp?.label || "Timbre fiscal");
     const stampHT      = Number(ex?.stamp?.amount) || 0;
@@ -293,7 +291,7 @@ body.print-mode #pdfRoot {
     const stampTTC     = stampHT + stampTVA;
 
     const cur   = meta.currency || "TND";
-    const logo = assets?.logo || company.logo || "./assets/logoSW.png";
+    const logo  = assets?.logo || company.logo || "./assets/logoIMG.png";
     const type  = getDocType(meta);
 
     const MAP = {
@@ -323,6 +321,7 @@ body.print-mode #pdfRoot {
     if (!hideTTC)       headerParts.push("Total TTC");
     const HEADERS = headerParts;
 
+    // Table rows
     const rows = items.map((raw) => {
       const it = {
         ref:      raw.ref || "",
@@ -352,6 +351,7 @@ body.print-mode #pdfRoot {
       return `<tr class="pdf-row">${cells.join("")}</tr>`;
     }).join("");
 
+    // Totals from items
     let subtotalItems = 0, totalDisc = 0, totalTVA_items = 0;
     items.forEach((raw) => {
       const qty   = Number(raw.qty || 0);
@@ -367,19 +367,49 @@ body.print-mode #pdfRoot {
       totalTVA_items+= tvaAmt;
     });
 
-    const totalHT_items   = subtotalItems - totalDisc;
-    const totalHT_display = totalHT_items + (shipEnabled ? shipHT : 0);
-    const totalTVA_disp   = totalTVA_items + (shipEnabled ? shipTVA : 0);
+    const totalHT_items = subtotalItems - totalDisc;
+
+    // === FODEC (from meta.extras) ===
+    const fEnabled = !!ex?.fodec?.enabled;
+    const fLabel   = (ex?.fodec?.label || "FODEC");
+    const fRate    = Number(ex?.fodec?.rate) || 0;                 // %
+    const fBaseSel = String(ex?.fodec?.base || "ht").toLowerCase();// "ht" | "ht_plus" | "ttc_sans_fodec"
+    const fTvaRate = Number(ex?.fodec?.tva)  || 0;                 // % TVA on FODEC
+
+    // Bases for FODEC calculation
+    const baseHT_simple = totalHT_items;                                    // HT lines only
+    const baseHT_plus   = totalHT_items + (shipEnabled ? shipHT : 0);       // HT + shipping
+    const baseTTC_sansF = baseHT_plus + totalTVA_items + (shipEnabled ? shipTVA : 0); // TTC before adding FODEC
+
+    let fodecBase = 0;
+    if (fBaseSel === "ht")         fodecBase = baseHT_simple;
+    else if (fBaseSel === "ht_plus") fodecBase = baseHT_plus;
+    else                            fodecBase = baseTTC_sansF;
+
+    const fodecHT  = fEnabled ? (fodecBase * (fRate / 100)) : 0;
+    const fodecTVA = fEnabled ? (fodecHT   * (fTvaRate / 100)) : 0;
+    const fodecTT  = fodecHT + fodecTVA;
+
+    // Totals including shipping + FODEC (stamp added later on TTC)
+    const totalHT_display = totalHT_items + (shipEnabled ? shipHT : 0) + (fEnabled ? fodecHT  : 0);
+    const totalTVA_disp   = totalTVA_items + (shipEnabled ? shipTVA : 0) + (fEnabled ? fodecTVA: 0);
     const totalTTC_all    = totalHT_display + totalTVA_disp + (stampEnabled ? stampTTC : 0);
 
+    // Amount in words target
     const wordsTarget       = totalTTC_all;
     const wordsTgtText      = SHOW_WORDS ? amountInWords(wordsTarget, cur) : "";
     const wordsHeaderFinal  = wordsHeader;
 
+    // Mini summary rows
     const miniRows = [];
     if (shipEnabled && shipHT > 0) {
       miniRows.push(`<tr><td>${esc(shipLabel)}</td><td class="right">${fmtMoney(shipTTC, cur)}</td></tr>`);
     }
+    // FODEC row BEFORE Total HT, showing FODEC HT amount
+  if (fEnabled) {
+  const rateTxt = Number.isFinite(fRate) ? ` (${fRate}%)` : "";
+  miniRows.push(`<tr><td>${esc(fLabel)}${rateTxt}</td><td class="right">${fmtMoney(fodecHT, cur)}</td></tr>`);
+}
     miniRows.push(
       `<tr class="head"><th>Total HT</th><th class="right">${fmtMoney(totalHT_display, cur)}</th></tr>`,
       `<tr><td>TVA</td><td class="right">${fmtMoney(totalTVA_disp, cur)}</td></tr>`
@@ -496,8 +526,7 @@ body.print-mode #pdfRoot {
           <div class="pdf-company">${companyCSV}</div>
           <div class="pdf-sign">
             <p class="pdf-sign-line">Signature et cachet</p>
-            <p style="margin:0;font-size:9px">Fait le : ${esc(meta.date || "")}</p>
-            <p style="margin-top:4px;font-style:italic;font-size:12px">Merci pour votre confiance&nbsp;!</p>
+            <p style="margin-top:0px;font-size:12px">Merci pour votre confiance&nbsp;!</p>
           </div>
         </div>
       </div>`;

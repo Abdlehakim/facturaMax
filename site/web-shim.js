@@ -104,11 +104,11 @@ async function canvasToA4PdfBlob(canvas) {
 // Ensure demo has a logo if none was set
 window.addEventListener("DOMContentLoaded", () => {
   const img = document.getElementById("companyLogo");
-  if (img && !img.src) img.src = "./logoSW.png";
+  if (img && !img.src) img.src = "./logoIMG.png";
 });
 
 // Prepare namespace
-window.smartwebify = window.smartwebify || {};
+window.SoukElMeuble = window.SoukElMeuble || {};
 
 /**
  * Export PDF directly (no print dialog) and optionally open it in a pre-opened tab.
@@ -126,7 +126,7 @@ window.smartwebify = window.smartwebify || {};
  * Returns:
  *   { ok: true, name: string, url?: string, opened: boolean } | null
  */
-window.smartwebify.exportPDFFromHTML = async ({ html, css, meta = {} }) => {
+window.SoukElMeuble.exportPDFFromHTML = async ({ html, css, meta = {} }) => {
   const name = meta.filename || `${docTypeText(meta.docType)} - ${sanitize(meta.number || today())}.pdf`;
 
   // Host element off-screen
@@ -176,7 +176,7 @@ window.smartwebify.exportPDFFromHTML = async ({ html, css, meta = {} }) => {
 };
 
 //////////////////// JSON save/open (web) ////////////////////
-window.smartwebify.saveInvoiceJSONToDesktop = async (payload = {}) => {
+window.SoukElMeuble.saveInvoiceJSONToDesktop = async (payload = {}) => {
   const meta = payload.meta || {};
   const name = `${docTypeText(meta.docType)} - ${sanitize(meta.number || today())}.json`;
   const json = JSON.stringify(payload, null, 2);
@@ -208,7 +208,7 @@ window.smartwebify.saveInvoiceJSONToDesktop = async (payload = {}) => {
   return { ok: true, name };
 };
 
-window.smartwebify.openInvoiceJSON = async () => {
+window.SoukElMeuble.openInvoiceJSON = async () => {
   if (window.showOpenFilePicker) {
     try {
       const [handle] = await window.showOpenFilePicker({
@@ -239,22 +239,22 @@ window.smartwebify.openInvoiceJSON = async () => {
 };
 
 //////////////////// renderer API stubs (web) ////////////////////
-window.smartwebify.saveInvoiceJSON = async (data) =>
-  window.smartwebify.saveInvoiceJSONToDesktop(data);
+window.SoukElMeuble.saveInvoiceJSON = async (data) =>
+  window.SoukElMeuble.saveInvoiceJSONToDesktop(data);
 
-window.smartwebify.exportPDFFromHTMLWithDialog = async (p) =>
-  window.smartwebify.exportPDFFromHTML(p);
+window.SoukElMeuble.exportPDFFromHTMLWithDialog = async (p) =>
+  window.SoukElMeuble.exportPDFFromHTML(p);
 
-window.smartwebify.pickLogo = async () => null;
+window.SoukElMeuble.pickLogo = async () => null;
 
-window.smartwebify.openPath = async () => false;
-window.smartwebify.showInFolder = async () => false;
-window.smartwebify.openExternal = async (url) => {
+window.SoukElMeuble.openPath = async () => false;
+window.SoukElMeuble.showInFolder = async () => false;
+window.SoukElMeuble.openExternal = async (url) => {
   try { window.open(url, "_blank", "noopener"); return true; }
   catch { return false; }
 };
 
-window.smartwebify.onEnterPrintMode = () => () => {};
-window.smartwebify.onExitPrintMode  = () => () => {};
+window.SoukElMeuble.onEnterPrintMode = () => () => {};
+window.SoukElMeuble.onExitPrintMode  = () => () => {};
 
-window.smartwebify.assets = window.smartwebify.assets || {};
+window.SoukElMeuble.assets = window.SoukElMeuble.assets || {};

@@ -1,11 +1,11 @@
-; Smartwebify Invoice Maker - Inno Setup script
+; SoukElMeuble Invoice Maker - Inno Setup script
 ; This script assumes you've run: npm run pack:win
 ; which creates the unpacked app inside: dist/win-unpacked
 
-#define MyAppName "Smartwebify Invoice Maker"
+#define MyAppName "SoukElMeuble Invoice Maker"
 #define MyAppVersion "1.0.0"
-#define MyAppPublisher "Smartwebify"
-#define MyAppExeName "Smartwebify Invoice Maker.exe"
+#define MyAppPublisher "SoukElMeuble"
+#define MyAppExeName "SoukElMeuble Invoice Maker.exe"
 
 [Setup]
 AppId={{B6984A6E-9B6F-4E45-8C41-5C30A7E2A8A9}
@@ -16,7 +16,7 @@ DefaultDirName={pf}\{#MyAppName}
 DefaultGroupName={#MyAppName}
 DisableDirPage=no
 DisableProgramGroupPage=no
-OutputBaseFilename=Smartwebify-Invoice-Maker-Setup
+OutputBaseFilename=SoukElMeuble-Invoice-Maker-Setup
 Compression=lzma
 SolidCompression=yes
 RestartIfNeededByRun=no

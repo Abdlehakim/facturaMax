@@ -1,5 +1,5 @@
 /* =========================
-   Smartwebify — Consolidated UI Styles
+   SoukElMeuble — Consolidated UI Styles
    ========================= */
 
 /* --- Reset & Vars --- */
@@ -491,7 +491,7 @@ td .del:hover {
 }
 
 /* =========================
-   Modal Dialog (Smartwebify)
+   Modal Dialog (SoukElMeuble)
    ========================= */
 .swbDialog {
   position: fixed;

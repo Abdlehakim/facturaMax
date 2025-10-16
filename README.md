@@ -1,4 +1,4 @@
-# Smartwebify Invoice Maker (Windows)
+# SoukElMeuble Invoice Maker (Windows)
 
 Offline desktop app to create, save (.json), and export PDF invoices — tailored for **Development, Marketing, Graphics, and Design** services.
 
@@ -23,8 +23,8 @@ This creates `dist/win-unpacked/`.
 ## Create Windows Installer with Inno Setup
 
 1. Install **Inno Setup**.
-2. Open `Smartwebify_Invoice_Maker.iss` in Inno Setup Compiler.
-3. Click **Build**. You'll get `Smartwebify-Invoice-Maker-Setup.exe`.
+2. Open `SoukElMeuble_Invoice_Maker.iss` in Inno Setup Compiler.
+3. Click **Build**. You'll get `SoukElMeuble-Invoice-Maker-Setup.exe`.
 
 *(Optional)* You can also create a portable EXE using:
 ```bash
@@ -35,7 +35,7 @@ npm run dist:portable
 
 - Company & client details with **logo upload** (stored locally on your machine).
 - Line items with **Qty, Unit, Price, TVA%, Discount%**, and automatic totals.
-- One‑click **templates** for common Smartwebify services.
+- One‑click **templates** for common SoukElMeuble services.
 - **Save/Open** invoices as JSON.
 - **Export to PDF** using Electron’s `printToPDF` (A4).
 - Clean, printable layout.
@@ -48,6 +48,6 @@ npm run dist:portable
 
 ---
 
-© Smartwebify
+© SoukElMeuble
 
 npm run dev:site

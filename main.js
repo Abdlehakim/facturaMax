@@ -6,7 +6,7 @@ const fs = require("fs");
 
 if (!app.isPackaged) {
   const temp = process.env.TEMP || process.env.TMP || "C:\\Windows\\Temp";
-  const devData = path.join(temp, "SmartwebifyInvoiceDev");
+  const devData = path.join(temp, "SoukElMeubleInvoiceDev");
   app.setPath("userData", devData);
 }
 app.commandLine.appendSwitch("disable-gpu-shader-disk-cache");
@@ -177,7 +177,7 @@ ipcMain.handle("open-invoice-json", async () => {
   }
 });
 
-ipcMain.handle("smartwebify:pickLogo", async () => {
+ipcMain.handle("SoukElMeuble:pickLogo", async () => {
   const { canceled, filePaths } = await dialog.showOpenDialog({
     title: "Choisir un logo",
     filters: [
@@ -198,7 +198,7 @@ ipcMain.handle("smartwebify:pickLogo", async () => {
   return { dataUrl: `data:${mime};base64,${base64}` };
 });
 
-ipcMain.handle("smartwebify:exportPDFFromHTML", async (event, payload) => {
+ipcMain.handle("SoukElMeuble:exportPDFFromHTML", async (event, payload) => {
   const { html = "", css = "", meta = {}, silent } = payload || {};
   const isSilent =
     meta.silent === true || silent === true || !!meta.to || !!meta.saveDir;
@@ -238,7 +238,7 @@ ipcMain.handle("smartwebify:exportPDFFromHTML", async (event, payload) => {
   }
 });
 
-ipcMain.handle("smartwebify:openPath", async (_evt, absPath) => {
+ipcMain.handle("SoukElMeuble:openPath", async (_evt, absPath) => {
   try {
     const res = await shell.openPath(absPath);
     return res === "";
@@ -246,7 +246,7 @@ ipcMain.handle("smartwebify:openPath", async (_evt, absPath) => {
     return false;
   }
 });
-ipcMain.handle("smartwebify:showInFolder", async (_evt, absPath) => {
+ipcMain.handle("SoukElMeuble:showInFolder", async (_evt, absPath) => {
   try {
     shell.showItemInFolder(absPath);
     return true;
@@ -254,7 +254,7 @@ ipcMain.handle("smartwebify:showInFolder", async (_evt, absPath) => {
     return false;
   }
 });
-ipcMain.handle("smartwebify:openExternal", async (_evt, url) => {
+ipcMain.handle("SoukElMeuble:openExternal", async (_evt, url) => {
   try {
     await shell.openExternal(url);
     return true;

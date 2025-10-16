@@ -36,10 +36,10 @@ function fileToDataURL(absPath) {
 
 function resolveLogoPath() {
   const candidates = [
-    path.join(__dirname, "src", "renderer", "assets", "logoSW.png"),
-    path.join(__dirname, "assets", "logoSW.png"),
-    path.join(process.resourcesPath || "", "src", "renderer", "assets", "logoSW.png"),
-    path.join(process.resourcesPath || "", "assets", "logoSW.png"),
+    path.join(__dirname, "src", "renderer", "assets", "logoIMG.png"),
+    path.join(__dirname, "assets", "logoIMG.png"),
+    path.join(process.resourcesPath || "", "src", "renderer", "assets", "logoIMG.png"),
+    path.join(process.resourcesPath || "", "assets", "logoIMG.png"),
   ];
   return candidates.find((p) => p && fs.existsSync(p)) || null;
 }
@@ -47,7 +47,7 @@ function resolveLogoPath() {
 const logoPath = resolveLogoPath();
 const logoDataURL = logoPath ? fileToDataURL(logoPath) : "";
 
-contextBridge.exposeInMainWorld("smartwebify", {
+contextBridge.exposeInMainWorld("SoukElMeuble", {
   saveInvoiceJSON: async (data) => {
     const result = await ipcRenderer.invoke("save-invoice-json", data);
     return !!result;
@@ -62,7 +62,7 @@ contextBridge.exposeInMainWorld("smartwebify", {
   openInvoiceJSON: () => ipcRenderer.invoke("open-invoice-json"),
 
   exportPDFFromHTML: async (payload) => {
-    const res = await ipcRenderer.invoke("smartwebify:exportPDFFromHTML", payload);
+    const res = await ipcRenderer.invoke("SoukElMeuble:exportPDFFromHTML", payload);
     if (!res || !res.ok || !res.path) return null;
     const name =
       payload?.meta?.filename ||
@@ -76,7 +76,7 @@ contextBridge.exposeInMainWorld("smartwebify", {
     return { ok: true, path: res.path, url: toFileURL(res.path), name };
   },
   exportPDFToDesktop: async ({ html, css, meta = {} }) => {
-    const res = await ipcRenderer.invoke("smartwebify:exportPDFFromHTML", {
+    const res = await ipcRenderer.invoke("SoukElMeuble:exportPDFFromHTML", {
       html,
       css,
       meta: { ...meta, to: "desktop", silent: true },
@@ -90,10 +90,10 @@ contextBridge.exposeInMainWorld("smartwebify", {
     };
   },
 
-  pickLogo: () => ipcRenderer.invoke("smartwebify:pickLogo"),
-  openPath: (absPath) => ipcRenderer.invoke("smartwebify:openPath", absPath),
-  showInFolder: (absPath) => ipcRenderer.invoke("smartwebify:showInFolder", absPath),
-  openExternal: (url) => ipcRenderer.invoke("smartwebify:openExternal", url),
+  pickLogo: () => ipcRenderer.invoke("SoukElMeuble:pickLogo"),
+  openPath: (absPath) => ipcRenderer.invoke("SoukElMeuble:openPath", absPath),
+  showInFolder: (absPath) => ipcRenderer.invoke("SoukElMeuble:showInFolder", absPath),
+  openExternal: (url) => ipcRenderer.invoke("SoukElMeuble:openExternal", url),
 
   assets: {
     logo: logoDataURL,

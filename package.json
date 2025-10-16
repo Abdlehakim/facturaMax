@@ -1,9 +1,9 @@
 {
-"name": "smartwebify-invoice-maker",
+"name": "facturamax",
 "version": "1.0.0",
-"description": "Smartwebify Invoice Maker (Windows) – create, save and export invoices to PDF for development, marketing, graphics and design services.",
+"description": "FacturaMax Maker (Windows) – create, save and export invoices to PDF for development, marketing, graphics and design services.",
 "main": "main.js",
-"author": "Smartwebify",
+"author": "Adelhakim Sabkhi",
 "license": "MIT",
 "scripts": {
 "dev:site": "http-server ./site -p 8080 -c-1",
@@ -27,14 +27,14 @@
 },
 "build": {
    "afterAllArtifactBuild": "scripts/trim-artifacts.js",
-  "appId": "com.smartwebify.invoice",
-  "productName": "Smartwebify Invoice Maker",
+  "appId": "FacturaMax",
+  "productName": "FacturaMax",
   "directories": { "output": "dist" },
   "files": ["main.js","preload.js","src/renderer/**","package.json"],
   "asar": true,
   "asarUnpack": ["**/*.node"],
 
-  "win": { "icon": "build/icon.ico", "target": ["nsis"], "artifactName": "Smartwebify-Invoice-Maker-Setup-${version}.exe" },
+  "win": { "icon": "build/icon.ico", "target": ["nsis"], "artifactName": "FacturaMax-${version}.exe" },
 
   "mac": {
     "icon": "build/icon.icns",
@@ -64,8 +64,8 @@
 ],
 "createDesktopShortcut": true,
 "createStartMenuShortcut": true,
-"shortcutName": "Smartwebify Invoice Maker"
+"shortcutName": "FacturaMax"
 },
 "compression": "maximum"
 }
-}
+}                                             

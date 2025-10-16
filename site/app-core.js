@@ -1,16 +1,3 @@
-const $ = (sel) => document.querySelector(sel);
-const $$ = (sel) => Array.from(document.querySelectorAll(sel));
-const getEl = (id) => document.getElementById(id);
-const setVal = (id, v) => { const el = getEl(id); if (el) el.value = v; };
-const getStr = (id, def = "") => { const el = getEl(id); return el ? el.value.trim() : def; };
-const getNum = (id, def = 0) => { const val = getStr(id, String(def)); const n = Number(val.replace?.(",", ".") ?? val); return Number.isFinite(n) ? n : def; };
-const setText = (id, v) => { const el = getEl(id); if (el) el.textContent = v; };
-const setSrc = (id, v) => { const el = getEl(id); if (el) el.src = v; };
-
-function slugForFile(s = "") { return String(s).trim().replace(/[\/\\:*?"<>|]/g, "-").replace(/\s+/g, " ").replace(/[\u0000-\u001f]/g, "").trim(); }
-function ensurePdfExt(name) { return name.toLowerCase().endsWith(".pdf") ? name : (name + ".pdf"); }
-function ensureJsonExt(name) { return name.toLowerCase().endsWith(".json") ? name : (name + ".json"); }
-function docTypeLabel(t) { const map = { facture: "Facture", devis: "Devis", bl: "Bon de livraison", bc: "Bon de commande" }; return map[String(t || "").toLowerCase()] || "Document"; }
 
 const state = {
   company: { name: "SoukElMeuble", vat: "1891628/W/A/M/000", phone: "+216 27 673 561", email: "contact@SoukElMeuble.com", address: "Rue Mahbouba Soussia 2080 Teboulba", logo: "" },
@@ -24,9 +11,9 @@ const state = {
     withholding: { enabled: false, rate: 1.5, base: "ht", label: "Retenue à la source", threshold: 1000 },
     extras: {
       shipping: { enabled:false, label:"Frais de livraison", amount:7, tva:19 },
-      stamp:    { enabled:false, label:"Timbre fiscal", amount:1, tva:0   },
+      stamp:    { enabled:false, label:"Timbre fiscal", amount:1, tva:0 },
       fodec:    { enabled:false, label:"FODEC", rate:1, base:"ht", tva:19 }
-    },
+    }
   },
   notes: "",
   items: [ { ref: "SKU-001", product: "Ordinateur portable", desc: "Garantie 2 ans", qty: 1, price: 1000, tva: 19, discount: 0 } ],
@@ -37,14 +24,10 @@ let selectedItemIndex = null;
 const IS_DESKTOP = !!(window.SoukElMeuble && typeof window.SoukElMeuble.openPath === "function");
 const IS_WEB = !IS_DESKTOP;
 
-function formatMoney(v, currency) { const n = Number(v || 0); try { return new Intl.NumberFormat(undefined, { style: "currency", currency }).format(n); } catch { return new Intl.NumberFormat(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n) + " " + (currency || ""); } }
-function formatInt(v) { return new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 }).format(Number(v || 0)); }
-function formatPct(v) { return new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(Number(v || 0)); }
-
 function saveCompanyToLocal(){ if (COMPANY_LOCKED) return; try{ localStorage.setItem("swb_company", JSON.stringify(state.company)); }catch{} }
 function loadCompanyFromLocal(){ if (COMPANY_LOCKED) return; try{ const c = JSON.parse(localStorage.getItem("swb_company")||"null"); if(c) state.company = {...state.company, ...c}; }catch{} }
 
-function updateClientIdLabel() {
+function updateClientIdLabel(){
   const type = state.client?.type === "particulier" ? "particulier" : "societe";
   const labelText = type === "particulier" ? "CIN / passeport" : "Identifiant fiscal / TVA";
   const placeholder = type === "particulier" ? "CIN ou Passeport" : "XXXXXXXXX";
@@ -54,12 +37,19 @@ function updateClientIdLabel() {
 }
 
 function bind(){
-  [["companyName","name"],["companyVat","vat"],["companyPhone","phone"],["companyEmail","email"],["companyAddress","address"]].forEach(([id,key])=>{ const el = getEl(id); if(!el) return; el.value = state.company[key] || ""; if (COMPANY_LOCKED) { el.readOnly = true; el.classList.add("locked"); el.setAttribute("tabindex","-1"); } });
+  [["companyName","name"],["companyVat","vat"],["companyPhone","phone"],["companyEmail","email"],["companyAddress","address"]]
+    .forEach(([id,key])=>{
+      const el = getEl(id); if(!el) return;
+      el.value = state.company[key] || "";
+      if (COMPANY_LOCKED) { el.readOnly = true; el.classList.add("locked"); el.setAttribute("tabindex","-1"); }
+    });
+
   setVal("docType",  state.meta.docType || "facture");
   setVal("invNumber", state.meta.number);
   setVal("currency",  state.meta.currency);
   setVal("invDate",   state.meta.date);
   setVal("invDue",    state.meta.due);
+
   setVal("clientType", state.client.type || "societe");
   setVal("clientName", state.client.name);
   setVal("clientEmail", state.client.email);
@@ -107,7 +97,8 @@ function bind(){
   setVal("notes", state.notes);
   setText("year", new Date().getFullYear());
 
-  ["colToggleRef","colToggleProduct","colToggleDesc","colToggleQty","colTogglePrice","colToggleTva","colToggleDiscount"].forEach(id => { const el = getEl(id); if (el) el.checked = true; });
+  ["colToggleRef","colToggleProduct","colToggleDesc","colToggleQty","colTogglePrice","colToggleTva","colToggleDiscount"]
+    .forEach(id => { const el = getEl(id); if (el) el.checked = true; });
 
   renderItems();
   computeTotals();
@@ -116,9 +107,15 @@ function bind(){
   updateExtrasMiniRows();
 }
 
-function wireLiveBindings() {
+function wireLiveBindings(){
   if (!COMPANY_LOCKED) {
-    const map = [["companyName", v => state.company.name = v],["companyVat", v => state.company.vat = v],["companyPhone", v => state.company.phone = v],["companyEmail", v => state.company.email = v],["companyAddress", v => state.company.address = v]];
+    const map = [
+      ["companyName", v => state.company.name = v],
+      ["companyVat", v => state.company.vat = v],
+      ["companyPhone", v => state.company.phone = v],
+      ["companyEmail", v => state.company.email = v],
+      ["companyAddress", v => state.company.address = v],
+    ];
     map.forEach(([id, set]) => getEl(id)?.addEventListener("input", () => { set(getStr(id, "")); saveCompanyToLocal(); }));
   }
 
@@ -126,7 +123,10 @@ function wireLiveBindings() {
   getEl("invNumber")?.addEventListener("input",  () => { state.meta.number  = getStr("invNumber", state.meta.number); });
   getEl("invDate")  ?.addEventListener("input",  () => { state.meta.date    = getStr("invDate",   state.meta.date); });
   getEl("invDue")   ?.addEventListener("input",  () => { state.meta.due     = getStr("invDue",    state.meta.due); });
-  getEl("currency") ?.addEventListener("change", () => { state.meta.currency = getStr("currency", state.meta.currency); renderItems(); computeTotals(); updateWHAmountPreview(); updateExtrasMiniRows(); });
+  getEl("currency") ?.addEventListener("change", () => {
+    state.meta.currency = getStr("currency", state.meta.currency);
+    renderItems(); computeTotals(); updateWHAmountPreview(); updateExtrasMiniRows();
+  });
 
   getEl("clientType")  ?.addEventListener("change", () => { state.client.type = getStr("clientType", state.client.type || "societe"); updateClientIdLabel(); });
   getEl("clientName")   ?.addEventListener("input", () => { state.client.name    = getStr("clientName",    state.client.name); });
@@ -136,7 +136,8 @@ function wireLiveBindings() {
   getEl("clientAddress")?.addEventListener("input", () => { state.client.address = getStr("clientAddress", state.client.address); });
   getEl("notes")?.addEventListener("input", () => { state.notes = getStr("notes", state.notes); });
 
-  ["colToggleRef","colToggleProduct","colToggleDesc","colToggleQty","colTogglePrice","colToggleTva","colToggleDiscount"].forEach(id => getEl(id)?.addEventListener("change", applyColumnHiding));
+  ["colToggleRef","colToggleProduct","colToggleDesc","colToggleQty","colTogglePrice","colToggleTva","colToggleDiscount"]
+    .forEach(id => getEl(id)?.addEventListener("change", applyColumnHiding));
 
   getEl("whEnabled")?.addEventListener("change", () => { state.meta.withholding.enabled = !!getEl("whEnabled").checked; toggleWHFields(state.meta.withholding.enabled); computeTotals(); updateWHAmountPreview(); });
   getEl("whRate")?.addEventListener("input", () => { state.meta.withholding.rate = getNum("whRate", state.meta.withholding.rate); computeTotals(); updateWHAmountPreview(); });
@@ -144,6 +145,7 @@ function wireLiveBindings() {
   getEl("whThreshold")?.addEventListener("input", () => { state.meta.withholding.threshold = getNum("whThreshold", state.meta.withholding.threshold ?? 0); computeTotals(); updateWHAmountPreview(); });
   getEl("whLabel")?.addEventListener("input", () => { state.meta.withholding.label = getStr("whLabel", state.meta.withholding.label); updateWHAmountPreview(); });
 
+  // Shipping / Stamp
   getEl("shipEnabled")?.addEventListener("change", () => { state.meta.extras.shipping.enabled = !!getEl("shipEnabled").checked; toggleShipFields(state.meta.extras.shipping.enabled); computeTotals(); updateExtrasMiniRows(); updateWHAmountPreview(); });
   getEl("shipLabel")?.addEventListener("input", () => { state.meta.extras.shipping.label = getStr("shipLabel", state.meta.extras.shipping.label); updateExtrasMiniRows(); });
   getEl("shipAmount")?.addEventListener("input", () => { state.meta.extras.shipping.amount = getNum("shipAmount", state.meta.extras.shipping.amount); computeTotals(); updateExtrasMiniRows(); updateWHAmountPreview(); });
@@ -154,11 +156,11 @@ function wireLiveBindings() {
   getEl("stampAmount")?.addEventListener("input", () => { state.meta.extras.stamp.amount = getNum("stampAmount", state.meta.extras.stamp.amount); computeTotals(); updateExtrasMiniRows(); updateWHAmountPreview(); });
   getEl("stampTva")?.addEventListener("input", () => { state.meta.extras.stamp.tva = getNum("stampTva", state.meta.extras.stamp.tva); computeTotals(); updateExtrasMiniRows(); updateWHAmountPreview(); });
 
+  // FODEC
   getEl("fodecEnabled")?.addEventListener("change", () => {
     const f = state.meta.extras.fodec || (state.meta.extras.fodec = {});
     f.enabled = !!getEl("fodecEnabled").checked;
-    toggleFodecFields(f.enabled);
-    computeTotals(); updateExtrasMiniRows(); updateWHAmountPreview();
+    toggleFodecFields(f.enabled); computeTotals(); updateExtrasMiniRows(); updateWHAmountPreview();
   });
   getEl("fodecLabel")?.addEventListener("input", () => {
     state.meta.extras.fodec.label = getStr("fodecLabel", state.meta.extras.fodec.label || "FODEC");
@@ -179,35 +181,47 @@ function wireLiveBindings() {
 
   const selectAllIds = ["shipLabel","shipAmount","shipTva","stampLabel","stampAmount","stampTva","whRate","whThreshold","whLabel","fodecRate","fodecTva"];
   selectAllIds.forEach(id => {
-    const el = getEl(id);
-    if (!el) return;
+    const el = getEl(id); if (!el) return;
     el.addEventListener("focus", () => { try { el.select(); } catch {} });
     el.addEventListener("click",  () => { try { el.select(); } catch {} });
   });
 }
 
-function toggleWHFields(enabled) { const fields = getEl("whFields"); if (fields) fields.style.display = enabled ? "" : "none"; const r1 = getEl("miniWHRow"); const r2 = getEl("miniNETRow"); if (r1) r1.style.display = enabled ? "" : "none"; if (r2) r2.style.display = enabled ? "" : "none"; }
-function toggleShipFields(enabled) { const f = getEl("shipFields"); if (f) f.style.display = enabled ? "" : "none"; const r = getEl("miniShipRow"); if (r) r.style.display = enabled ? "" : "none"; }
-function toggleStampFields(enabled) { const f = getEl("stampFields"); if (f) f.style.display = enabled ? "" : "none"; const r = getEl("miniStampRow"); if (r) r.style.display = enabled ? "" : "none"; }
-function toggleFodecFields(enabled) { const f = getEl("fodecFields"); if (f) f.style.display = enabled ? "" : "none"; const r = getEl("miniFODECRow"); if (r) r.style.display = enabled ? "" : "none"; }
+function toggleWHFields(enabled){
+  const fields = getEl("whFields"); if (fields) fields.style.display = enabled ? "" : "none";
+  const r1 = getEl("miniWHRow"); const r2 = getEl("miniNETRow");
+  if (r1) r1.style.display = enabled ? "" : "none";
+  if (r2) r2.style.display = enabled ? "" : "none";
+}
+function toggleShipFields(enabled){
+  const f = getEl("shipFields"); if (f) f.style.display = enabled ? "" : "none";
+  const r = getEl("miniShipRow"); if (r) r.style.display = enabled ? "" : "none";
+}
+function toggleStampFields(enabled){
+  const f = getEl("stampFields"); if (f) f.style.display = enabled ? "" : "none";
+  const r = getEl("miniStampRow"); if (r) r.style.display = enabled ? "" : "none";
+}
+function toggleFodecFields(enabled){
+  const f = getEl("fodecFields"); if (f) f.style.display = enabled ? "" : "none";
+  const r = getEl("miniFODECRow"); if (r) r.style.display = enabled ? "" : "none";
+}
 
-function updateWHAmountPreview() {
+function updateWHAmountPreview(){
   const { whAmount } = computeTotalsReturn();
   setVal("whAmount", formatMoney(whAmount, state.meta.currency || "TND"));
   const lbl = state.meta.withholding?.label?.trim() || "Retenue à la source";
   setText("miniWHLabel", lbl);
 }
-
 function updateExtrasMiniRows(){
   const ex = state.meta.extras || {};
   const cur = state.meta.currency || "TND";
-  const f = ex.fodec || {};
   const { fodecHT } = computeTotalsReturn();
 
   const shipTT = (ex.shipping?.enabled) ? (Number(ex.shipping.amount||0) * (1 + Number(ex.shipping.tva||0)/100)) : 0;
   if (getEl("miniShipLabel")) setText("miniShipLabel", ex.shipping?.label?.trim() || "Frais de livraison");
   if (getEl("miniShip")) setText("miniShip", formatMoney(shipTT, cur));
   if (getEl("miniShipRow")) getEl("miniShipRow").style.display = ex.shipping?.enabled ? "" : "none";
+
   const stampTT = (ex.stamp?.enabled) ? (Number(ex.stamp.amount||0) * (1 + Number(ex.stamp.tva||0)/100)) : 0;
   if (getEl("miniStampLabel")) setText("miniStampLabel", ex.stamp?.label?.trim() || "Timbre fiscal");
   if (getEl("miniStamp")) setText("miniStamp", formatMoney(stampTT, cur));
@@ -222,7 +236,6 @@ function readInputs(){
     state.company.email   = getStr("companyEmail", state.company.email);
     state.company.address = getStr("companyAddress", state.company.address);
   }
-
   state.meta.docType  = getStr("docType", state.meta.docType) || state.meta.docType;
   state.meta.number   = getStr("invNumber", state.meta.number);
   state.meta.currency = getStr("currency", state.meta.currency) || state.meta.currency;
@@ -265,236 +278,51 @@ function readInputs(){
   f.tva     = getNum("fodecTva",  f.tva ?? 19);
 }
 
-function unlockAddInputs() { ["addRef","addProduct","addDesc","addQty","addPrice","addTva","addDiscount"].forEach(id=>{ const el = getEl(id); if (el) { el.disabled = false; el.readOnly = false; } }); }
-function focusFirstEmptyAddField() { const order = ["addProduct","addDesc","addRef"]; const target = order.map(getEl).find(el => el && !el.value.trim()) || getEl("addProduct") || getEl("addDesc") || getEl("addRef"); if (target) { target.focus(); try { target.select(); } catch {} } }
-function killOverlays() { document.body.classList.remove("printing","print-mode"); const pdfRoot = document.getElementById("pdfRoot"); if (pdfRoot) { pdfRoot.style.display = "none"; pdfRoot.style.pointerEvents = "none"; pdfRoot.setAttribute("aria-hidden","true"); } }
-function recoverFocus() { killOverlays(); try { window.focus(); } catch {} unlockAddInputs(); }
-function installFocusGuards() { const handler = () => recoverFocus(); document.addEventListener("pointerdown", handler, true); document.addEventListener("keydown", handler, true); document.addEventListener("focusin", handler, true); window.addEventListener("focus", recoverFocus); document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") recoverFocus(); }); }
+function unlockAddInputs(){ ["addRef","addProduct","addDesc","addQty","addPrice","addTva","addDiscount"].forEach(id=>{ const el = getEl(id); if (el) { el.disabled = false; el.readOnly = false; } }); }
+function focusFirstEmptyAddField(){
+  const order = ["addProduct","addDesc","addRef"];
+  const target = order.map(getEl).find(el => el && !el.value.trim()) || getEl("addProduct") || getEl("addDesc") || getEl("addRef");
+  if (target) { target.focus(); try { target.select(); } catch {} }
+}
+function killOverlays(){
+  document.body.classList.remove("printing","print-mode");
+  const pdfRoot = document.getElementById("pdfRoot");
+  if (pdfRoot) { pdfRoot.style.display = "none"; pdfRoot.style.pointerEvents = "none"; pdfRoot.setAttribute("aria-hidden","true"); }
+}
+function recoverFocus(){ killOverlays(); try { window.focus(); } catch {} unlockAddInputs(); }
+function installFocusGuards(){
+  const handler = () => recoverFocus();
+  document.addEventListener("pointerdown", handler, true);
+  document.addEventListener("keydown", handler, true);
+  document.addEventListener("focusin", handler, true);
+  window.addEventListener("focus", recoverFocus);
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") recoverFocus(); });
+}
 
 function clearAddForm(){ setVal("addRef", ""); setVal("addProduct", ""); setVal("addDesc",""); setVal("addQty","1"); setVal("addPrice","0"); setVal("addTva","19"); setVal("addDiscount","0"); }
 function fillAddFormFromItem(it){ setVal("addRef", it.ref ?? ""); setVal("addProduct", it.product ?? ""); setVal("addDesc", it.desc ?? ""); setVal("addQty", String(it.qty ?? 1)); setVal("addPrice", String(it.price ?? 0)); setVal("addTva", String(it.tva ?? 19)); setVal("addDiscount", String(it.discount ?? 0)); }
-function setSubmitMode(mode){ const submitBtn = getEl("btnSubmitItem"); const newBtn = getEl("btnNewItem"); if(!submitBtn || !newBtn) return; if(mode === "update"){ submitBtn.textContent = "Mettre à jour"; submitBtn.dataset.mode="update"; newBtn.disabled = false; } else { submitBtn.textContent = "+ Ajouter"; submitBtn.dataset.mode="add"; newBtn.disabled = true; } }
+function setSubmitMode(mode){
+  const submitBtn = getEl("btnSubmitItem"); const newBtn = getEl("btnNewItem"); if(!submitBtn || !newBtn) return;
+  if(mode === "update"){ submitBtn.textContent = "Mettre à jour"; submitBtn.dataset.mode="update"; newBtn.disabled = false; }
+  else { submitBtn.textContent = "+ Ajouter"; submitBtn.dataset.mode="add"; newBtn.disabled = true; }
+}
 function clearAddFormAndMode(){ selectedItemIndex=null; clearAddForm(); setSubmitMode("add"); }
 function enterUpdateMode(i){ selectedItemIndex=i; fillAddFormFromItem(state.items[i]); setSubmitMode("update"); }
 
-function ensureDialog() {
-  let overlay = getEl("swbDialog");
-  if (overlay) return overlay;
-  overlay = document.createElement("div");
-  overlay.id = "swbDialog";
-  overlay.className = "swbDialog";
-  overlay.setAttribute("aria-hidden", "true");
-  const panel = document.createElement("div");
-  panel.className = "swbDialog__panel";
-  const header = document.createElement("div");
-  header.className = "swbDialog__header";
-  const title = document.createElement("div");
-  title.id = "swbDialogTitle";
-  title.className = "swbDialog__title";
-  const closeX = document.createElement("button");
-  closeX.type = "button";
-  closeX.className = "swbDialog__close";
-  closeX.textContent = "×";
-  header.appendChild(title);
-  header.appendChild(closeX);
-  const msg = document.createElement("div");
-  msg.id = "swbDialogMsg";
-  msg.className = "swbDialog__msg";
-  const actions = document.createElement("div");
-  actions.className = "swbDialog__actions";
-  const groupLeft  = document.createElement("div");
-  groupLeft.className = "swbDialog__group swbDialog__group--left";
-  const groupRight = document.createElement("div");
-  groupRight.className = "swbDialog__group swbDialog__group--right";
-  const cancel = document.createElement("button");
-  cancel.id = "swbDialogCancel";
-  cancel.type = "button";
-  cancel.className = "swbDialog__cancel";
-  cancel.textContent = "Fermer";
-  groupLeft.appendChild(cancel);
-  const ok = document.createElement("button");
-  ok.id = "swbDialogOk";
-  ok.type = "button";
-  ok.className = "swbDialog__ok";
-  ok.textContent = "OK";
-  const extra = document.createElement("button");
-  extra.id = "swbDialogExtra";
-  extra.type = "button";
-  extra.className = "swbDialog__ok";
-  extra.style.display = "none";
-  groupRight.appendChild(ok);
-  groupRight.appendChild(extra);
-  actions.appendChild(groupLeft);
-  actions.appendChild(groupRight);
-  panel.appendChild(header);
-  panel.appendChild(msg);
-  panel.appendChild(actions);
-  overlay.appendChild(panel);
-  document.body.appendChild(overlay);
-  closeX.addEventListener("click", () => {
-    const evt = new KeyboardEvent("keydown", { key: "Escape" });
-    document.dispatchEvent(evt);
-  });
-  return overlay;
-}
-
-function setSiblingsInert(exceptEl, inertOn) { const kids = Array.from(document.body.children); for (const el of kids) { if (el === exceptEl) continue; if (inertOn) el.setAttribute('inert', ''); else el.removeAttribute('inert'); } }
-function openOverlayA11y(overlay, focusEl) { const panel = overlay.querySelector('.swbDialog__panel'); if (panel) { panel.setAttribute('role', 'dialog'); panel.setAttribute('aria-modal', 'true'); } overlay.style.display = 'flex'; overlay.removeAttribute('aria-hidden'); setSiblingsInert(overlay, true); if (focusEl) try { focusEl.focus(); } catch {} }
-function closeOverlayA11y(overlay, prevFocusEl, buttonsToBlur = []) { buttonsToBlur.forEach(btn => { try { btn.blur(); } catch {} }); overlay.setAttribute('aria-hidden', 'true'); overlay.style.display = 'none'; setSiblingsInert(overlay, false); if (prevFocusEl && typeof prevFocusEl.focus === 'function') { try { prevFocusEl.focus(); } catch {} } }
-
-function showDialog(message, { title = "Information" } = {}) {
-  return new Promise((resolve) => {
-    const overlay = ensureDialog();
-    const msg = getEl("swbDialogMsg");
-    const ok = getEl("swbDialogOk");
-    const ttl = getEl("swbDialogTitle");
-    const cancel = overlay.querySelector("#swbDialogCancel");
-    if (cancel) cancel.style.display = "none";
-    const extra = overlay.querySelector("#swbDialogExtra");
-    if (extra) extra.style.display = "none";
-    ok.textContent = "Fermer";
-    const previouslyFocused = document.activeElement;
-    msg.textContent = message || "";
-    ttl.textContent = title;
-    function close() {
-      ok.removeEventListener("click", onOk);
-      overlay.removeEventListener("click", onBackdrop);
-      document.removeEventListener("keydown", onKey);
-      closeOverlayA11y(overlay, previouslyFocused, [ok]);
-      resolve();
-      recoverFocus();
-    }
-    function onOk() { close(); }
-    function onBackdrop(e) { if (e.target === overlay) close(); }
-    function onKey(e) { if (e.key === "Enter" || e.key === "Escape") close(); }
-    openOverlayA11y(overlay, ok);
-    ok.addEventListener("click", onOk);
-    overlay.addEventListener("click", onBackdrop);
-    document.addEventListener("keydown", onKey);
-  });
-}
-
-function showConfirm(
-  message,
-  { title="Export terminé", okText="Ouvrir", cancelText="Fermer",
-    onOk, openUrls, extra, okKeepsOpen=false } = {}
-){
-  const overlay = ensureDialog();
-  const msg   = getEl("swbDialogMsg");
-  const ok    = getEl("swbDialogOk");
-  const ttl   = getEl("swbDialogTitle");
-  const cancel= getEl("swbDialogCancel");
-  const extraBtn = getEl("swbDialogExtra");
-  ok.textContent = okText;
-  cancel.textContent = cancelText;
-  cancel.style.display = "";
-  if (extra && extra.text){
-    extraBtn.textContent = extra.text;
-    extraBtn.style.display = "";
-  } else {
-    extraBtn.style.display = "none";
-  }
-  const previouslyFocused = document.activeElement;
-  msg.textContent = message || "";
-  ttl.textContent = title;
-  const openUrlInNewTab = (u) => { if (!u) return false; try { return !!window.open(u,"_blank","noopener,noreferrer"); } catch { return false; } };
-  const urls = Array.isArray(openUrls) ? openUrls.filter(Boolean) : (openUrls ? [openUrls] : []);
-  return new Promise((resolve) => {
-    function close(result){
-      ok.removeEventListener("click", onOkClick);
-      cancel.removeEventListener("click", onCancel);
-      overlay.removeEventListener("click", onBackdrop);
-      document.removeEventListener("keydown", onKey);
-      extraBtn.removeEventListener("click", onExtraClick);
-      closeOverlayA11y(overlay, previouslyFocused, [ok, cancel, extraBtn]);
-      recoverFocus();
-      resolve(result);
-    }
-    function runOpeners(){ try { onOk && onOk(); } catch {} urls.forEach((u)=>{ try{ window.open(u,"_blank","noopener,noreferrer"); }catch{} }); }
-    function onOkClick(){ runOpeners(); if (!okKeepsOpen) close(true); }
-    function onCancel(){ close(false); }
-    function onBackdrop(e){ if (e.target === overlay) close(false); }
-    function onKey(e){ if (e.key === "Enter") onOkClick(); else if (e.key === "Escape") close(false); }
-    function onExtraClick(){ try { extra?.onClick && extra.onClick(); } catch {} }
-    if (extra && extra.text) extraBtn.addEventListener("click", onExtraClick);
-    openOverlayA11y(overlay, ok);
-    ok.addEventListener("click", onOkClick);
-    cancel.addEventListener("click", onCancel);
-    overlay.addEventListener("click", onBackdrop);
-    document.addEventListener("keydown", onKey);
-  });
-}
-
-function downloadBlob(filename, blob) {
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  setTimeout(() => {
-    URL.revokeObjectURL(a.href);
-    a.remove();
-  }, 0);
-}
-
-// ========== SAVE (without company info) ==========
-async function saveInvoiceJSON() {
-  // Do NOT include Informations entreprise in saved file
-  const data = captureForm({ forSave: true });
-
-  const invNum = slugForFile(state.meta.number || "");
-  const base   = [docTypeLabel(state.meta.docType), invNum].filter(Boolean).join(" ");
-  const filename = ensureJsonExt(base || "Document");
-
-  if (window.SoukElMeuble?.saveInvoiceJSON) {
-    try {
-      const res = await window.SoukElMeuble.saveInvoiceJSON({ data, filename });
-      await showDialog(res ? "Document enregistré." : "Enregistrement annulé.", { title: "Enregistrer" });
-    } catch {
-      await showDialog("Impossible d’enregistrer via l’app. Téléchargement via le navigateur…", { title: "Enregistrer" });
-      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
-      downloadBlob(filename, blob);
-    }
-    return;
-  }
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
-  downloadBlob(filename, blob);
-  await showDialog("Fichier téléchargé.", { title: "Enregistrer" });
-}
-
-async function openInvoiceFromFilePicker() {
-  return new Promise((resolve) => {
-    const inp = document.createElement("input");
-    inp.type = "file";
-    inp.accept = "application/json";
-    inp.addEventListener("change", () => {
-      const file = inp.files?.[0];
-      if (!file) return resolve(null);
-      const reader = new FileReader();
-      reader.onload = () => {
-        try { resolve(JSON.parse(String(reader.result || "null"))); }
-        catch { resolve(null); }
-      };
-      reader.readAsText(file, "utf-8");
-    });
-    inp.click();
-  });
-}
-
 async function submitItemForm(){
   recoverFocus();
-  const item = { ref: getStr("addRef"), product: getStr("addProduct"), desc: getStr("addDesc"), qty: getNum("addQty",1), price: getNum("addPrice",0), tva: getNum("addTva",19), discount: getNum("addDiscount",0) };
+  const item = {
+    ref: getStr("addRef"), product: getStr("addProduct"), desc: getStr("addDesc"),
+    qty: getNum("addQty",1), price: getNum("addPrice",0), tva: getNum("addTva",19), discount: getNum("addDiscount",0)
+  };
   if (!item.product && !item.desc) {
     await showDialog("Veuillez saisir au moins un Produit ou une Description.", { title: "Article incomplet" });
-    focusFirstEmptyAddField();
-    return;
+    focusFirstEmptyAddField(); return;
   }
   const mode = getEl("btnSubmitItem")?.dataset.mode || "add";
-  if (mode === "update" && selectedItemIndex !== null) { state.items[selectedItemIndex] = item; }
-  else { state.items.push(item); }
-  renderItems();
-  clearAddFormAndMode();
-  focusFirstEmptyAddField();
+  if (mode === "update" && selectedItemIndex !== null) state.items[selectedItemIndex] = item;
+  else state.items.push(item);
+  renderItems(); clearAddFormAndMode(); focusFirstEmptyAddField();
 }
 
 function renderItems(){
@@ -502,7 +330,15 @@ function renderItems(){
   body.innerHTML = "";
   const currency = state.meta.currency || "TND";
   state.items.forEach((raw,i)=>{
-    const it = { ref: raw.ref ?? "", product: raw.product ?? (raw.desc ? String(raw.desc) : ""), desc: raw.product ? (raw.desc ?? "") : (raw.desc ?? ""), qty: Number(raw.qty ?? 0), price: Number(raw.price ?? 0), tva: Number(raw.tva ?? 0), discount: Number(raw.discount ?? 0) };
+    const it = {
+      ref: raw.ref ?? "",
+      product: raw.product ?? (raw.desc ? String(raw.desc) : ""),
+      desc: raw.product ? (raw.desc ?? "") : (raw.desc ?? ""),
+      qty: Number(raw.qty ?? 0),
+      price: Number(raw.price ?? 0),
+      tva: Number(raw.tva ?? 0),
+      discount: Number(raw.discount ?? 0)
+    };
     const base = it.qty * it.price;
     const disc = base * (it.discount / 100);
     const taxedBase = Math.max(0, base - disc);
@@ -554,54 +390,65 @@ function computeTotals(){
     const disc = base * (discount/100);
     const taxedBase = Math.max(0, base - disc);
     const tax = taxedBase * (tva/100);
-    subtotal += base;
-    totalDiscount += disc;
-    totalTax += tax;
+    subtotal += base; totalDiscount += disc; totalTax += tax;
   });
+
   const totalHT_items  = subtotal - totalDiscount;
+
   const ex = state.meta.extras || {};
   const shipHT  = (ex.shipping?.enabled) ? Number(ex.shipping.amount||0) : 0;
   const shipTVA = shipHT * (Number(ex.shipping?.tva||0)/100);
   const shipTT  = shipHT + shipTVA;
+
   const stampHT = (ex.stamp?.enabled) ? Number(ex.stamp.amount||0) : 0;
   const stampTVA= stampHT * (Number(ex.stamp?.tva||0)/100);
   const stampTT = stampHT + stampTVA;
+
   const f      = ex.fodec || {};
   const fEnabled = !!f.enabled;
   const fRate    = Number(f.rate || 0);
   const fBaseSel = String(f.base || "ht").toLowerCase();
   const fTvaRate = Number(f.tva || 0);
+
   const baseHT_simple = totalHT_items;
   const baseHT_plus   = totalHT_items + shipHT;
   const baseTTC_sansF = baseHT_plus + totalTax + shipTVA;
+
   let fodecBase = 0;
   if (fBaseSel === "ht")            fodecBase = baseHT_simple;
   else if (fBaseSel === "ht_plus")  fodecBase = baseHT_plus;
   else                              fodecBase = baseTTC_sansF;
+
   const fodecHT  = fEnabled ? (fodecBase * (fRate/100)) : 0;
   const fodecTVA = fEnabled ? (fodecHT   * (fTvaRate/100)) : 0;
+
   const displayHT  = totalHT_items + shipHT + (fEnabled ? fodecHT : 0);
   const displayTVA = totalTax + shipTVA + (fEnabled ? fodecTVA : 0);
   const totalTTC_all = displayHT + displayTVA + stampTT;
+
   const fodecAmountInput = getEl("fodecAmount");
   if (fodecAmountInput) fodecAmountInput.value = (fEnabled ? fodecHT : 0).toFixed(3);
-  const cur = state.meta.currency || "TND";
+
   if (getEl("miniFODECLabel")) {
     const rateTxt = Number.isFinite(Number(fRate)) ? ` (${fRate || 0}%)` : "";
     setText("miniFODECLabel", (f.label?.trim() || "FODEC") + rateTxt);
   }
-  if (getEl("miniFODEC")) setText("miniFODEC", formatMoney(fEnabled ? fodecHT : 0, cur));
+  if (getEl("miniFODEC")) setText("miniFODEC", formatMoney(fEnabled ? fodecHT : 0, state.meta.currency || "TND"));
   if (getEl("miniFODECRow")) getEl("miniFODECRow").style.display = fEnabled ? "" : "none";
+
   const rasBaseHT  = totalHT_items + shipHT + (fEnabled ? fodecHT : 0);
   const rasBaseTTC = totalTTC_all - stampTT;
+
   const wh = state.meta.withholding || {};
   const baseVal = (wh.base === "ttc") ? rasBaseTTC : rasBaseHT;
   const threshold = Number(wh.threshold || 0);
   const whAmount = (wh.enabled && baseVal > threshold) ? (Math.max(0, baseVal) * (Number(wh.rate||0)/100)) : 0;
   const netToPay = totalTTC_all - whAmount;
+
   if(getEl("miniHT"))  setText("miniHT",  formatMoney(displayHT,  currency));
   if(getEl("miniTVA")) setText("miniTVA", formatMoney(displayTVA, currency));
   if(getEl("miniTTC")) setText("miniTTC", formatMoney(totalTTC_all, currency));
+
   const whRow  = getEl("miniWHRow");
   const netRow = getEl("miniNETRow");
   if (whRow)  whRow.style.display  = wh.enabled ? "" : "none";
@@ -612,11 +459,11 @@ function computeTotals(){
     setText("miniWH",  "- " + formatMoney(whAmount, currency));
     setText("miniNET", formatMoney(netToPay, currency));
   }
+
   updateExtrasMiniRows();
 }
 
-// ===== captureForm: omit company when saving =====
-function captureForm(opts = {}) {
+function captureForm(opts = {}){
   const { forSave = false } = opts;
   readInputs();
   const snapshot = {
@@ -648,31 +495,39 @@ function computeTotalsReturn(){
   const stampHT = (ex.stamp?.enabled) ? Number(ex.stamp.amount||0) : 0;
   const stampTVA= stampHT * (Number(ex.stamp.tva||0)/100);
   const stampTT = stampHT + stampTVA;
+
   const f      = ex.fodec || {};
   const fEnabled = !!f.enabled;
   const fRate    = Number(f.rate || 0);
   const fBaseSel = String(f.base || "ht").toLowerCase();
   const fTvaRate = Number(f.tva || 0);
+
   const baseHT_simple = totalHT_items;
   const baseHT_plus   = totalHT_items + shipHT;
   const baseTTC_sansF = baseHT_plus + totalTax + shipTVA;
+
   let fodecBase = 0;
   if (fBaseSel === "ht")            fodecBase = baseHT_simple;
   else if (fBaseSel === "ht_plus")  fodecBase = baseHT_plus;
   else                              fodecBase = baseTTC_sansF;
+
   const fodecHT  = fEnabled ? (fodecBase * (fRate/100)) : 0;
   const fodecTVA = fEnabled ? (fodecHT   * (fTvaRate/100)) : 0;
   const fodecTT  = fodecHT + fodecTVA;
+
   const totalHT_display  = totalHT_items + shipHT + (fEnabled ? fodecHT : 0);
   const totalTVA_display = totalTax + shipTVA + (fEnabled ? fodecTVA : 0);
   const totalTTC_all     = totalHT_display + totalTVA_display + stampTT;
+
   const rasBaseHT  = totalHT_items + shipHT + (fEnabled ? fodecHT : 0);
   const rasBaseTTC = totalTTC_all - stampTT;
+
   const wh = state.meta.withholding || {};
   const baseVal   = (wh.base === "ttc") ? rasBaseTTC : rasBaseHT;
   const threshold = Number(wh.threshold || 0);
   const whAmount  = (wh.enabled && baseVal > threshold) ? (Math.max(0, baseVal) * (Number(wh.rate||0)/100)) : 0;
   const net = totalTTC_all - whAmount;
+
   return {
     currency,
     subtotal,
@@ -707,148 +562,6 @@ function newInvoice(){
   clearAddFormAndMode(); bind();
 }
 
-function enableFirstClickSelectSecondClickCaret(input) {
-  if (!input) return;
-  let suppressNextMouseUp = false;
-  let firstClickDone = false;
-  input.addEventListener("mousedown", () => {
-    if (document.activeElement !== input || !firstClickDone) {
-      setTimeout(() => { input.select(); try { input.setSelectionRange(0, input.value.length); } catch {} }, 0);
-      suppressNextMouseUp = true; firstClickDone = true;
-    } else {
-      suppressNextMouseUp = false;
-    }
-  });
-  input.addEventListener("mouseup", (e) => { if (suppressNextMouseUp) { e.preventDefault(); suppressNextMouseUp = false; } }, true);
-  input.addEventListener("blur", () => { firstClickDone = false; suppressNextMouseUp = false; });
-}
-
-function toFileURL(p) {
-  if (!p) return null;
-  if (/^(file|https?):\/\//i.test(p)) return p;
-  const normalized = String(p).replace(/\\/g, "/");
-  if (/^[a-zA-Z]:\//.test(normalized)) return "file:///" + encodeURI(normalized);
-  if (normalized.startsWith("//")) return "file:" + normalized;
-  return "file://" + encodeURI(normalized.startsWith("/") ? normalized : "/" + normalized);
-}
-async function openPDFFile(path) {
-  if (!path) return false;
-  if (window.SoukElMeuble?.openPath) { try { return !!(await window.SoukElMeuble.openPath(path)); } catch {} }
-  if (window.SoukElMeuble?.showInFolder) { try { await window.SoukElMeuble.showInFolder(path); return true; } catch {} }
-  if (window.SoukElMeuble?.openExternal) { try { const url = toFileURL(path); await window.SoukElMeuble.openExternal(url); return true; } catch {} }
-  try { const url = toFileURL(path); return true; } catch { return false; }
-}
-
-function onReady(fn){ if(document.readyState === "loading") { document.addEventListener("DOMContentLoaded", fn, {once:true}); } else { fn(); } }
-
-function init(){
-  if (!COMPANY_LOCKED) loadCompanyFromLocal();
-  bind();
-  wireLiveBindings();
-  setSubmitMode("add");
-  installFocusGuards();
-  ["addPrice", "addQty", "addTva", "addDiscount"].forEach(id => enableFirstClickSelectSecondClickCaret(getEl(id)));
-  getEl("btnNew") ?.addEventListener("click", newInvoice);
-  getEl("btnOpen")?.addEventListener("click", async ()=>{
-    const data = (await window.SoukElMeuble?.openInvoiceJSON?.()) || (await openInvoiceFromFilePicker());
-    if(!data) return;
-    Object.assign(state, data);   // saved files may not have "company"; our current company stays intact
-    bind();
-  });
-  getEl("btnSave")?.addEventListener("click", saveInvoiceJSON);
-  getEl("btnPDF")?.addEventListener("click", async () => {
-    readInputs();
-    computeTotals();
-
-    const assets  = window.SoukElMeuble?.assets || {};
-    const htmlInv = window.PDFView.build(state, assets);
-    const cssInv  = window.PDFView.css;
-
-    const invNum    = slugForFile(state.meta.number || "");
-    const typeLabel = docTypeLabel(state.meta.docType); // "Facture" | "Devis" | "Bon de livraison" | "Bon de commande"
-    const fileName  = ensurePdfExt([typeLabel, invNum].filter(Boolean).join(" "));
-
-    const resInv = await window.SoukElMeuble?.exportPDFFromHTML?.({
-      html: htmlInv, css: cssInv,
-      meta: { number: state.meta.number, type: state.meta.docType, filename: fileName, deferOpen: true }
-    });
-    if (!resInv) return;
-
-    let resWH = null;
-    if (state.meta?.withholding?.enabled && window.PDFWH) {
-      const htmlWH = window.PDFWH.build(state, assets);
-      const cssWH  = window.PDFWH.css;
-      const baseWH = ensurePdfExt(invNum ? `Retenue à la source - ${invNum}` : `Retenue à la source`);
-      resWH = await window.SoukElMeuble?.exportPDFFromHTML?.({
-        html: htmlWH, css: cssWH,
-        meta: { number: state.meta.number, type: "retenue", filename: baseWH, deferOpen: true }
-      });
-    }
-
-    const invLabel = resInv?.name || fileName;
-    const whLabel  = resWH ? (resWH?.name || "Retenue à la source.pdf") : null;
-
-    const msg =
-      "PDF exporté : " + invLabel +
-      (whLabel ? "\nCertificat exporté : " + whLabel : "");
-
-    // 🔽 dynamic OK button text by doc type
-    const okBtnText = (() => {
-      const t = String(state.meta.docType || "").toLowerCase();
-      if (t === "facture") return "Ouvrir la facture";
-      if (t === "devis")   return "Ouvrir le devis";
-      if (t === "bl")      return "Ouvrir le bon de livraison";
-      if (t === "bc")      return "Ouvrir le bon de commande";
-      return "Ouvrir le document";
-    })();
-
-    const openViaAnchor = (url) => {
-      if (!url) return;
-      const a = document.createElement("a");
-      a.href = url; a.target = "_blank"; a.rel = "noopener";
-      document.body.appendChild(a); a.click(); a.remove();
-    };
-
-    await showConfirm(msg, {
-      title: "Ouvrir les documents",
-      okText: okBtnText,
-      cancelText: "Fermer",
-      okKeepsOpen: true,
-      extra: resWH?.url ? {
-        text: "Ouvrir le certificat",
-        onClick: () => { try { openViaAnchor(resWH.url); } catch {} }
-      } : undefined,
-      onOk: () => {
-        const invUrl = resInv?.url || null;
-        if (invUrl) openViaAnchor(invUrl);
-      }
-    });
-  });
-
-  getEl("btnSubmitItem")?.addEventListener("click", () => { submitItemForm(); });
-  getEl("btnNewItem")   ?.addEventListener("click", () => { clearAddFormAndMode(); focusFirstEmptyAddField(); });
-  ["addRef","addProduct","addDesc","addQty","addPrice","addTva","addDiscount"].forEach(id=>{
-    getEl(id)?.addEventListener("keydown",(e)=>{ if(e.key==="Enter"){ e.preventDefault(); submitItemForm(); } });
-    const el = getEl(id);
-    if (el) {
-      el.addEventListener("focus", () => { try { el.select(); } catch {} });
-      el.addEventListener("click", () => { try { el.select(); } catch {} });
-    }
-  });
-  getEl("companyLogo")?.addEventListener("click", async () => {
-    if (!window.SoukElMeuble?.pickLogo) return;
-    const res = await window.SoukElMeuble.pickLogo();
-    if (res?.dataUrl) {
-      state.company.logo = res.dataUrl;
-      setSrc("companyLogo", res.dataUrl);
-    }
-  });
-  const addFieldset = getEl("addRef")?.closest("fieldset.section-box");
-  if (addFieldset) { addFieldset.addEventListener("mousedown", recoverFocus, true); }
-  window.SoukElMeuble?.onEnterPrintMode?.(() => { window.PDFView?.show?.(state, window.SoukElMeuble?.assets || {}); });
-  window.SoukElMeuble?.onExitPrintMode?.(() => { window.PDFView?.hide?.(); recoverFocus(); });
-}
-
 function setColumnVisibility(table, oneBasedIndex, visible){
   if (!table) return;
   const th = table.tHead?.rows?.[0]?.cells?.[oneBasedIndex - 1];
@@ -859,14 +572,13 @@ function setColumnVisibility(table, oneBasedIndex, visible){
     if (cell) cell.style.display = visible ? "" : "none";
   }
 }
-function setAddInputVisibility({ref, product, desc, qty, price, tva, discount}) {
+function setAddInputVisibility({ref, product, desc, qty, price, tva, discount}){
   const map = { addRef: ref, addProduct: product, addDesc: desc, addQty: qty, addPrice: price, addTva: tva, addDiscount: discount };
   Object.entries(map).forEach(([id, vis]) => {
     const el = getEl(id);
     if (el) el.style.display = vis ? "" : "none";
   });
 }
-
 function applyColumnHiding(){
   const refVis      = !!getEl('colToggleRef')?.checked;
   const productVis  = !!getEl('colToggleProduct')?.checked;
@@ -875,6 +587,7 @@ function applyColumnHiding(){
   const priceVis    = !!getEl('colTogglePrice')?.checked;
   const tvaVis      = !!getEl('colToggleTva')?.checked;
   const discountVis = !!getEl('colToggleDiscount')?.checked;
+
   document.body.classList.toggle('hide-col-ref',      !refVis);
   document.body.classList.toggle('hide-col-product',  !productVis);
   document.body.classList.toggle('hide-col-desc',     !descVis);
@@ -883,15 +596,59 @@ function applyColumnHiding(){
   document.body.classList.toggle('hide-col-tva',      !tvaVis);
   document.body.classList.toggle('hide-col-discount', !discountVis);
   document.body.classList.toggle('hide-col-ttc', !priceVis);
+
   const itemsTable = getEl('items');
   setColumnVisibility(itemsTable, 8, priceVis);
+
   const mini = document.querySelector('.mini-sum');
   if (mini) mini.style.display = priceVis ? '' : 'none';
+
   setAddInputVisibility({ ref: refVis, product: productVis, desc: descVis, qty: qtyVis, price: priceVis, tva: tvaVis, discount: discountVis });
 }
 
+function init(){
+  if (!COMPANY_LOCKED) loadCompanyFromLocal();
+  bind();
+  wireLiveBindings();
+  setSubmitMode("add");
+  installFocusGuards();
+
+  ["addPrice", "addQty", "addTva", "addDiscount"].forEach(id => enableFirstClickSelectSecondClickCaret(getEl(id)));
+
+  getEl("btnNew") ?.addEventListener("click", newInvoice);
+
+  // NOTE: handlers for Open/Save/PDF are defined in app-export.js (global functions):
+  getEl("btnOpen")?.addEventListener("click", onOpenInvoiceClick);
+  getEl("btnSave")?.addEventListener("click", saveInvoiceJSON);
+  getEl("btnPDF") ?.addEventListener("click", exportCurrentPDF);
+
+  getEl("btnSubmitItem")?.addEventListener("click", () => { submitItemForm(); });
+  getEl("btnNewItem")   ?.addEventListener("click", () => { clearAddFormAndMode(); focusFirstEmptyAddField(); });
+
+  ["addRef","addProduct","addDesc","addQty","addPrice","addTva","addDiscount"].forEach(id=>{
+    getEl(id)?.addEventListener("keydown",(e)=>{ if(e.key==="Enter"){ e.preventDefault(); submitItemForm(); } });
+    const el = getEl(id);
+    if (el) {
+      el.addEventListener("focus", () => { try { el.select(); } catch {} });
+      el.addEventListener("click", () => { try { el.select(); } catch {} });
+    }
+  });
+
+  getEl("companyLogo")?.addEventListener("click", async () => {
+    if (!window.SoukElMeuble?.pickLogo) return;
+    const res = await window.SoukElMeuble.pickLogo();
+    if (res?.dataUrl) { state.company.logo = res.dataUrl; setSrc("companyLogo", res.dataUrl); }
+  });
+
+  const addFieldset = getEl("addRef")?.closest("fieldset.section-box");
+  if (addFieldset) { addFieldset.addEventListener("mousedown", recoverFocus, true); }
+
+  window.SoukElMeuble?.onEnterPrintMode?.(() => { window.PDFView?.show?.(state, window.SoukElMeuble?.assets || {}); });
+  window.SoukElMeuble?.onExitPrintMode?.(() => { window.PDFView?.hide?.(); recoverFocus(); });
+}
+
+// first column toggle listeners for SSR safety
 getEl('colToggleRef')  ?.addEventListener('change', applyColumnHiding);
 getEl('colTogglePrice')?.addEventListener('change', applyColumnHiding);
 applyColumnHiding();
 onReady(init);
-function escapeHTML(str=""){ return String(str).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }

@@ -13,7 +13,7 @@ function ensureJsonExt(name) { return name.toLowerCase().endsWith(".json") ? nam
 function docTypeLabel(t) { const map = { facture: "Facture", devis: "Devis", bl: "Bon de livraison", bc: "Bon de commande" }; return map[String(t || "").toLowerCase()] || "Document"; }
 
 const state = {
-  company: { name: "Smartwebify", vat: "1891628/W/A/M/000", phone: "+216 27 673 561", email: "contact@smartwebify.com", address: "Rue Mahbouba Soussia 2080 Teboulba", logo: "" },
+  company: { name: "SoukElMeuble", vat: "1891628/W/A/M/000", phone: "+216 27 673 561", email: "contact@SoukElMeuble.com", address: "Rue Mahbouba Soussia 2080 Teboulba", logo: "" },
   client: { type: "societe", name: "", email: "", phone: "", address: "", vat: "" },
   meta: {
     number: "",
@@ -30,7 +30,7 @@ const state = {
 
 const COMPANY_LOCKED = true;
 let selectedItemIndex = null;
-const IS_DESKTOP = !!(window.smartwebify && typeof window.smartwebify.openPath === "function");
+const IS_DESKTOP = !!(window.SoukElMeuble && typeof window.SoukElMeuble.openPath === "function");
 const IS_WEB = !IS_DESKTOP;
 
 function formatMoney(v, currency) { const n = Number(v || 0); try { return new Intl.NumberFormat(undefined, { style: "currency", currency }).format(n); } catch { return new Intl.NumberFormat(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n) + " " + (currency || ""); } }
@@ -83,8 +83,8 @@ function bind(){
   setVal("stampAmount", String(t.amount ?? 1));
   setVal("stampTva",    String(t.tva ?? 0));
   toggleStampFields(!!t.enabled);
-  const bundled = "./assets/logoSW.png";
-  const logo = window.smartwebify?.assets?.logo || state.company.logo || bundled;
+  const bundled = "./assets/logoIMG.png";
+  const logo = window.SoukElMeuble?.assets?.logo || state.company.logo || bundled;
   setSrc("companyLogo", logo);
   if (!state.company.logo) state.company.logo = bundled;
   setVal("notes", state.notes);
@@ -475,7 +475,7 @@ function enableFirstClickSelectSecondClickCaret(input) {
 }
 
 function toFileURL(p) { if (!p) return null; if (/^(file|https?):\/\//i.test(p)) return p; const normalized = String(p).replace(/\\/g, "/"); if (/^[a-zA-Z]:\//.test(normalized)) return "file:///" + encodeURI(normalized); if (normalized.startsWith("//")) return "file:" + normalized; return "file://" + encodeURI(normalized.startsWith("/") ? normalized : "/" + normalized); }
-async function openPDFFile(path) { if (!path) return false; if (window.smartwebify?.openPath) { try { return !!(await window.smartwebify.openPath(path)); } catch {} } if (window.smartwebify?.showInFolder) { try { await window.smartwebify.showInFolder(path); return true; } catch {} } if (window.smartwebify?.openExternal) { try { const url = toFileURL(path); await window.smartwebify.openExternal(url); return true; } catch {} } try { const url = toFileURL(path); return true; } catch { return false; } }
+async function openPDFFile(path) { if (!path) return false; if (window.SoukElMeuble?.openPath) { try { return !!(await window.SoukElMeuble.openPath(path)); } catch {} } if (window.SoukElMeuble?.showInFolder) { try { await window.SoukElMeuble.showInFolder(path); return true; } catch {} } if (window.SoukElMeuble?.openExternal) { try { const url = toFileURL(path); await window.SoukElMeuble.openExternal(url); return true; } catch {} } try { const url = toFileURL(path); return true; } catch { return false; } }
 
 function onReady(fn){ if(document.readyState === "loading") { document.addEventListener("DOMContentLoaded", fn, {once:true}); } else { fn(); } }
 
@@ -488,10 +488,10 @@ function init(){
   ["addPrice", "addQty", "addTva", "addDiscount"].forEach(id => enableFirstClickSelectSecondClickCaret(getEl(id)));
   getEl("btnSave")?.addEventListener("click", async () => {
     const snapshot = captureForm();
-    const savedPath = await window.smartwebify?.saveInvoiceJSON?.(snapshot);
+    const savedPath = await window.SoukElMeuble?.saveInvoiceJSON?.(snapshot);
     if (savedPath) await showDialog("Facture enregistrée avec succès.", { title: "Enregistré" });
   });
-  getEl("btnOpen")?.addEventListener("click", async ()=>{ const data = await window.smartwebify?.openInvoiceJSON?.(); if(!data) return; Object.assign(state, data); bind(); });
+  getEl("btnOpen")?.addEventListener("click", async ()=>{ const data = await window.SoukElMeuble?.openInvoiceJSON?.(); if(!data) return; Object.assign(state, data); bind(); });
 
 getEl("btnNew")?.addEventListener("click", newInvoice);
 
@@ -499,7 +499,7 @@ getEl("btnPDF")?.addEventListener("click", async () => {
   readInputs();
   computeTotals();
 
-  const assets  = window.smartwebify?.assets || {};
+  const assets  = window.SoukElMeuble?.assets || {};
   const htmlInv = window.PDFView.build(state, assets);
   const cssInv  = window.PDFView.css;
 
@@ -508,7 +508,7 @@ getEl("btnPDF")?.addEventListener("click", async () => {
   const fileName  = ensurePdfExt([typeLabel, invNum].filter(Boolean).join(" "));
 
   // ⬇⬇ corrected: handle the object { ok, path, url, name }
-  const resInv = await window.smartwebify?.exportPDFFromHTML?.({
+  const resInv = await window.SoukElMeuble?.exportPDFFromHTML?.({
     html: htmlInv,
     css: cssInv,
     meta: { number: state.meta.number, docType: state.meta.docType, filename: fileName, deferOpen: true }
@@ -526,7 +526,7 @@ getEl("btnPDF")?.addEventListener("click", async () => {
     const cssWH  = window.PDFWH.css;
     const baseWH = ensurePdfExt(invNum ? `Retenue à la source - ${invNum}` : `Retenue à la source`);
 
-    resWH = await window.smartwebify?.exportPDFFromHTML?.({
+    resWH = await window.SoukElMeuble?.exportPDFFromHTML?.({
       html: htmlWH,
       css: cssWH,
       meta: { number: state.meta.number, docType: "retenue", filename: baseWH, deferOpen: true }
@@ -553,11 +553,11 @@ getEl("btnPDF")?.addEventListener("click", async () => {
   getEl("btnSubmitItem")?.addEventListener("click", () => { submitItemForm(); });
   getEl("btnNewItem")?.addEventListener("click", () => { clearAddFormAndMode(); focusFirstEmptyAddField(); });
   ["addRef","addProduct","addDesc","addQty","addPrice","addTva","addDiscount"].forEach(id=>{ getEl(id)?.addEventListener("keydown",(e)=>{ if(e.key==="Enter"){ e.preventDefault(); submitItemForm(); } }); const el = getEl(id); if (el) { el.addEventListener("focus", () => { try { el.select(); } catch {} }); el.addEventListener("click", () => { try { el.select(); } catch {} }); } });
-  getEl("companyLogo")?.addEventListener("click", async () => { if (!window.smartwebify?.pickLogo) return; const res = await window.smartwebify.pickLogo(); if (res?.dataUrl) { state.company.logo = res.dataUrl; setSrc("companyLogo", res.dataUrl); } });
+  getEl("companyLogo")?.addEventListener("click", async () => { if (!window.SoukElMeuble?.pickLogo) return; const res = await window.SoukElMeuble.pickLogo(); if (res?.dataUrl) { state.company.logo = res.dataUrl; setSrc("companyLogo", res.dataUrl); } });
   const addFieldset = getEl("addRef")?.closest("fieldset.section-box");
   if (addFieldset) { addFieldset.addEventListener("mousedown", recoverFocus, true); }
-  window.smartwebify?.onEnterPrintMode?.(() => { window.PDFView?.show?.(state, window.smartwebify?.assets || {}); });
-  window.smartwebify?.onExitPrintMode?.(() => { window.PDFView?.hide?.(); recoverFocus(); });
+  window.SoukElMeuble?.onEnterPrintMode?.(() => { window.PDFView?.show?.(state, window.SoukElMeuble?.assets || {}); });
+  window.SoukElMeuble?.onExitPrintMode?.(() => { window.PDFView?.hide?.(); recoverFocus(); });
 }
 
 function setColumnVisibility(table, oneBasedIndex, visible){ if (!table) return; const th = table.tHead?.rows?.[0]?.cells?.[oneBasedIndex - 1]; if (th) th.style.display = visible ? "" : "none"; const rows = table.tBodies[0]?.rows || []; for (const r of rows) { const cell = r.cells[oneBasedIndex - 1]; if (cell) cell.style.display = visible ? "" : "none"; } }
