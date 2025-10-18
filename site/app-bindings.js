@@ -41,7 +41,7 @@
     SEM.refreshSealPreview();
   };
 
-  // ───────── existing bindings ─────────
+  // ───────── existing bindings (client id label etc.) ─────────
   SEM.updateClientIdLabel = function () {
     const type = state().client?.type === "particulier" ? "particulier" : "societe";
     const labelText = type === "particulier" ? "CIN / passeport" : "Identifiant fiscal / TVA";
@@ -96,6 +96,7 @@
     if (getEl("miniStampRow")) getEl("miniStampRow").style.display = ex.stamp?.enabled ? "" : "none";
   };
 
+  // ───────── bind (fill inputs, listeners, etc.) ─────────
   SEM.bind = function () {
     const st = state();
     [["companyName","name"],["companyVat","vat"],["companyPhone","phone"],["companyEmail","email"],["companyAddress","address"]]
@@ -363,11 +364,10 @@
     const pickBtn = getEl("btnPickSeal");
     if (pickBtn) {
       pickBtn.addEventListener("click", async () => {
-        // Hidden <input type="file"> to pick image
+        // Hidden <input type="file"> to pick image (also opens camera on mobile)
         const inp = document.createElement("input");
         inp.type = "file";
         inp.accept = "image/*";
-        // mobile hint to open camera as well:
         inp.setAttribute("capture", "environment");
         inp.onchange = () => {
           const f = inp.files && inp.files[0];
@@ -382,25 +382,83 @@
       });
     }
 
+    // Camera scanning with adjustable crop + simple background removal
     const scanBtn = getEl("btnScanSeal");
     if (scanBtn) {
       scanBtn.addEventListener("click", async () => {
-        // very small camera overlay for a single capture
         const overlay = document.createElement("div");
-        overlay.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:9999;";
+        overlay.style.cssText =
+          "position:fixed;inset:0;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center;z-index:9999;";
         const box = document.createElement("div");
-        box.style.cssText = "background:#111;color:#fff;border-radius:10px;padding:16px;min-width:320px;display:grid;gap:8px;justify-items:center";
-        const video = document.createElement("video");
-        video.autoplay = true; video.playsInline = true; video.style.maxWidth = "520px";
-        const btns = document.createElement("div"); btns.style.display = "flex"; btns.style.gap = "8px";
-        const take = document.createElement("button"); take.className = "btn"; take.textContent = "Capturer";
-        const cancel = document.createElement("button"); cancel.className = "btn"; cancel.textContent = "Annuler";
-        btns.appendChild(take); btns.appendChild(cancel);
-        box.appendChild(video); box.appendChild(btns); overlay.appendChild(box); document.body.appendChild(overlay);
+        box.style.cssText =
+          "background:#0b0b0b;color:#fff;border-radius:12px;padding:14px;display:grid;gap:8px;justify-items:center;min-width:340px;";
+        const hint = document.createElement("div");
+        hint.textContent = "Placez le cachet dans le cadre, ajustez si besoin puis Capturer";
+        hint.style.cssText = "font-size:12px;opacity:.85;margin-bottom:2px;text-align:center;";
 
+        const stage = document.createElement("div");
+        stage.style.cssText =
+          "position:relative;width:min(92vw,680px);height:min(65vh,520px);background:#000;border-radius:10px;overflow:hidden;";
+
+        const video = document.createElement("video");
+        video.autoplay = true;
+        video.playsInline = true;
+        video.muted = true;
+        video.style.cssText = "width:100%;height:100%;object-fit:cover;display:block;";
+        stage.appendChild(video);
+
+        // Movable/resizable crop rectangle
+        const crop = document.createElement("div");
+        crop.style.cssText = `
+          position:absolute;left:20%;top:25%;width:60%;height:45%;
+          border:2px solid #34d399; box-shadow:0 0 0 9999px rgba(0,0,0,.35) inset;
+          border-radius:8px; cursor:move;`;
+        stage.appendChild(crop);
+
+        // Resize handle
+        const handle = document.createElement("div");
+        handle.style.cssText =
+          "position:absolute;right:-8px;bottom:-8px;width:18px;height:18px;background:#34d399;border-radius:50%;cursor:nwse-resize;box-shadow:0 0 0 2px #0b0b0b;";
+        crop.appendChild(handle);
+
+        // Controls
+        const controls = document.createElement("div");
+        controls.style.cssText = "display:flex;gap:8px;margin-top:6px;flex-wrap:wrap;justify-content:center;";
+
+        const thrWrap = document.createElement("label");
+        thrWrap.style.cssText = "font-size:12px;opacity:.9;display:flex;gap:6px;align-items:center;";
+        thrWrap.innerHTML = `Fond&nbsp;<input id="sealThr" type="range" min="180" max="255" value="235">`;
+
+        const mode = document.createElement("select");
+        mode.innerHTML = `
+          <option value="auto">Auto (fond blanc)</option>
+          <option value="blue">Encre bleue</option>
+          <option value="red">Encre rouge</option>
+          <option value="black">Noir</option>`;
+        mode.style.cssText = "font-size:12px;padding:4px;border-radius:6px;background:#111;color:#fff;border:1px solid #333;";
+
+        const take = document.createElement("button");
+        take.className = "btn"; take.textContent = "Capturer";
+        const cancel = document.createElement("button");
+        cancel.className = "btn"; cancel.textContent = "Annuler";
+
+        controls.appendChild(thrWrap);
+        controls.appendChild(mode);
+        controls.appendChild(take);
+        controls.appendChild(cancel);
+
+        box.appendChild(hint);
+        box.appendChild(stage);
+        box.appendChild(controls);
+        overlay.appendChild(box);
+        document.body.appendChild(overlay);
+
+        // Camera
         let stream = null;
         try {
-          stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: false });
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: "environment" }, audio: false
+          });
           video.srcObject = stream;
         } catch (err) {
           console.error(err);
@@ -409,20 +467,111 @@
           return;
         }
 
+        // Drag/resize logic
+        const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+        let drag = null; // {type:"move"|"resize", x,y,w,h, mx,my}
+        const startMove = (e, type) => {
+          const r = crop.getBoundingClientRect();
+          drag = { type, x: r.left, y: r.top, w: r.width, h: r.height, mx: e.clientX, my: e.clientY };
+          e.preventDefault?.();
+        };
+        const onMove = (e) => {
+          if (!drag) return;
+          const stageR = stage.getBoundingClientRect();
+          if (drag.type === "move") {
+            const nx = clamp(drag.x + (e.clientX - drag.mx), stageR.left, stageR.right - drag.w);
+            const ny = clamp(drag.y + (e.clientY - drag.my), stageR.top,  stageR.bottom - drag.h);
+            crop.style.left = ((nx - stageR.left)/stageR.width*100) + "%";
+            crop.style.top  = ((ny - stageR.top) /stageR.height*100) + "%";
+          } else {
+            const min = 60;
+            const nw = clamp(drag.w + (e.clientX - drag.mx), min, stageR.right - drag.x);
+            const nh = clamp(drag.h + (e.clientY - drag.my), min, stageR.bottom - drag.y);
+            crop.style.width  = (nw/stageR.width*100) + "%";
+            crop.style.height = (nh/stageR.height*100) + "%";
+          }
+        };
+        const endMove = () => (drag = null);
+
+        crop.addEventListener("mousedown", (e) => { if (e.target===handle) return; startMove(e, "move"); });
+        handle.addEventListener("mousedown", (e) => startMove(e, "resize"));
+        window.addEventListener("mousemove", onMove);
+        window.addEventListener("mouseup", endMove);
+
+        // touch
+        crop.addEventListener("touchstart", (e)=>{
+          const t=e.touches[0]; startMove({clientX:t.clientX,clientY:t.clientY}, "move");
+        },{passive:true});
+        handle.addEventListener("touchstart",(e)=>{
+          const t=e.touches[0]; startMove({clientX:t.clientX,clientY:t.clientY}, "resize");
+        },{passive:true});
+        window.addEventListener("touchmove",(e)=>{
+          const t=e.touches[0]; if (t) onMove({clientX:t.clientX,clientY:t.clientY});
+        },{passive:true});
+        window.addEventListener("touchend", endMove);
+
         const cleanup = () => {
           if (stream) stream.getTracks().forEach(t => t.stop());
+          window.removeEventListener("mousemove", onMove);
+          window.removeEventListener("mouseup", endMove);
+          window.removeEventListener("touchmove", onMove);
+          window.removeEventListener("touchend", endMove);
           overlay.remove();
         };
         cancel.onclick = cleanup;
+
+        // Simple, fast white-paper → alpha remover
+        function removeBackgroundToAlpha(ctx, w, h, thr, modeVal) {
+          const img = ctx.getImageData(0, 0, w, h);
+          const d = img.data;
+          for (let i = 0; i < d.length; i += 4) {
+            const r = d[i], g = d[i+1], b = d[i+2];
+            let transparent = false;
+
+            if (modeVal === "auto") {
+              if (r > thr && g > thr && b > thr && Math.max(r,g,b)-Math.min(r,g,b) < 18) transparent = true;
+            } else if (modeVal === "blue") {
+              if (r > thr && g > thr && b > thr) transparent = true;
+              if (!transparent && !(b > r + 18 && b > g + 18)) {
+                if (r > 220 && g > 220 && b > 220) transparent = true;
+              }
+            } else if (modeVal === "red") {
+              if (r > thr && g > thr && b > thr) transparent = true;
+              if (!transparent && !(r > g + 18 && r > b + 18)) {
+                if (r > 220 && g > 220 && b > 220) transparent = true;
+              }
+            } else { // black
+              if (r > thr && g > thr && b > thr) transparent = true;
+            }
+
+            if (transparent) d[i+3] = 0;
+          }
+          ctx.putImageData(img, 0, 0);
+        }
+
         take.onclick = () => {
-          // draw current frame to canvas
-          const wv = video.videoWidth || 640;
-          const hv = video.videoHeight || 480;
+          const vb = video.getBoundingClientRect();
+          const cb = crop.getBoundingClientRect();
+          const scaleX = (video.videoWidth  || 1280) / vb.width;
+          const scaleY = (video.videoHeight || 720)  / vb.height;
+
+          // Crop coordinates in source frame
+          const sx = Math.max(0, (cb.left - vb.left) * scaleX);
+          const sy = Math.max(0, (cb.top  - vb.top)  * scaleY);
+          const sw = Math.max(1, cb.width  * scaleX);
+          const sh = Math.max(1, cb.height * scaleY);
+
           const canvas = document.createElement("canvas");
-          canvas.width = wv; canvas.height = hv;
+          canvas.width = Math.round(sw);
+          canvas.height = Math.round(sh);
           const ctx = canvas.getContext("2d");
-          ctx.drawImage(video, 0, 0, wv, hv);
-          const dataUrl = canvas.toDataURL("image/png", 0.92);
+          ctx.drawImage(video, sx, sy, sw, sh, 0, 0, sw, sh);
+
+          // Remove background to transparent (PNG keeps alpha)
+          const thr = Number(getEl("sealThr")?.value || 235);
+          removeBackgroundToAlpha(ctx, canvas.width, canvas.height, thr, mode.value);
+
+          const dataUrl = canvas.toDataURL("image/png");
           SEM.setSealImage(dataUrl);
           cleanup();
         };
