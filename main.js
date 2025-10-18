@@ -135,28 +135,39 @@ app.on("window-all-closed", () => {
   if (process.platform !== "darwin") app.quit();
 });
 
+// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+// Save JSON — accept both shapes and always write RAW snapshot
+// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 ipcMain.handle("save-invoice-json", async (_evt, payload = {}) => {
-  const meta = payload?.meta || {};
+  // Accept either a flat snapshot or { data, meta, filename }
+  const incoming = (payload && payload.data && typeof payload.data === "object") ? payload.data : payload;
+  const meta     = incoming?.meta || payload?.meta || {};
   const typeLabel = docTypeLabelFromValue(meta.docType);
   const numOrDate = sanitizeFileName(meta.number || todayStr());
   const baseName = withJsonExt(`${typeLabel} - ${numOrDate}`);
 
+  const toWrite = incoming; // we always write the flat snapshot
+
+  // Silent destinations
   if (meta?.silent === true || meta?.to || meta?.saveDir) {
     const dir = resolveSaveDir(meta);
     const target = ensureUniquePath(path.join(dir, baseName));
-    fs.writeFileSync(target, JSON.stringify(payload, null, 2), "utf-8");
-    return target;
+    fs.writeFileSync(target, JSON.stringify(toWrite, null, 2), "utf-8");
+    return { ok: true, path: target, name: path.basename(target) };
   }
 
+  // Normal save dialog
   const { canceled, filePath } = await dialog.showSaveDialog({
     title: "Enregistrer",
     defaultPath: path.join(app.getPath("desktop"), baseName),
     filters: [{ name: "JSON", extensions: ["json"] }],
   });
   if (canceled || !filePath) return null;
-  fs.writeFileSync(filePath, JSON.stringify(payload, null, 2), "utf-8");
-  return filePath;
+
+  fs.writeFileSync(filePath, JSON.stringify(toWrite, null, 2), "utf-8");
+  return { ok: true, path: filePath, name: path.basename(filePath) };
 });
+
 
 ipcMain.handle("open-invoice-json", async () => {
   const { canceled, filePaths } = await dialog.showOpenDialog({
@@ -216,7 +227,7 @@ ipcMain.handle("SoukElMeuble:exportPDFFromHTML", async (event, payload) => {
       const saveDir = resolveSaveDir(meta);
       const target = ensureUniquePath(path.join(saveDir, fileName));
       fs.writeFileSync(target, pdfBuffer);
-      return { ok: true, path: target };
+      return { ok: true, path: target, name: path.basename(target) };
     }
 
     const { canceled, filePath } = await dialog.showSaveDialog(
@@ -230,7 +241,7 @@ ipcMain.handle("SoukElMeuble:exportPDFFromHTML", async (event, payload) => {
     if (canceled || !filePath) return null;
 
     fs.writeFileSync(filePath, pdfBuffer);
-    return { ok: true, path: filePath };
+    return { ok: true, path: filePath, name: path.basename(filePath) };
   } catch (err) {
     console.error("exportPDFFromHTML error:", err);
     dialog.showErrorBox("Erreur PDF", String(err?.message || err));

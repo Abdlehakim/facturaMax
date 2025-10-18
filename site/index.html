@@ -2,7 +2,8 @@
 <html lang="fr">
   <head>
     <meta charset="UTF-8" />
-    <meta http-equiv="Content-Security-Policy"
+    <meta
+      http-equiv="Content-Security-Policy"
       content="
         default-src 'self' data: blob:;
         script-src 'self';
@@ -10,7 +11,8 @@
         img-src 'self' data: blob: file:;
         font-src 'self' data:;
         connect-src 'self';
-      ">
+      "
+    />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>SoukElMeuble – Gestionnaire de société</title>
     <link rel="stylesheet" href="./styles.css" />
@@ -18,54 +20,130 @@
     <style>
       .section-box legend .for-devis,
       .section-box legend .for-bl,
-      .section-box legend .for-bc { display: none; }
+      .section-box legend .for-bc {
+        display: none;
+      }
       #invNumberLabel .for-devis,
       #invNumberLabel .for-bl,
-      #invNumberLabel .for-bc { display: none; }
+      #invNumberLabel .for-bc {
+        display: none;
+      }
 
-      .section-box:has(#docType option[value="devis"]:checked) legend .for-facture { display: none; }
-      .section-box:has(#docType option[value="devis"]:checked) legend .for-devis { display: inline; }
-      .section-box:has(#docType option[value="devis"]:checked) #invNumberLabel .for-facture { display: none; }
-      .section-box:has(#docType option[value="devis"]:checked) #invNumberLabel .for-devis { display: inline; }
+      .section-box:has(#docType option[value="devis"]:checked)
+        legend
+        .for-facture {
+        display: none;
+      }
+      .section-box:has(#docType option[value="devis"]:checked)
+        legend
+        .for-devis {
+        display: inline;
+      }
+      .section-box:has(#docType option[value="devis"]:checked)
+        #invNumberLabel
+        .for-facture {
+        display: none;
+      }
+      .section-box:has(#docType option[value="devis"]:checked)
+        #invNumberLabel
+        .for-devis {
+        display: inline;
+      }
 
       .section-box:has(#docType option[value="bl"]:checked) legend .for-facture,
-      .section-box:has(#docType option[value="bl"]:checked) legend .for-devis { display: none; }
-      .section-box:has(#docType option[value="bl"]:checked) legend .for-bl { display: inline; }
-      .section-box:has(#docType option[value="bl"]:checked) #invNumberLabel .for-facture,
-      .section-box:has(#docType option[value="bl"]:checked) #invNumberLabel .for-devis { display: none; }
-      .section-box:has(#docType option[value="bl"]:checked) #invNumberLabel .for-bl { display: inline; }
+      .section-box:has(#docType option[value="bl"]:checked) legend .for-devis {
+        display: none;
+      }
+      .section-box:has(#docType option[value="bl"]:checked) legend .for-bl {
+        display: inline;
+      }
+      .section-box:has(#docType option[value="bl"]:checked)
+        #invNumberLabel
+        .for-facture,
+      .section-box:has(#docType option[value="bl"]:checked)
+        #invNumberLabel
+        .for-devis {
+        display: none;
+      }
+      .section-box:has(#docType option[value="bl"]:checked)
+        #invNumberLabel
+        .for-bl {
+        display: inline;
+      }
 
       .section-box:has(#docType option[value="bc"]:checked) legend .for-facture,
       .section-box:has(#docType option[value="bc"]:checked) legend .for-devis,
-      .section-box:has(#docType option[value="bc"]:checked) legend .for-bl { display: none; }
-      .section-box:has(#docType option[value="bc"]:checked) legend .for-bc { display: inline; }
-      .section-box:has(#docType option[value="bc"]:checked) #invNumberLabel .for-facture,
-      .section-box:has(#docType option[value="bc"]:checked) #invNumberLabel .for-devis,
-      .section-box:has(#docType option[value="bc"]:checked) #invNumberLabel .for-bl { display: none; }
-      .section-box:has(#docType option[value="bc"]:checked) #invNumberLabel .for-bc { display: inline; }
+      .section-box:has(#docType option[value="bc"]:checked) legend .for-bl {
+        display: none;
+      }
+      .section-box:has(#docType option[value="bc"]:checked) legend .for-bc {
+        display: inline;
+      }
+      .section-box:has(#docType option[value="bc"]:checked)
+        #invNumberLabel
+        .for-facture,
+      .section-box:has(#docType option[value="bc"]:checked)
+        #invNumberLabel
+        .for-devis,
+      .section-box:has(#docType option[value="bc"]:checked)
+        #invNumberLabel
+        .for-bl {
+        display: none;
+      }
+      .section-box:has(#docType option[value="bc"]:checked)
+        #invNumberLabel
+        .for-bc {
+        display: inline;
+      }
 
-      .label-inline { display: inline-flex; align-items: center; gap: .5rem; }
-      .label-text { cursor: default; user-select: text; white-space: nowrap; }
-      .col-toggle { cursor: pointer; }
+      .label-inline {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
+      .label-text {
+        cursor: default;
+        user-select: text;
+        white-space: nowrap;
+      }
+      .col-toggle {
+        cursor: pointer;
+      }
 
       .hide-col-ref #items thead th:nth-child(1),
-      .hide-col-ref #items tbody td:nth-child(1) { display: none; }
+      .hide-col-ref #items tbody td:nth-child(1) {
+        display: none;
+      }
       .hide-col-product #items thead th:nth-child(2),
-      .hide-col-product #items tbody td:nth-child(2) { display: none; }
+      .hide-col-product #items tbody td:nth-child(2) {
+        display: none;
+      }
       .hide-col-desc #items thead th:nth-child(3),
-      .hide-col-desc #items tbody td:nth-child(3) { display: none; }
+      .hide-col-desc #items tbody td:nth-child(3) {
+        display: none;
+      }
       .hide-col-qty #items thead th:nth-child(4),
-      .hide-col-qty #items tbody td:nth-child(4) { display: none; }
+      .hide-col-qty #items tbody td:nth-child(4) {
+        display: none;
+      }
       .hide-col-price #items thead th:nth-child(5),
-      .hide-col-price #items tbody td:nth-child(5) { display: none; }
+      .hide-col-price #items tbody td:nth-child(5) {
+        display: none;
+      }
       .hide-col-tva #items thead th:nth-child(6),
-      .hide-col-tva #items tbody td:nth-child(6) { display: none; }
+      .hide-col-tva #items tbody td:nth-child(6) {
+        display: none;
+      }
       .hide-col-discount #items thead th:nth-child(7),
-      .hide-col-discount #items tbody td:nth-child(7) { display: none; }
+      .hide-col-discount #items tbody td:nth-child(7) {
+        display: none;
+      }
 
       #extrasBox #shipFields,
       #extrasBox #stampFields,
-      #whBox #whFields { display: none; }
+      #whBox #whFields {
+        display: none;
+      }
 
       #extrasBox #shipFields,
       #extrasBox #stampFields {
@@ -83,7 +161,9 @@
         align-items: end;
         width: 100%;
       }
-      #extrasBox .grid.two:has(#fodecEnabled:checked) #fodecFields { display: grid; }
+      #extrasBox .grid.two:has(#fodecEnabled:checked) #fodecFields {
+        display: grid;
+      }
 
       /* Retenue: Taux | Base | Seuil | Libellé (large) | Montant */
       #whBox #whFields {
@@ -93,20 +173,34 @@
         align-items: end;
         width: 100%;
       }
-      #whFields label.full { grid-column: auto; }
+      #whFields label.full {
+        grid-column: auto;
+      }
 
-      #extrasBox .grid.two:has(#shipEnabled:checked) #shipFields { display: grid; }
-      #extrasBox .grid.two:has(#stampEnabled:checked) #stampFields { display: grid; }
-      #whBox:has(#whEnabled:checked) #whFields { display: grid; }
+      #extrasBox .grid.two:has(#shipEnabled:checked) #shipFields {
+        display: grid;
+      }
+      #extrasBox .grid.two:has(#stampEnabled:checked) #stampFields {
+        display: grid;
+      }
+      #whBox:has(#whEnabled:checked) #whFields {
+        display: grid;
+      }
 
       @media (max-width: 900px) {
-        #whBox #whFields { grid-template-columns: 1fr 1fr; }
-        #whFields label.full { grid-column: 1 / -1; }
+        #whBox #whFields {
+          grid-template-columns: 1fr 1fr;
+        }
+        #whFields label.full {
+          grid-column: 1 / -1;
+        }
       }
       @media (max-width: 720px) {
         #extrasBox #shipFields,
         #extrasBox #stampFields,
-        #extrasBox #fodecFields { grid-template-columns: 1fr; }
+        #extrasBox #fodecFields {
+          grid-template-columns: 1fr;
+        }
       }
     </style>
   </head>
@@ -118,7 +212,11 @@
       <header class="header">
         <div class="brand">
           <div class="logo-wrap">
-            <img id="companyLogo" src="./assets/logoIMG.png" alt="Logo SoukElMeuble" />
+            <img
+              id="companyLogo"
+              src="./assets/logoIMG.png"
+              alt="Logo SoukElMeuble"
+            />
           </div>
           <div><h1>SoukElMeuble – Créateur de factures</h1></div>
         </div>
@@ -180,20 +278,31 @@
           <fieldset class="section-box">
             <legend>Informations entreprise :</legend>
             <div class="grid two">
-              <label>Nom de l’entreprise
+              <label
+                >Nom de l’entreprise
                 <input id="companyName" placeholder="SoukElMeuble SARL" />
               </label>
-              <label>Identifiant fiscal / TVA
+              <label
+                >Identifiant fiscal / TVA
                 <input id="companyVat" placeholder="1891628/W/A/M000" />
               </label>
-              <label>Téléphone
+              <label
+                >Téléphone
                 <input id="companyPhone" placeholder="+216 27 673 561" />
               </label>
-              <label>E-mail
-                <input id="companyEmail" placeholder="contact@SoukElMeuble.com" />
+              <label
+                >E-mail
+                <input
+                  id="companyEmail"
+                  placeholder="contact@SoukElMeuble.com"
+                />
               </label>
-              <label class="full">Adresse
-                <input id="companyAddress" placeholder="Rue Mahbouba Soussia 2080 Teboulba" />
+              <label class="full"
+                >Adresse
+                <input
+                  id="companyAddress"
+                  placeholder="Rue Mahbouba Soussia 2080 Teboulba"
+                />
               </label>
             </div>
           </fieldset>
@@ -204,12 +313,15 @@
               <label class="full">
                 Type de client
                 <select id="clientType">
-                  <option value="societe" selected>Société / personne morale</option>
+                  <option value="societe" selected>
+                    Société / personne morale
+                  </option>
                   <option value="particulier">Particulier</option>
                 </select>
               </label>
 
-              <label>Nom du client
+              <label
+                >Nom du client
                 <input id="clientName" placeholder="Client ou Entreprise" />
               </label>
 
@@ -218,13 +330,16 @@
                 <input id="clientVat" placeholder="XXXXXXXXX" />
               </label>
 
-              <label>Téléphone du client
+              <label
+                >Téléphone du client
                 <input id="clientPhone" placeholder="+216 ..." />
               </label>
-              <label>E-mail du client
+              <label
+                >E-mail du client
                 <input id="clientEmail" placeholder="client@email.com" />
               </label>
-              <label class="full">Adresse du client
+              <label class="full"
+                >Adresse du client
                 <input id="clientAddress" placeholder="Rue, Ville, Pays" />
               </label>
             </div>
@@ -252,50 +367,49 @@
           </div>
 
           <div class="mini-sum">
-  <table id="miniSum">
-    <tbody>
-      <tr id="miniShipRow" style="display: none">
-        <td id="miniShipLabel">Frais de livraison</td>
-        <td id="miniShip" class="right">0</td>
-      </tr>
+            <table id="miniSum">
+              <tbody>
+                <tr id="miniShipRow" style="display: none">
+                  <td id="miniShipLabel">Frais de livraison</td>
+                  <td id="miniShip" class="right">0</td>
+                </tr>
 
-      <!-- FODEC APRES livraison et AVANT Total HT -->
-      <tr id="miniFODECRow" style="display:none">
-        <td id="miniFODECLabel">FODEC (1%)</td>
-        <td id="miniFODEC" class="right">0</td>
-      </tr>
+                <!-- FODEC APRES livraison et AVANT Total HT -->
+                <tr id="miniFODECRow" style="display: none">
+                  <td id="miniFODECLabel">FODEC (1%)</td>
+                  <td id="miniFODEC" class="right">0</td>
+                </tr>
 
-      <tr class="head">
-        <th>Total HT</th>
-        <th id="miniHT" class="right">0</th>
-      </tr>
+                <tr class="head">
+                  <th>Total HT</th>
+                  <th id="miniHT" class="right">0</th>
+                </tr>
 
-      <tr>
-        <td>TVA</td>
-        <td id="miniTVA" class="right">0</td>
-      </tr>
+                <tr>
+                  <td>TVA</td>
+                  <td id="miniTVA" class="right">0</td>
+                </tr>
 
-      <tr id="miniStampRow" style="display: none">
-        <td id="miniStampLabel">Timbre fiscal</td>
-        <td id="miniStamp" class="right">0</td>
-      </tr>
+                <tr id="miniStampRow" style="display: none">
+                  <td id="miniStampLabel">Timbre fiscal</td>
+                  <td id="miniStamp" class="right">0</td>
+                </tr>
 
-      <tr class="grand">
-        <th>Total TTC</th>
-        <th id="miniTTC" class="right">0</th>
-      </tr>
-      <tr id="miniWHRow" style="display: none">
-        <td id="miniWHLabel">Retenue à la source</td>
-        <td id="miniWH" class="right">0</td>
-      </tr>
-      <tr id="miniNETRow" class="grand" style="display: none">
-        <th>Net à payer</th>
-        <th id="miniNET" class="right">0</th>
-      </tr>
-    </tbody>
-  </table>
-</div>
-
+                <tr class="grand">
+                  <th>Total TTC</th>
+                  <th id="miniTTC" class="right">0</th>
+                </tr>
+                <tr id="miniWHRow" style="display: none">
+                  <td id="miniWHLabel">Retenue à la source</td>
+                  <td id="miniWH" class="right">0</td>
+                </tr>
+                <tr id="miniNETRow" class="grand" style="display: none">
+                  <th>Net à payer</th>
+                  <th id="miniNET" class="right">0</th>
+                </tr>
+              </tbody>
+            </table>
+          </div>
 
           <fieldset class="section-box">
             <legend>Ajouter un article</legend>
@@ -304,7 +418,12 @@
                 <div>
                   <div class="label-inline">
                     <label for="addRef" class="label-text">Référence</label>
-                    <input id="colToggleRef" type="checkbox" class="col-toggle" aria-label="Masquer colonne Référence" />
+                    <input
+                      id="colToggleRef"
+                      type="checkbox"
+                      class="col-toggle"
+                      aria-label="Masquer colonne Référence"
+                    />
                   </div>
                   <input id="addRef" placeholder="ex. : SKU-12345" />
                 </div>
@@ -312,55 +431,117 @@
                 <div>
                   <div class="label-inline">
                     <label for="addProduct" class="label-text">Produit</label>
-                    <input id="colToggleProduct" type="checkbox" class="col-toggle" aria-label="Masquer colonne Produit" />
+                    <input
+                      id="colToggleProduct"
+                      type="checkbox"
+                      class="col-toggle"
+                      aria-label="Masquer colonne Produit"
+                    />
                   </div>
-                  <input id="addProduct" placeholder="ex. : Ordinateur portable" />
+                  <input
+                    id="addProduct"
+                    placeholder="ex. : Ordinateur portable"
+                  />
                 </div>
 
                 <div class="full">
                   <div class="label-inline">
                     <label for="addDesc" class="label-text">Description</label>
-                    <input id="colToggleDesc" type="checkbox" class="col-toggle" aria-label="Masquer colonne Description" />
+                    <input
+                      id="colToggleDesc"
+                      type="checkbox"
+                      class="col-toggle"
+                      aria-label="Masquer colonne Description"
+                    />
                   </div>
-                  <input id="addDesc" placeholder="ex. : Garantie 2 ans, couleur noire…" />
+                  <input
+                    id="addDesc"
+                    placeholder="ex. : Garantie 2 ans, couleur noire…"
+                  />
                 </div>
 
                 <div>
                   <div class="label-inline">
                     <label for="addQty" class="label-text">Qté</label>
-                    <input id="colToggleQty" type="checkbox" class="col-toggle" aria-label="Masquer colonne Qté" />
+                    <input
+                      id="colToggleQty"
+                      type="checkbox"
+                      class="col-toggle"
+                      aria-label="Masquer colonne Qté"
+                    />
                   </div>
                   <input id="addQty" type="number" min="0" step="1" value="1" />
                 </div>
 
                 <div>
                   <div class="label-inline">
-                    <label for="addPrice" class="label-text">Prix&nbsp;HT</label>
-                    <input id="colTogglePrice" type="checkbox" class="col-toggle" aria-label="Masquer colonne Prix HT" />
+                    <label for="addPrice" class="label-text"
+                      >Prix&nbsp;HT</label
+                    >
+                    <input
+                      id="colTogglePrice"
+                      type="checkbox"
+                      class="col-toggle"
+                      aria-label="Masquer colonne Prix HT"
+                    />
                   </div>
-                  <input id="addPrice" type="number" min="0" step="0.01" value="0" />
+                  <input
+                    id="addPrice"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value="0"
+                  />
                 </div>
 
                 <div>
                   <div class="label-inline">
                     <label for="addTva" class="label-text">TVA&nbsp;%</label>
-                    <input id="colToggleTva" type="checkbox" class="col-toggle" aria-label="Masquer colonne TVA" />
+                    <input
+                      id="colToggleTva"
+                      type="checkbox"
+                      class="col-toggle"
+                      aria-label="Masquer colonne TVA"
+                    />
                   </div>
-                  <input id="addTva" type="number" min="0" step="0.01" value="19" />
+                  <input
+                    id="addTva"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value="19"
+                  />
                 </div>
 
                 <div>
                   <div class="label-inline">
-                    <label for="addDiscount" class="label-text">Remise&nbsp;%</label>
-                    <input id="colToggleDiscount" type="checkbox" class="col-toggle" aria-label="Masquer colonne Remise" />
+                    <label for="addDiscount" class="label-text"
+                      >Remise&nbsp;%</label
+                    >
+                    <input
+                      id="colToggleDiscount"
+                      type="checkbox"
+                      class="col-toggle"
+                      aria-label="Masquer colonne Remise"
+                    />
                   </div>
-                  <input id="addDiscount" type="number" min="0" step="0.01" value="0" />
+                  <input
+                    id="addDiscount"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value="0"
+                  />
                 </div>
               </div>
 
               <div class="add-actions end">
-                <button id="btnSubmitItem" type="button" class="btn">+ Ajouter</button>
-                <button id="btnNewItem" type="button" class="btn" disabled>Nouveau</button>
+                <button id="btnSubmitItem" type="button" class="btn">
+                  + Ajouter
+                </button>
+                <button id="btnNewItem" type="button" class="btn" disabled>
+                  Nouveau
+                </button>
               </div>
             </div>
           </fieldset>
@@ -373,7 +554,12 @@
               <div class="full">
                 <div class="label-inline">
                   <span class="label-text">Activer le FODEC</span>
-                  <input id="fodecEnabled" type="checkbox" class="col-toggle" aria-label="Activer le FODEC" />
+                  <input
+                    id="fodecEnabled"
+                    type="checkbox"
+                    class="col-toggle"
+                    aria-label="Activer le FODEC"
+                  />
                 </div>
               </div>
 
@@ -384,19 +570,33 @@
                 </label>
                 <label>
                   Taux %
-                  <input id="fodecRate" type="number" min="0" step="0.01" value="1" />
+                  <input
+                    id="fodecRate"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value="1"
+                  />
                 </label>
                 <label>
                   Base de calcul
                   <select id="fodecBase">
                     <option value="ht" selected>Total HT (lignes)</option>
-                    <option value="ht_plus">HT + Livraison (sans timbre)</option>
+                    <option value="ht_plus">
+                      HT + Livraison (sans timbre)
+                    </option>
                     <option value="ttc_sans_fodec">TTC (sans FODEC)</option>
                   </select>
                 </label>
                 <label>
                   TVA %
-                  <input id="fodecTva" type="number" min="0" step="0.01" value="19" />
+                  <input
+                    id="fodecTva"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value="19"
+                  />
                 </label>
                 <label>
                   Montant (auto)
@@ -406,9 +606,14 @@
               <!-- === fin FODEC === -->
 
               <div class="full">
-                <div class="label-inline" style="margin-top:.5rem">
+                <div class="label-inline" style="margin-top: 0.5rem">
                   <span class="label-text">Activer les frais de livraison</span>
-                  <input id="shipEnabled" type="checkbox" class="col-toggle" aria-label="Activer les frais de livraison" />
+                  <input
+                    id="shipEnabled"
+                    type="checkbox"
+                    class="col-toggle"
+                    aria-label="Activer les frais de livraison"
+                  />
                 </div>
               </div>
 
@@ -419,18 +624,35 @@
                 </label>
                 <label>
                   Montant HT
-                  <input id="shipAmount" type="number" min="0" step="0.01" value="7" />
+                  <input
+                    id="shipAmount"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value="7"
+                  />
                 </label>
                 <label>
                   TVA %
-                  <input id="shipTva" type="number" min="0" step="0.01" value="19" />
+                  <input
+                    id="shipTva"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value="19"
+                  />
                 </label>
               </div>
 
               <div class="full" style="margin-top: 0.5rem">
                 <div class="label-inline">
                   <span class="label-text">Activer le timbre fiscal</span>
-                  <input id="stampEnabled" type="checkbox" class="col-toggle" aria-label="Activer le timbre fiscal" />
+                  <input
+                    id="stampEnabled"
+                    type="checkbox"
+                    class="col-toggle"
+                    aria-label="Activer le timbre fiscal"
+                  />
                 </div>
               </div>
 
@@ -441,11 +663,23 @@
                 </label>
                 <label>
                   Montant HT
-                  <input id="stampAmount" type="number" min="0" step="0.001" value="1" />
+                  <input
+                    id="stampAmount"
+                    type="number"
+                    min="0"
+                    step="0.001"
+                    value="1"
+                  />
                 </label>
                 <label>
                   TVA %
-                  <input id="stampTva" type="number" min="0" step="0.01" value="0" />
+                  <input
+                    id="stampTva"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value="0"
+                  />
                 </label>
               </div>
             </div>
@@ -457,14 +691,25 @@
             <div class="full" style="margin-top: 0.5rem">
               <div class="label-inline">
                 <span class="label-text">Activer la retenue à la source</span>
-                <input id="whEnabled" type="checkbox" class="col-toggle" aria-label="Activer la retenue à la source" />
+                <input
+                  id="whEnabled"
+                  type="checkbox"
+                  class="col-toggle"
+                  aria-label="Activer la retenue à la source"
+                />
               </div>
             </div>
 
             <div id="whFields">
               <label>
                 Taux %
-                <input id="whRate" type="number" min="0" step="0.01" value="1.5" />
+                <input
+                  id="whRate"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value="1.5"
+                />
               </label>
 
               <label>
@@ -477,7 +722,13 @@
 
               <label>
                 Seuil (Montant &gt;)
-                <input id="whThreshold" type="number" min="0" step="0.01" value="1000" />
+                <input
+                  id="whThreshold"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value="1000"
+                />
               </label>
 
               <label class="full">
@@ -510,7 +761,9 @@
       </main>
 
       <footer class="footer muted">
-        <span>© <span id="year"></span> SoukElMeuble. Tous droits réservés.</span>
+        <span
+          >© <span id="year"></span> SoukElMeuble. Tous droits réservés.</span
+        >
         <span>Pour Windows • Hors ligne • Export PDF</span>
       </footer>
     </div>
@@ -521,7 +774,9 @@
     <script src="./pdfView.js" defer></script>
     <script src="./pdfWH.js" defer></script>
     <script src="helpers.js"></script>
-<script src="app-core.js"></script>
-<script src="app-export.js"></script>
+    <script src="app-state.js"></script>
+    <script src="app-bindings.js"></script>
+    <script src="app-init.js"></script>
+    <script src="app-export.js"></script>
   </body>
 </html>

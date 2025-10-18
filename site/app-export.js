@@ -1,26 +1,52 @@
-async function saveInvoiceJSON(){
-  const data = captureForm({ forSave: true });
-  const invNum = slugForFile(state.meta.number || "");
-  const base   = [docTypeLabel(state.meta.docType), invNum].filter(Boolean).join(" ");
+// ===== app-export.js =====
+
+// Save EVERYTHING (company included) so the file is fully restorable
+async function saveInvoiceJSON() {
+  // 1) Make sure DOM -> state is up to date
+  if (window.SEM?.readInputs) window.SEM.readInputs();
+  else if (typeof readInputs === "function") readInputs();
+
+  // 2) Build a full flat snapshot
+  const snapshot = (window.SEM?.captureForm
+    ? window.SEM.captureForm({ includeCompany: true })
+    : captureForm({ includeCompany: true })
+  );
+
+  const st = (window.SEM?.state || window.state);
+  const invNum   = slugForFile(st.meta.number || "");
+  const base     = [docTypeLabel(st.meta.docType), invNum].filter(Boolean).join(" ");
   const filename = ensureJsonExt(base || "Document");
 
+  // 3) Ask the desktop bridge to save the *flat* snapshot
   if (window.SoukElMeuble?.saveInvoiceJSON) {
     try {
-      const res = await window.SoukElMeuble.saveInvoiceJSON({ data, filename });
-      await showDialog(res ? "Document enregistré." : "Enregistrement annulé.", { title: "Enregistrer" });
+      const res = await window.SoukElMeuble.saveInvoiceJSON({
+        ...snapshot,                 // <- flat data (company, client, meta, items, notes, totals)
+        meta: snapshot.meta || {},   // <- ensure meta exists for naming
+        filename,                    // <- suggested filename (used by main if needed)
+      });
+
+      if (res && res.path) {
+        await showDialog("Document enregistré :\n" + res.path, { title: "Enregistrer" });
+      } else {
+        await showDialog("Enregistrement annulé.", { title: "Enregistrer" });
+      }
     } catch {
+      // Fallback: browser download
       await showDialog("Impossible d’enregistrer via l’app. Téléchargement via le navigateur…", { title: "Enregistrer" });
-      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+      const blob = new Blob([JSON.stringify(snapshot, null, 2)], { type: "application/json" });
       downloadBlob(filename, blob);
     }
     return;
   }
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+
+  // 4) Web fallback
+  const blob = new Blob([JSON.stringify(snapshot, null, 2)], { type: "application/json" });
   downloadBlob(filename, blob);
   await showDialog("Fichier téléchargé.", { title: "Enregistrer" });
 }
 
-// OPEN
+// === OPEN (browser fallback + desktop bridge) ===
 async function openInvoiceFromFilePicker(){
   return new Promise((resolve) => {
     const inp = document.createElement("input");
@@ -39,41 +65,106 @@ async function openInvoiceFromFilePicker(){
   });
 }
 
-// Handler used by core init
-async function onOpenInvoiceClick(){
-  const data = (await window.SoukElMeuble?.openInvoiceJSON?.()) || (await openInvoiceFromFilePicker());
-  if(!data) return;
-  Object.assign(state, data); // keep current company if absent in file
-  bind();
+// Small helper to deep-merge without dropping defaults
+function mergeInvoiceDataIntoState(data){
+  if (!data || typeof data !== "object") return;
+
+  // Accept both shapes: {data:{...}} or flat
+  const src = data.data && typeof data.data === "object" ? data.data : data;
+
+  const st = (window.SEM?.state || window.state);
+
+  // company
+  if (src.company) {
+    st.company = { ...st.company, ...src.company };
+  }
+
+  // client
+  if (src.client) {
+    st.client = { ...st.client, ...src.client };
+  }
+
+  // meta (with some nested blocks)
+  if (src.meta) {
+    const cur = st.meta || {};
+    const incoming = src.meta;
+
+    const mergedWH = { ...(cur.withholding || {}), ...(incoming.withholding || {}) };
+    const curExtras = cur.extras || {};
+    const incExtras = incoming.extras || {};
+    const mergedExtras = {
+      ...curExtras,
+      shipping: { ...(curExtras.shipping || {}), ...(incExtras.shipping || {}) },
+      stamp:    { ...(curExtras.stamp    || {}), ...(incExtras.stamp    || {}) },
+      fodec:    { ...(curExtras.fodec    || {}), ...(incExtras.fodec    || {}) },
+    };
+
+    st.meta = {
+      ...cur,
+      ...incoming,
+      withholding: mergedWH,
+      extras: mergedExtras,
+    };
+  }
+
+  // items (replace array if provided)
+  if (Array.isArray(src.items)) {
+    st.items = src.items.map(x => ({ ...x }));
+  }
+
+  // notes
+  if (typeof src.notes === "string") {
+    st.notes = src.notes;
+  }
 }
 
-// EXPORT PDF (invoice + optional WH certificate)
-async function exportCurrentPDF(){
-  readInputs();
-  computeTotals();
+async function onOpenInvoiceClick(){
+  const raw = (await window.SoukElMeuble?.openInvoiceJSON?.()) || (await openInvoiceFromFilePicker());
+  if (!raw) return;
 
+  mergeInvoiceDataIntoState(raw);
+
+  const st = (window.SEM?.state || window.state);
+
+  // Back-compat: if older file had no company and you want to keep current logo, this preserves it
+  const data = raw.data && typeof raw.data === "object" ? raw.data : raw;
+  if (!data.company && st.company && !st.company.logo) {
+    st.company.logo = getEl("companyLogo")?.src || st.company.logo || "";
+  }
+
+  (window.SEM?.bind ? window.SEM.bind() : bind());
+}
+
+// === EXPORT PDF (invoice + optional WH certificate) ===
+async function exportCurrentPDF(){
+  (window.SEM?.readInputs ? window.SEM.readInputs() : readInputs());
+  (window.SEM?.computeTotals ? window.SEM.computeTotals() : computeTotals());
+
+  const st = (window.SEM?.state || window.state);
   const assets  = window.SoukElMeuble?.assets || {};
-  const htmlInv = window.PDFView.build(state, assets);
+  const htmlInv = window.PDFView.build(st, assets);
   const cssInv  = window.PDFView.css;
 
-  const invNum    = slugForFile(state.meta.number || "");
-  const typeLabel = docTypeLabel(state.meta.docType);
+  const invNum    = slugForFile(st.meta.number || "");
+  const typeLabel = docTypeLabel(st.meta.docType);
   const fileName  = ensurePdfExt([typeLabel, invNum].filter(Boolean).join(" "));
 
   const resInv = await window.SoukElMeuble?.exportPDFFromHTML?.({
-    html: htmlInv, css: cssInv,
-    meta: { number: state.meta.number, type: state.meta.docType, filename: fileName, deferOpen: true }
+    html: htmlInv,
+    css: cssInv,
+    meta: { number: st.meta.number, docType: st.meta.docType, filename: fileName, deferOpen: true }
   });
   if (!resInv) return;
 
   let resWH = null;
-  if (state.meta?.withholding?.enabled && window.PDFWH) {
-    const htmlWH = window.PDFWH.build(state, assets);
+  if (st.meta?.withholding?.enabled && window.PDFWH) {
+    const htmlWH = window.PDFWH.build(st, assets);
     const cssWH  = window.PDFWH.css;
     const baseWH = ensurePdfExt(invNum ? `Retenue à la source - ${invNum}` : `Retenue à la source`);
     resWH = await window.SoukElMeuble?.exportPDFFromHTML?.({
-      html: htmlWH, css: cssWH,
-      meta: { number: state.meta.number, type: "retenue", filename: baseWH, deferOpen: true }
+      html: htmlWH,
+      css: cssWH,
+      meta: { number: st.meta.number, docType: "retenue", filename: baseWH, deferOpen: true }
     });
   }
 
@@ -85,7 +176,7 @@ async function exportCurrentPDF(){
     (whLabel ? "\nCertificat exporté : " + whLabel : "");
 
   const okBtnText = (() => {
-    const t = String(state.meta.docType || "").toLowerCase();
+    const t = String(st.meta.docType || "").toLowerCase();
     if (t === "facture") return "Ouvrir la facture";
     if (t === "devis")   return "Ouvrir le devis";
     if (t === "bl")      return "Ouvrir le bon de livraison";
@@ -115,4 +206,3 @@ async function exportCurrentPDF(){
     }
   });
 }
-
