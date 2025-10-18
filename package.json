@@ -1,71 +1,99 @@
 {
-"name": "facturamax",
-"version": "1.0.0",
-"description": "FacturaMax Maker (Windows) – create, save and export invoices to PDF for development, marketing, graphics and design services.",
-"main": "main.js",
-"author": "Adelhakim Sabkhi",
-"license": "MIT",
-"scripts": {
-"dev:site": "http-server ./site -p 8080 -c-1",
-"dev:renderer": "http-server ./src/renderer -p 8081 -c-1",
-"start": "electron .",
-"dist": "electron-builder --win nsis",
-  "dist:mac": "electron-builder --mac dmg,zip",
-  "dist:mac:arm64": "electron-builder --mac dmg,zip --arm64",
-  "dist:mac:x64": "electron-builder --mac dmg,zip --x64"
-},
-"devDependencies": {
-"chokidar": "^4.0.3",
-"electron": "^31.2.0",
-"electron-builder": "^24.13.3",
-"electronmon": "^2.0.3",
-"http-server": "^14.1.1"
-},
-"dependencies": {
-"html2canvas": "^1.4.1",
-"jspdf": "^3.0.3"
-},
-"build": {
-   "afterAllArtifactBuild": "scripts/trim-artifacts.js",
-  "appId": "FacturaMax",
-  "productName": "FacturaMax",
-  "directories": { "output": "dist" },
-  "files": ["main.js","preload.js","src/renderer/**","package.json"],
-  "asar": true,
-  "asarUnpack": ["**/*.node"],
-
-  "win": { "icon": "build/icon.ico", "target": ["nsis"], "artifactName": "FacturaMax-${version}.exe" },
-
-  "mac": {
-    "icon": "build/icon.icns",
-    "category": "public.app-category.productivity",
-    "hardenedRuntime": true,
-    "entitlements": "build/entitlements.mac.plist",
-    "entitlementsInherit": "build/entitlements.mac.plist",
-    "target": [
-      { "target": "dmg", "arch": ["x64","arm64"] },
-      { "target": "zip", "arch": ["x64","arm64"] }
-    ]
+  "name": "facturamax",
+  "version": "1.0.0",
+  "description": "FacturaMax Maker (Windows) – create, save and export invoices to PDF for development, marketing, graphics and design services.",
+  "main": "main.js",
+  "author": "Adelhakim Sabkhi",
+  "license": "MIT",
+  "scripts": {
+    "dev:site": "http-server ./site -p 8080 -c-1",
+    "dev:renderer": "http-server ./src/renderer -p 8081 -c-1",
+    "start": "electron .",
+    "dist": "electron-builder --win nsis",
+    "dist:mac": "electron-builder --mac dmg,zip",
+    "dist:mac:arm64": "electron-builder --mac dmg,zip --arm64",
+    "dist:mac:x64": "electron-builder --mac dmg,zip --x64",
+    "copy:pdfjs": "node scripts/copy-pdfjs.cjs",
+    "postinstall": "npm run copy:pdfjs"
   },
-  "dmg": {
-    "sign": true
+  "devDependencies": {
+    "chokidar": "^4.0.3",
+    "copyfiles": "^2.4.1",
+    "electron": "^31.2.0",
+    "electron-builder": "^24.13.3",
+    "electronmon": "^2.0.3",
+    "http-server": "^14.1.1"
   },
-
-"nsis": {
-"installerIcon": "build/icon.ico",
-"installerHeaderIcon": "build/icon.ico",
-    "uninstallerIcon": "build/icon.ico",
-    "oneClick": false,
-    "perMachine": false,
-    "allowToChangeInstallationDirectory": false,
-"displayLanguageSelector": true,
-"installerLanguages": [
-"fr_FR"
-],
-"createDesktopShortcut": true,
-"createStartMenuShortcut": true,
-"shortcutName": "FacturaMax"
-},
-"compression": "maximum"
+  "dependencies": {
+    "html2canvas": "^1.4.1",
+    "jspdf": "^3.0.3",
+    "pdfjs-dist": "^3.11.174"
+  },
+  "build": {
+    "afterAllArtifactBuild": "scripts/trim-artifacts.js",
+    "appId": "FacturaMax",
+    "productName": "FacturaMax",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "src/renderer/**",
+      "package.json"
+    ],
+    "asar": true,
+    "asarUnpack": [
+      "**/*.node"
+    ],
+    "win": {
+      "icon": "build/icon.ico",
+      "target": [
+        "nsis"
+      ],
+      "artifactName": "FacturaMax-${version}.exe"
+    },
+    "mac": {
+      "icon": "build/icon.icns",
+      "category": "public.app-category.productivity",
+      "hardenedRuntime": true,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
+      ]
+    },
+    "dmg": {
+      "sign": true
+    },
+    "nsis": {
+      "installerIcon": "build/icon.ico",
+      "installerHeaderIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": false,
+      "displayLanguageSelector": true,
+      "installerLanguages": [
+        "fr_FR"
+      ],
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "FacturaMax"
+    },
+    "compression": "maximum"
+  }
 }
-}                                             

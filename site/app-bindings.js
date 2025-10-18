@@ -41,6 +41,51 @@
     SEM.refreshSealPreview();
   };
 
+  // Load seal image from a File (image/* or application/pdf)
+  SEM.loadSealFromFile = async function (file) {
+    if (!file) return;
+
+    // Case 1: image file
+    if (file.type && file.type.startsWith("image/")) {
+      const reader = new FileReader();
+      reader.onload = () => SEM.setSealImage(String(reader.result || ""));
+      reader.readAsDataURL(file);
+      return;
+    }
+
+    // Case 2: PDF -> render first page with pdf.js (must be loaded locally)
+    if (file.type === "application/pdf") {
+      if (!w.pdfjsLib) {
+        await showDialog(
+          "Impossible de lire le PDF sans pdf.js. Veuillez l’installer/charger localement, ou joignez une image.",
+          { title: "Cachet PDF" }
+        );
+        return;
+      }
+      try {
+        const buf = await file.arrayBuffer();
+        const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+        const page = await pdf.getPage(1);
+        const viewport = page.getViewport({ scale: 2.0 });
+        const canvas = document.createElement("canvas");
+        const ctx = canvas.getContext("2d");
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+        await page.render({ canvasContext: ctx, viewport }).promise;
+        const dataUrl = canvas.toDataURL("image/png", 0.92);
+        SEM.setSealImage(dataUrl);
+      } catch (err) {
+        console.error(err);
+        await showDialog("Échec du chargement du PDF. Essayez un autre fichier ou convertissez-le en image.", {
+          title: "Cachet PDF"
+        });
+      }
+      return;
+    }
+
+    await showDialog("Format de fichier non supporté. Joignez une image ou un PDF.", { title: "Cachet" });
+  };
+
   // ───────── existing bindings ─────────
   SEM.updateClientIdLabel = function () {
     const type = state().client?.type === "particulier" ? "particulier" : "societe";
@@ -348,7 +393,7 @@
       map.forEach(([id, set]) => getEl(id)?.addEventListener("input", () => { set(getStr(id, "")); SEM.saveCompanyToLocal(); }));
     }
 
-    // Seal (cachet) listeners
+    // Seal (cachet) listeners — keep only file picker (images + PDF)
     const sealCb = getEl("sealEnabled");
     if (sealCb) {
       sealCb.addEventListener("change", () => {
@@ -363,98 +408,14 @@
     const pickBtn = getEl("btnPickSeal");
     if (pickBtn) {
       pickBtn.addEventListener("click", async () => {
-        // Hidden <input type="file"> to pick image
         const inp = document.createElement("input");
         inp.type = "file";
-        inp.accept = "image/*";
-        // mobile hint to open camera as well:
-        inp.setAttribute("capture", "environment");
-        inp.onchange = () => {
+        inp.accept = "image/*,application/pdf"; // allow images + PDF
+        inp.onchange = async () => {
           const f = inp.files && inp.files[0];
-          if (!f) return;
-          const reader = new FileReader();
-          reader.onload = () => {
-            SEM.setSealImage(String(reader.result || ""));
-          };
-          reader.readAsDataURL(f);
+          await SEM.loadSealFromFile(f);
         };
         inp.click();
-      });
-    }
-
-    const scanBtn = getEl("btnScanSeal");
-    if (scanBtn) {
-      scanBtn.addEventListener("click", async () => {
-        // very small camera overlay for a single capture
-        const overlay = document.createElement("div");
-        overlay.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:9999;";
-        const box = document.createElement("div");
-        box.style.cssText = "background:#111;color:#fff;border-radius:10px;padding:16px;min-width:320px;display:grid;gap:8px;justify-items:center";
-        const video = document.createElement("video");
-        video.autoplay = true; video.playsInline = true; video.style.maxWidth = "520px";
-        const btns = document.createElement("div"); btns.style.display = "flex"; btns.style.gap = "8px";
-        const take = document.createElement("button"); take.className = "btn"; take.textContent = "Capturer";
-        const cancel = document.createElement("button"); cancel.className = "btn"; cancel.textContent = "Annuler";
-        btns.appendChild(take); btns.appendChild(cancel);
-        box.appendChild(video); box.appendChild(btns); overlay.appendChild(box); document.body.appendChild(overlay);
-
-        let stream = null;
-        try {
-          stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: false });
-          video.srcObject = stream;
-        } catch (err) {
-          console.error(err);
-          await showDialog("Impossible d’accéder à la caméra.", { title: "Scanner le cachet" });
-          overlay.remove();
-          return;
-        }
-
-        const cleanup = () => {
-          if (stream) stream.getTracks().forEach(t => t.stop());
-          overlay.remove();
-        };
-        cancel.onclick = cleanup;
-        take.onclick = () => {
-          // draw current frame to canvas
-          const wv = video.videoWidth || 640;
-          const hv = video.videoHeight || 480;
-          const canvas = document.createElement("canvas");
-          canvas.width = wv; canvas.height = hv;
-          const ctx = canvas.getContext("2d");
-          ctx.drawImage(video, 0, 0, wv, hv);
-          const dataUrl = canvas.toDataURL("image/png", 0.92);
-          SEM.setSealImage(dataUrl);
-          cleanup();
-        };
-      });
-    }
-
-    // Drag & drop + paste for seal
-    const drop = getEl("sealDrop");
-    if (drop) {
-      ["dragenter","dragover"].forEach(ev =>
-        drop.addEventListener(ev, e => { e.preventDefault(); e.dataTransfer.dropEffect = "copy"; })
-      );
-      drop.addEventListener("drop", e => {
-        e.preventDefault();
-        const f = e.dataTransfer.files && e.dataTransfer.files[0];
-        if (!f) return;
-        const reader = new FileReader();
-        reader.onload = () => SEM.setSealImage(String(reader.result || ""));
-        reader.readAsDataURL(f);
-      });
-      drop.addEventListener("paste", e => {
-        const items = e.clipboardData && e.clipboardData.items;
-        if (!items) return;
-        for (const it of items) {
-          if (it.type && it.type.startsWith("image/")) {
-            const file = it.getAsFile();
-            const reader = new FileReader();
-            reader.onload = () => SEM.setSealImage(String(reader.result || ""));
-            reader.readAsDataURL(file);
-            break;
-          }
-        }
       });
     }
 

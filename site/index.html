@@ -310,7 +310,7 @@
                 />
               </label>
 
-              <!-- ───────── Cachet de l’entreprise (ajout) ───────── -->
+              <!-- ───────── Cachet de l’entreprise (scan & dropzone retirés) ───────── -->
               <div class="full" style="margin-top: 8px">
                 <div class="label-inline" style="margin-bottom: 6px">
                   <span class="label-text">Afficher le cachet</span>
@@ -322,22 +322,6 @@
                     <button id="btnPickSeal" type="button" class="btn">
                       Joindre un cachet scanné…
                     </button>
-                    <button id="btnScanSeal" type="button" class="btn">
-                      Scanner le cachet (caméra)
-                    </button>
-                  </div>
-
-                  <div
-                    id="sealDrop"
-                    class="muted"
-                    style="
-                      border: 1px dashed #999;
-                      padding: 10px;
-                      border-radius: 8px;
-                      margin-top: 10px;
-                    "
-                  >
-                    Glissez-déposez un fichier ici ou collez (Ctrl+V) une image
                   </div>
 
                   <div
@@ -823,14 +807,18 @@
     </div>
 
     <script src="./lib/html2canvas.min.js" defer></script>
-    <script src="./lib/jspdf.umd.min.js" defer></script>
-    <script src="./web-shim.js" defer></script>
-    <script src="./pdfView.js" defer></script>
-    <script src="./pdfWH.js" defer></script>
-    <script src="helpers.js"></script>
-    <script src="app-state.js"></script>
-    <script src="app-bindings.js"></script>
-    <script src="app-init.js"></script>
-    <script src="app-export.js"></script>
+<script src="./lib/jspdf.umd.min.js" defer></script>
+<script src="./web-shim.js" defer></script>
+<script src="./pdfView.js" defer></script>
+<script src="./pdfWH.js" defer></script>
+<script src="helpers.js"></script>
+<script src="app-state.js"></script>
+
+<!-- pdf.js (for importing PDF cachets) -->
+<script src="./lib/pdfs/pdf.min.js" defer></script>
+
+<script src="app-bindings.js"></script>
+<script src="app-init.js"></script>
+<script src="app-export.js"></script>
   </body>
 </html>
