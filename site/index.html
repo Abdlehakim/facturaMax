@@ -277,33 +277,87 @@
 
           <fieldset class="section-box">
             <legend>Informations entreprise :</legend>
+
             <div class="grid two">
-              <label
-                >Nom de l’entreprise
+              <label>
+                Nom de l’entreprise
                 <input id="companyName" placeholder="SoukElMeuble SARL" />
               </label>
-              <label
-                >Identifiant fiscal / TVA
+
+              <label>
+                Identifiant fiscal / TVA
                 <input id="companyVat" placeholder="1891628/W/A/M000" />
               </label>
-              <label
-                >Téléphone
+
+              <label>
+                Téléphone
                 <input id="companyPhone" placeholder="+216 27 673 561" />
               </label>
-              <label
-                >E-mail
+
+              <label>
+                E-mail
                 <input
                   id="companyEmail"
                   placeholder="contact@SoukElMeuble.com"
                 />
               </label>
-              <label class="full"
-                >Adresse
+
+              <label class="full">
+                Adresse
                 <input
                   id="companyAddress"
                   placeholder="Rue Mahbouba Soussia 2080 Teboulba"
                 />
               </label>
+
+              <!-- ───────── Cachet de l’entreprise (ajout) ───────── -->
+              <div class="full" style="margin-top: 8px">
+                <div class="label-inline" style="margin-bottom: 6px">
+                  <span class="label-text">Afficher le cachet</span>
+                  <input id="sealEnabled" type="checkbox" class="col-toggle" />
+                </div>
+
+                <div id="sealFields" style="display: none">
+                  <div class="grid two" style="gap: 12px; align-items: center">
+                    <button id="btnPickSeal" type="button" class="btn">
+                      Joindre un cachet scanné…
+                    </button>
+                    <button id="btnScanSeal" type="button" class="btn">
+                      Scanner le cachet (caméra)
+                    </button>
+                  </div>
+
+                  <div
+                    id="sealDrop"
+                    class="muted"
+                    style="
+                      border: 1px dashed #999;
+                      padding: 10px;
+                      border-radius: 8px;
+                      margin-top: 10px;
+                    "
+                  >
+                    Glissez-déposez un fichier ici ou collez (Ctrl+V) une image
+                  </div>
+
+                  <div
+                    id="sealPreviewWrap"
+                    class="muted"
+                    style="margin-top: 10px; display: none"
+                  >
+                    <img
+                      id="sealPreview"
+                      alt="Aperçu cachet"
+                      style="
+                        max-width: 220px;
+                        max-height: 160px;
+                        display: block;
+                      "
+                    />
+                  </div>
+                </div>
+              </div>
+              <!-- ───────── fin cachet ───────── -->
             </div>
           </fieldset>
 

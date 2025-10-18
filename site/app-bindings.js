@@ -3,6 +3,45 @@
   const SEM = (w.SEM = w.SEM || {});
   const state = () => SEM.state;
 
+  // ───────── helpers for the SEAL (cachet) feature ─────────
+  SEM.toggleSealFields = function (enabled) {
+    const f = getEl("sealFields");
+    if (f) f.style.display = enabled ? "" : "none";
+  };
+
+  SEM.refreshSealPreview = function () {
+    const st = state();
+    const wrap = getEl("sealPreviewWrap");
+    const img  = getEl("sealPreview");
+    if (!wrap || !img) return;
+
+    const seal = st.company?.seal || {};
+    if (seal.enabled && seal.image) {
+      img.src = seal.image;
+      wrap.style.display = "";
+    } else {
+      img.src = "";
+      wrap.style.display = "none";
+    }
+  };
+
+  SEM.setSealImage = function (dataUrl) {
+    const st = state();
+    st.company = st.company || {};
+    st.company.seal = st.company.seal || {
+      enabled: false,
+      image: "",
+      maxWidthMm: 38,
+      maxHeightMm: 38,
+      opacity: 0.88,
+      rotateDeg: -2
+    };
+    st.company.seal.image = dataUrl || "";
+    if (st.company.seal.image) st.company.seal.enabled = true;
+    SEM.refreshSealPreview();
+  };
+
+  // ───────── existing bindings ─────────
   SEM.updateClientIdLabel = function () {
     const type = state().client?.type === "particulier" ? "particulier" : "societe";
     const labelText = type === "particulier" ? "CIN / passeport" : "Identifiant fiscal / TVA";
@@ -42,12 +81,16 @@
     const ex = state().meta.extras || {};
     const cur = state().meta.currency || "TND";
 
-    const shipTT = (ex.shipping?.enabled) ? (Number(ex.shipping.amount || 0) * (1 + Number(ex.shipping.tva || 0) / 100)) : 0;
+    const shipTT = (ex.shipping?.enabled)
+      ? (Number(ex.shipping.amount || 0) * (1 + Number(ex.shipping.tva || 0) / 100))
+      : 0;
     if (getEl("miniShipLabel")) setText("miniShipLabel", ex.shipping?.label?.trim() || "Frais de livraison");
     if (getEl("miniShip")) setText("miniShip", formatMoney(shipTT, cur));
     if (getEl("miniShipRow")) getEl("miniShipRow").style.display = ex.shipping?.enabled ? "" : "none";
 
-    const stampTT = (ex.stamp?.enabled) ? (Number(ex.stamp.amount || 0) * (1 + Number(ex.stamp.tva || 0) / 100)) : 0;
+    const stampTT = (ex.stamp?.enabled)
+      ? (Number(ex.stamp.amount || 0) * (1 + Number(ex.stamp.tva || 0) / 100))
+      : 0;
     if (getEl("miniStampLabel")) setText("miniStampLabel", ex.stamp?.label?.trim() || "Timbre fiscal");
     if (getEl("miniStamp")) setText("miniStamp", formatMoney(stampTT, cur));
     if (getEl("miniStampRow")) getEl("miniStampRow").style.display = ex.stamp?.enabled ? "" : "none";
@@ -61,6 +104,13 @@
         el.value = st.company[key] || "";
         if (SEM.COMPANY_LOCKED) { el.readOnly = true; el.classList.add("locked"); el.setAttribute("tabindex", "-1"); }
       });
+
+    // Seal (cachet): initialize checkbox + fields + preview
+    const seal = st.company?.seal || {};
+    const sealCb = getEl("sealEnabled");
+    if (sealCb) sealCb.checked = !!seal.enabled;
+    SEM.toggleSealFields(!!seal.enabled);
+    SEM.refreshSealPreview();
 
     setVal("docType",  st.meta.docType || "facture");
     setVal("invNumber", st.meta.number);
@@ -298,6 +348,117 @@
       map.forEach(([id, set]) => getEl(id)?.addEventListener("input", () => { set(getStr(id, "")); SEM.saveCompanyToLocal(); }));
     }
 
+    // Seal (cachet) listeners
+    const sealCb = getEl("sealEnabled");
+    if (sealCb) {
+      sealCb.addEventListener("change", () => {
+        const st = state();
+        st.company.seal = st.company.seal || {};
+        st.company.seal.enabled = !!sealCb.checked;
+        SEM.toggleSealFields(st.company.seal.enabled);
+        SEM.refreshSealPreview();
+      });
+    }
+
+    const pickBtn = getEl("btnPickSeal");
+    if (pickBtn) {
+      pickBtn.addEventListener("click", async () => {
+        // Hidden <input type="file"> to pick image
+        const inp = document.createElement("input");
+        inp.type = "file";
+        inp.accept = "image/*";
+        // mobile hint to open camera as well:
+        inp.setAttribute("capture", "environment");
+        inp.onchange = () => {
+          const f = inp.files && inp.files[0];
+          if (!f) return;
+          const reader = new FileReader();
+          reader.onload = () => {
+            SEM.setSealImage(String(reader.result || ""));
+          };
+          reader.readAsDataURL(f);
+        };
+        inp.click();
+      });
+    }
+
+    const scanBtn = getEl("btnScanSeal");
+    if (scanBtn) {
+      scanBtn.addEventListener("click", async () => {
+        // very small camera overlay for a single capture
+        const overlay = document.createElement("div");
+        overlay.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:9999;";
+        const box = document.createElement("div");
+        box.style.cssText = "background:#111;color:#fff;border-radius:10px;padding:16px;min-width:320px;display:grid;gap:8px;justify-items:center";
+        const video = document.createElement("video");
+        video.autoplay = true; video.playsInline = true; video.style.maxWidth = "520px";
+        const btns = document.createElement("div"); btns.style.display = "flex"; btns.style.gap = "8px";
+        const take = document.createElement("button"); take.className = "btn"; take.textContent = "Capturer";
+        const cancel = document.createElement("button"); cancel.className = "btn"; cancel.textContent = "Annuler";
+        btns.appendChild(take); btns.appendChild(cancel);
+        box.appendChild(video); box.appendChild(btns); overlay.appendChild(box); document.body.appendChild(overlay);
+
+        let stream = null;
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: false });
+          video.srcObject = stream;
+        } catch (err) {
+          console.error(err);
+          await showDialog("Impossible d’accéder à la caméra.", { title: "Scanner le cachet" });
+          overlay.remove();
+          return;
+        }
+
+        const cleanup = () => {
+          if (stream) stream.getTracks().forEach(t => t.stop());
+          overlay.remove();
+        };
+        cancel.onclick = cleanup;
+        take.onclick = () => {
+          // draw current frame to canvas
+          const wv = video.videoWidth || 640;
+          const hv = video.videoHeight || 480;
+          const canvas = document.createElement("canvas");
+          canvas.width = wv; canvas.height = hv;
+          const ctx = canvas.getContext("2d");
+          ctx.drawImage(video, 0, 0, wv, hv);
+          const dataUrl = canvas.toDataURL("image/png", 0.92);
+          SEM.setSealImage(dataUrl);
+          cleanup();
+        };
+      });
+    }
+
+    // Drag & drop + paste for seal
+    const drop = getEl("sealDrop");
+    if (drop) {
+      ["dragenter","dragover"].forEach(ev =>
+        drop.addEventListener(ev, e => { e.preventDefault(); e.dataTransfer.dropEffect = "copy"; })
+      );
+      drop.addEventListener("drop", e => {
+        e.preventDefault();
+        const f = e.dataTransfer.files && e.dataTransfer.files[0];
+        if (!f) return;
+        const reader = new FileReader();
+        reader.onload = () => SEM.setSealImage(String(reader.result || ""));
+        reader.readAsDataURL(f);
+      });
+      drop.addEventListener("paste", e => {
+        const items = e.clipboardData && e.clipboardData.items;
+        if (!items) return;
+        for (const it of items) {
+          if (it.type && it.type.startsWith("image/")) {
+            const file = it.getAsFile();
+            const reader = new FileReader();
+            reader.onload = () => SEM.setSealImage(String(reader.result || ""));
+            reader.readAsDataURL(file);
+            break;
+          }
+        }
+      });
+    }
+
+    // ——— the rest of the listeners ———
     getEl("docType") ?.addEventListener("change", () => { state().meta.docType = getStr("docType", state().meta.docType); });
     getEl("invNumber")?.addEventListener("input",  () => { state().meta.number  = getStr("invNumber", state().meta.number); });
     getEl("invDate")  ?.addEventListener("input",  () => { state().meta.date    = getStr("invDate",   state().meta.date); });

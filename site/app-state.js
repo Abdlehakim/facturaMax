@@ -2,7 +2,6 @@
 (function (w) {
   const SEM = (w.SEM = w.SEM || {});
 
-  // === Public state & constants ===
   SEM.state = {
     company: {
       name: "SoukElMeuble",
@@ -10,7 +9,16 @@
       phone: "+216 27 673 561",
       email: "contact@SoukElMeuble.com",
       address: "Rue Mahbouba Soussia 2080 Teboulba",
-      logo: ""
+      logo: "",
+      // Unified seal structure
+      seal: {
+        enabled: false,
+        image: "",        // data URL
+        maxWidthMm: 38,
+        maxHeightMm: 38,
+        opacity: 0.88,
+        rotateDeg: -2
+      }
     },
     client: { type: "societe", name: "", email: "", phone: "", address: "", vat: "" },
     meta: {
@@ -35,7 +43,6 @@
   SEM.IS_DESKTOP = !!(w.SoukElMeuble && typeof w.SoukElMeuble.openPath === "function");
   SEM.IS_WEB = !SEM.IS_DESKTOP;
 
-  // === Persistence for company (optional when unlocked) ===
   SEM.saveCompanyToLocal = function () {
     if (SEM.COMPANY_LOCKED) return;
     try { localStorage.setItem("swb_company", JSON.stringify(SEM.state.company)); } catch {}
@@ -49,7 +56,6 @@
     } catch {}
   };
 
-  // === Totals (pure) ===
   SEM.computeTotalsReturn = function () {
     const st = SEM.state;
     const currency = st.meta.currency || "TND";
@@ -124,7 +130,6 @@
     };
   };
 
-  // === Read inputs -> state (mutates) ===
   SEM.readInputs = function () {
     const st = SEM.state;
 
@@ -135,6 +140,10 @@
       st.company.email   = getStr("companyEmail", st.company.email);
       st.company.address = getStr("companyAddress", st.company.address);
     }
+    // Seal toggle always syncs from UI if present
+    const sealCb = getEl("sealEnabled");
+    st.company.seal = st.company.seal || {};
+    if (sealCb) st.company.seal.enabled = !!sealCb.checked;
 
     st.meta.docType  = getStr("docType", st.meta.docType) || st.meta.docType;
     st.meta.number   = getStr("invNumber", st.meta.number);
@@ -178,7 +187,6 @@
     f.tva     = getNum("fodecTva",  f.tva ?? 19);
   };
 
-  // === Snapshot (for saving) ===
   SEM.captureForm = function (opts = {}) {
     const { includeCompany = true } = opts;
     SEM.readInputs();
@@ -194,7 +202,6 @@
     };
   };
 
-  // === Utils available to other files ===
   SEM.newInvoice = function () {
     const st = SEM.state;
     st.client = { type:"societe", name:"", email:"", phone:"", address:"", vat:"" };
@@ -209,6 +216,7 @@
     };
     st.notes = "";
     st.items = [{ ref: "SKU-001", product: "Ordinateur portable", desc: "Garantie 2 ans", qty: 1, price: 1000, tva: 19, discount: 0 }];
+    // Do not touch st.company or st.company.seal here.
   };
 
 })(window);

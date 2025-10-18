@@ -1,5 +1,5 @@
 (function (global) {
-const PDF_CSS = `
+  const PDF_CSS = `
 :root{
   --invoice-font: -apple-system, BlinkMacSystemFont, "Segoe UI",
                   Arial, "Helvetica Neue", Helvetica, "Liberation Sans", Roboto, "Noto Sans", sans-serif;
@@ -20,7 +20,7 @@ body.print-mode #pdfRoot {
 .pdf-page{
   position:relative;
   width:210mm;
-  height:296.5mm;            /* <— slightly under 297mm to avoid rounding spill */
+  height:296.5mm;            /* slight under 297mm to avoid rounding spill */
   background:#ffffff; color:#000000;
   padding:16mm 14mm;
   box-sizing:border-box;
@@ -35,7 +35,7 @@ body.print-mode #pdfRoot {
   break-after: avoid-page;
 }
 .pdf-page:last-child{
-  page-break-after: avoid;    /* extra safety: no blank after last */
+  page-break-after: avoid;
   break-after: avoid-page;
 }
 
@@ -48,8 +48,40 @@ body.print-mode #pdfRoot {
 .title-divider-bot {height:1px; background:#15335e; margin:8px 0px; width:200px}
 .pdf-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:18px;font-size:14px}
 .pdf-small{font-size:12px}
+.section-box{
+  position: relative;
+  border: none;
+  border-radius: 6px;
+  padding: 16px;
+  background: #fff;
+}
+.section-box::before{
+  content: "";
+  position: absolute;
+  inset: 0;
+  border: 1.5px solid #15335e;
+  border-radius: 6px;
+  z-index: 0;
+  pointer-events: none;
+}
+.section-box > legend{
+  position: absolute;
+  top: 0;
+  left: 14px;
+  transform: translateY(-50%);
+  margin: 0;
+  padding: 0 8px;
+  font-weight: 700;
+  color: #15335e;
+  background: #ffffff;
+  line-height: 1.1;
+  z-index: 1;
+  display: inline-block;
+}
+
 .pdf-meta{background:#f9fafb;padding:12px;border-radius:5px;margin-top:12px; width:280px}
 .pdf-meta-grid{display:grid;grid-template-columns:1fr 1fr;gap:3px;font-size:12px}
+
 .tableDiv{ margin-top:20px; border-radius:5px; border:2px solid #15335e; overflow-x:auto; height:350px }
 .pdf-table{ width:100%; font-size:10px; table-layout:auto; font-family: var(--invoice-font); }
 .pdf-table th,.pdf-table td{ padding:4px; vertical-align:top }
@@ -63,6 +95,10 @@ body.print-mode #pdfRoot {
 .pdf-table tbody td:nth-child(6),  tbody td:nth-child(7){  white-space: nowrap; }
 .pdf-table tbody tr td { border-bottom: 1px solid #15335e; }
 .pdf-table tbody tr:last-child td { border-bottom: 0; }
+.pdf-table thead th:nth-child(6),
+.pdf-table thead th:nth-child(7){
+  white-space: nowrap;
+}
 
 .pdf-mini-sum{
   border:2px solid #15335e;
@@ -99,7 +135,7 @@ body.print-mode #pdfRoot {
 .pdf-sign{ text-align:left; font-size:12px; }
 .pdf-sign-line{ font-size:9px; margin:0; border-top:1px solid #000; width:150px; }
 
-/* Keep this block from growing too tall */
+/* Amount-in-words block */
 .pdf-amount-words{
   position: absolute;
   display: flex;
@@ -112,39 +148,18 @@ body.print-mode #pdfRoot {
   line-height: 1.25;
   font-weight: 500;
 }
-.section-box{
-  position: relative;
-  border: none;              /* we’ll draw our own border */
-  border-radius: 6px;
-  padding: 16px;             /* leave space inside */
-  background: #fff;
-}
 
-/* draw the full border behind everything (including the legend) */
-.section-box::before{
-  content: "";
-  position: absolute;
-  inset: 0;
-  border: 1.5px solid #15335e;
-  border-radius: 6px;
-  z-index: 0;                /* behind text */
-  pointer-events: none;
-}
-
-/* put the legend text ON the border line and mask the border under it */
-.section-box > legend{
-  position: absolute;
-  top: 0;
-  left: 14px;
-  transform: translateY(-50%);
-  margin: 0;
-  padding: 0 8px;           /* a bit more side padding to create the gap */
-  font-weight: 700;
-  color: #15335e;
-  background: #ffffff;      /* << mask the border behind the label */
-  line-height: 1.1;         /* ensures enough white height for the mask */
-  z-index: 1;
-  display: inline-block;    /* make the background box take effect */
+/* Seal (cachet) rendering */
+.pdf-seal{
+  position:absolute;
+  right:18mm;
+  bottom:34mm;              /* above the signature line */
+  max-width:38mm;
+  max-height:38mm;
+  opacity:0.88;             /* slightly transparent for stamp effect */
+  object-fit:contain;
+  pointer-events:none;
+  transform: rotate(-2deg); /* tiny rotation gives a stamp vibe */
 }
 
 .pdf-notes{
@@ -158,10 +173,6 @@ body.print-mode #pdfRoot {
 .pdf-notes-title{
   font-weight: 400;
   letter-spacing: .02em;
-}
-  .pdf-table thead th:nth-child(6),
-.pdf-table thead th:nth-child(7){
-  white-space: nowrap;
 }
 `;
 
@@ -194,6 +205,7 @@ body.print-mode #pdfRoot {
     cssInjected = true;
   }
 
+  // very small French number words (fallback if n2words is not present)
   function wordsFR(n) {
     if (typeof window !== "undefined" && window.n2words) return window.n2words(n, { lang: "fr" });
     const UNITS = ["zéro","un","deux","trois","quatre","cinq","six","sept","huit","neuf","dix","onze","douze","treize","quatorze","quinze","seize"];
@@ -290,6 +302,14 @@ body.print-mode #pdfRoot {
     const stampTVA     = stampHT * (stampTVApc / 100);
     const stampTTC     = stampHT + stampTVA;
 
+    // Seal (cachet)
+    const sealEnabled   = !!company?.seal?.enabled;
+    const sealDataUrl   = company?.seal?.image || "";
+    const sealMaxWidth  = Number(company?.seal?.maxWidthMm || 38);  // mm
+    const sealMaxHeight = Number(company?.seal?.maxHeightMm || 38); // mm
+    const sealOpacity   = Math.max(0, Math.min(1, Number(company?.seal?.opacity ?? 0.88)));
+    const sealRotateDeg = Number(company?.seal?.rotateDeg ?? -2);
+
     const cur   = meta.currency || "TND";
     const logo  = assets?.logo || company.logo || "./assets/logoIMG.png";
     const type  = getDocType(meta);
@@ -302,7 +322,8 @@ body.print-mode #pdfRoot {
     };
     const { DOC_LABEL, NUM_LABEL, SHOW_WORDS } = MAP[type];
 
-    const wordsHeader =
+    // FIX: use a single declaration name
+    const wordsHeaderText =
       type === "devis"   ? "Arrêté le présent devis à la somme de&nbsp;:"
     : type === "facture" ? "Arrêté la présente facture à la somme de&nbsp;:"
     : "";
@@ -395,21 +416,20 @@ body.print-mode #pdfRoot {
     const totalTVA_disp   = totalTVA_items + (shipEnabled ? shipTVA : 0) + (fEnabled ? fodecTVA: 0);
     const totalTTC_all    = totalHT_display + totalTVA_disp + (stampEnabled ? stampTTC : 0);
 
-    // Amount in words target
+    // Amount in words
     const wordsTarget       = totalTTC_all;
     const wordsTgtText      = SHOW_WORDS ? amountInWords(wordsTarget, cur) : "";
-    const wordsHeaderFinal  = wordsHeader;
+    const wordsHeaderFinal  = wordsHeaderText;
 
     // Mini summary rows
     const miniRows = [];
     if (shipEnabled && shipHT > 0) {
       miniRows.push(`<tr><td>${esc(shipLabel)}</td><td class="right">${fmtMoney(shipTTC, cur)}</td></tr>`);
     }
-    // FODEC row BEFORE Total HT, showing FODEC HT amount
-  if (fEnabled) {
-  const rateTxt = Number.isFinite(fRate) ? ` (${fRate}%)` : "";
-  miniRows.push(`<tr><td>${esc(fLabel)}${rateTxt}</td><td class="right">${fmtMoney(fodecHT, cur)}</td></tr>`);
-}
+    if (fEnabled) {
+      const rateTxt = Number.isFinite(fRate) ? ` (${fRate}%)` : "";
+      miniRows.push(`<tr><td>${esc(fLabel)}${rateTxt}</td><td class="right">${fmtMoney(fodecHT, cur)}</td></tr>`);
+    }
     miniRows.push(
       `<tr class="head"><th>Total HT</th><th class="right">${fmtMoney(totalHT_display, cur)}</th></tr>`,
       `<tr><td>TVA</td><td class="right">${fmtMoney(totalTVA_disp, cur)}</td></tr>`
@@ -464,6 +484,20 @@ body.print-mode #pdfRoot {
              ${notesHTML}
            </div>`
         : "";
+
+    // Optional seal image HTML
+    const sealHtml = (sealEnabled && sealDataUrl)
+      ? `<img class="pdf-seal"
+               src="${sealDataUrl}"
+               alt="Cachet"
+               style="
+                 max-width:${sealMaxWidth}mm;
+                 max-height:${sealMaxHeight}mm;
+                 opacity:${sealOpacity};
+                 transform: rotate(${sealRotateDeg}deg);
+               "
+         />`
+      : "";
 
     return `
       <div class="pdf-page">
@@ -529,6 +563,8 @@ body.print-mode #pdfRoot {
             <p style="margin-top:0px;font-size:12px">Merci pour votre confiance&nbsp;!</p>
           </div>
         </div>
+
+        ${sealHtml}
       </div>`;
   }
 
