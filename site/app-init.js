@@ -1,3 +1,4 @@
+// ───────── app-init.js ─────────
 (function (w) {
   const SEM = (w.SEM = w.SEM || {});
 
@@ -12,7 +13,7 @@
     qty: "colToggleQty",
     price: "colTogglePrice",
     tva: "colToggleTva",
-    discount: "colToggleDiscount"
+    discount: "colToggleDiscount",
   };
 
   const CLIENTS_DIR_KEY = "clientsDirHandle";
@@ -28,7 +29,7 @@
       vat: getStr("clientVat"),
       phone: getStr("clientPhone"),
       email: getStr("clientEmail"),
-      address: getStr("clientAddress")
+      address: getStr("clientAddress"),
     };
   }
   function fillClientToForm(c = {}) {
@@ -69,7 +70,7 @@
       qty: isEnabled("qty"),
       price: isEnabled("price"),
       tva: isEnabled("tva"),
-      discount: isEnabled("discount")
+      discount: isEnabled("discount"),
     };
     return {
       ref: getStr("addRef"),
@@ -79,7 +80,7 @@
       price: getNum("addPrice", 0),
       tva: getNum("addTva", 19),
       discount: getNum("addDiscount", 0),
-      use
+      use,
     };
   }
   function fillArticleToForm(a = {}) {
@@ -99,7 +100,11 @@
     }
   }
   function pickSuggestedName(a) {
-    const u = { ref: isEnabled("ref"), product: isEnabled("product"), desc: isEnabled("desc") };
+    const u = {
+      ref: isEnabled("ref"),
+      product: isEnabled("product"),
+      desc: isEnabled("desc"),
+    };
     const ref = String(a.ref || "").trim();
     const product = String(a.product || "").trim();
     const desc = String(a.desc || "").trim();
@@ -141,73 +146,64 @@
     return String(s).trim().replace(/[\/\\:*?"<>|]/g, "-").replace(/\s+/g, " ").slice(0, 80) || "Societe";
   }
 
-  async function resetStoredHandles() {
-    await idbSet(DOCS_ROOT_KEY, null);
-    await idbSet(ARTICLES_DIR_KEY, null);
-    await idbSet(CLIENTS_DIR_KEY, null);
+  async function pickWritableBaseDir() {
+    const handle = await window.showDirectoryPicker({ id: "sem-company-folder", mode: "readwrite", startIn: "documents" });
+    const p = await handle.requestPermission({ mode: "readwrite" });
+    if (p !== "granted") throw new Error("permission denied");
+    return handle;
   }
 
-  async function getDocsRootHandle(retry) {
-    let root = await idbGet(DOCS_ROOT_KEY);
+  async function getCompanyBaseDirHandle() {
+    let base = await idbGet(DOCS_ROOT_KEY);
     try {
-      if (!root) {
-        if (!window.showDirectoryPicker) throw new Error("showDirectoryPicker not supported");
-        root = await window.showDirectoryPicker({ id: "sem-docs-root", mode: "readwrite", startIn: "documents" });
-        await idbSet(DOCS_ROOT_KEY, root);
+      if (base) {
+        const p = await base.requestPermission({ mode: "readwrite" });
+        if (p === "granted") {
+          await base.getDirectoryHandle(".", { create: false }).catch(() => {});
+          await base.getDirectoryHandle("Articles", { create: true });
+          await base.getDirectoryHandle("Clients", { create: true });
+          return base;
+        }
       }
-      const p = await root.requestPermission({ mode: "readwrite" });
-      if (p !== "granted") throw new Error("permission denied");
-      return root;
-    } catch {
-      if (retry) throw new Error("root failed");
-      await resetStoredHandles();
-      return getDocsRootHandle(true);
-    }
+    } catch {}
+    const picked = await pickWritableBaseDir();
+    await idbSet(DOCS_ROOT_KEY, picked);
+    await picked.getDirectoryHandle("Articles", { create: true });
+    await picked.getDirectoryHandle("Clients", { create: true });
+    return picked;
   }
 
-  async function getCompanyBaseDirHandle(retry) {
+  async function getArticlesFolderHandle() {
     try {
-      const root = await getDocsRootHandle(false);
-      const companyName = getStr?.("companyName")?.trim() || (window.SEM?.state?.company?.name || "").trim() || "Societe";
-      const folder = safeCompanyFolderName(companyName);
-      const base = await root.getDirectoryHandle(folder, { create: true });
-      await base.getDirectoryHandle("Articles", { create: true });
-      await base.getDirectoryHandle("Clients", { create: true });
-      return base;
-    } catch {
-      if (retry) throw new Error("base failed");
-      await resetStoredHandles();
-      return getCompanyBaseDirHandle(true);
-    }
-  }
-
-  async function getArticlesFolderHandle(retry) {
-    try {
-      const base = await getCompanyBaseDirHandle(false);
+      const base = await getCompanyBaseDirHandle();
       const dir = await base.getDirectoryHandle("Articles", { create: true });
       const p = await dir.requestPermission({ mode: "readwrite" });
       if (p !== "granted") throw new Error("permission denied");
       await idbSet(ARTICLES_DIR_KEY, dir);
       return dir;
     } catch {
-      if (retry) throw new Error("articles dir failed");
-      await resetStoredHandles();
-      return getArticlesFolderHandle(true);
+      const picked = await pickWritableBaseDir();
+      await idbSet(DOCS_ROOT_KEY, picked);
+      const dir = await picked.getDirectoryHandle("Articles", { create: true });
+      await idbSet(ARTICLES_DIR_KEY, dir);
+      return dir;
     }
   }
 
-  async function getClientsFolderHandle(retry) {
+  async function getClientsFolderHandle() {
     try {
-      const base = await getCompanyBaseDirHandle(false);
+      const base = await getCompanyBaseDirHandle();
       const dir = await base.getDirectoryHandle("Clients", { create: true });
       const p = await dir.requestPermission({ mode: "readwrite" });
       if (p !== "granted") throw new Error("permission denied");
       await idbSet(CLIENTS_DIR_KEY, dir);
       return dir;
     } catch {
-      if (retry) throw new Error("clients dir failed");
-      await resetStoredHandles();
-      return getClientsFolderHandle(true);
+      const picked = await pickWritableBaseDir();
+      await idbSet(DOCS_ROOT_KEY, picked);
+      const dir = await picked.getDirectoryHandle("Clients", { create: true });
+      await idbSet(CLIENTS_DIR_KEY, dir);
+      return dir;
     }
   }
 
@@ -216,12 +212,12 @@
     const blob = new Blob([data], { type: "application/json" });
     if (window.isSecureContext && window.showSaveFilePicker) {
       try {
-        const dir = await getArticlesFolderHandle(false);
+        const dir = await getArticlesFolderHandle();
         const handle = await window.showSaveFilePicker({
           suggestedName: `${safeName(suggested)}.article.json`,
           startIn: dir,
           types: [{ description: "Article JSON", accept: { "application/json": [".json"] } }],
-          excludeAcceptAllOption: false
+          excludeAcceptAllOption: false,
         });
         const writable = await handle.createWritable();
         await writable.write(blob);
@@ -244,12 +240,12 @@
     const blob = new Blob([data], { type: "application/json" });
     if (window.isSecureContext && window.showSaveFilePicker) {
       try {
-        const dir = await getClientsFolderHandle(false);
+        const dir = await getClientsFolderHandle();
         const handle = await window.showSaveFilePicker({
           suggestedName: `${safeClientName(suggested)}.client.json`,
           startIn: dir,
           types: [{ description: "Client JSON", accept: { "application/json": [".json"] } }],
-          excludeAcceptAllOption: false
+          excludeAcceptAllOption: false,
         });
         const writable = await handle.createWritable();
         await writable.write(blob);
