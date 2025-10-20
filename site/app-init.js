@@ -183,58 +183,54 @@
   }
 
   async function browserSaveArticleWithDialog(article, suggested = "article") {
+    if (!window.isSecureContext || !window.showSaveFilePicker) {
+      await showDialog("Votre navigateur ne permet pas d’ouvrir la boîte de dialogue d’enregistrement. Utilisez un navigateur compatible (Chrome/Edge) via HTTPS.", { title: "Enregistrement indisponible" });
+      return false;
+    }
     const data = JSON.stringify(article, null, 2);
     const blob = new Blob([data], { type: "application/json" });
-    if (window.isSecureContext && window.showSaveFilePicker) {
-      try {
-        const dir = await getArticlesFolderHandle();
-        const handle = await window.showSaveFilePicker({
-          suggestedName: `${safeName(suggested)}.article.json`,
-          startIn: dir,
-          types: [{ description: "Article JSON", accept: { "application/json": [".json"] } }],
-          excludeAcceptAllOption: false,
-        });
-        const writable = await handle.createWritable();
-        await writable.write(blob);
-        await writable.close();
-        return true;
-      } catch (e) {
-        if (e && e.name === "AbortError") return false;
-      }
+    try {
+      const dir = await getArticlesFolderHandle();
+      const handle = await window.showSaveFilePicker({
+        suggestedName: `${safeName(suggested)}.article.json`,
+        startIn: dir,
+        types: [{ description: "Article JSON", accept: { "application/json": [".json"] } }],
+        excludeAcceptAllOption: false,
+      });
+      const writable = await handle.createWritable();
+      await writable.write(blob);
+      await writable.close();
+      return true;
+    } catch (e) {
+      if (e && e.name === "AbortError") return false;
+      await showDialog("Échec de l’enregistrement de l’article.", { title: "Erreur" });
+      return false;
     }
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = `${safeName(suggested)}.article.json`;
-    a.click();
-    URL.revokeObjectURL(a.href);
-    return true;
   }
   async function browserSaveClientWithDialog(client, suggested = "client") {
+    if (!window.isSecureContext || !window.showSaveFilePicker) {
+      await showDialog("Votre navigateur ne permet pas d’ouvrir la boîte de dialogue d’enregistrement. Utilisez un navigateur compatible (Chrome/Edge) via HTTPS.", { title: "Enregistrement indisponible" });
+      return false;
+    }
     const data = JSON.stringify(client, null, 2);
     const blob = new Blob([data], { type: "application/json" });
-    if (window.isSecureContext && window.showSaveFilePicker) {
-      try {
-        const dir = await getClientsFolderHandle();
-        const handle = await window.showSaveFilePicker({
-          suggestedName: `${safeClientName(suggested)}.client.json`,
-          startIn: dir,
-          types: [{ description: "Client JSON", accept: { "application/json": [".json"] } }],
-          excludeAcceptAllOption: false,
-        });
-        const writable = await handle.createWritable();
-        await writable.write(blob);
-        await writable.close();
-        return true;
-      } catch (e) {
-        if (e && e.name === "AbortError") return false;
-      }
+    try {
+      const dir = await getClientsFolderHandle();
+      const handle = await window.showSaveFilePicker({
+        suggestedName: `${safeClientName(suggested)}.client.json`,
+        startIn: dir,
+        types: [{ description: "Client JSON", accept: { "application/json": [".json"] } }],
+        excludeAcceptAllOption: false,
+      });
+      const writable = await handle.createWritable();
+      await writable.write(blob);
+      await writable.close();
+      return true;
+    } catch (e) {
+      if (e && e.name === "AbortError") return false;
+      await showDialog("Échec de l’enregistrement du client.", { title: "Erreur" });
+      return false;
     }
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = `${safeClientName(suggested)}.client.json`;
-    a.click();
-    URL.revokeObjectURL(a.href);
-    return true;
   }
 
   function enableFirstClickSelectSecondClickCaret(input) {
