@@ -77,12 +77,12 @@ body.print-mode #pdfRoot {
   line-height: 1.1;
   z-index: 1;
   display: inline-block;
-}
+} 
 
 .pdf-meta{background:#f9fafb;padding:12px;border-radius:5px;margin-top:12px; width:280px}
 .pdf-meta-grid{display:grid;grid-template-columns:1fr 1fr;gap:3px;font-size:12px}
 
-.tableDiv{ margin-top:20px; border-radius:5px; border:2px solid #15335e; overflow-x:auto; height:350px }
+.tableDiv{ margin-top:20px; border-radius:5px; border:2px solid #15335e; overflow-x:auto; height:380px }
 .pdf-table{ width:100%; font-size:10px; table-layout:auto; font-family: var(--invoice-font); }
 .pdf-table th,.pdf-table td{ padding:4px; vertical-align:top }
 .pdf-table thead th{ font-weight:600; background-color:#15335e; color:#fff; text-align:right; }
@@ -154,9 +154,10 @@ body.print-mode #pdfRoot {
   position:absolute;
   right:18mm;
   bottom:34mm;              /* above the signature line */
-  max-width:38mm;
-  max-height:38mm;
-  opacity:0.88;             /* slightly transparent for stamp effect */
+  max-width:68mm;
+  max-height:68mm;
+  scale:1.4;
+  opacity:1;             /* slightly transparent for stamp effect */
   object-fit:contain;
   pointer-events:none;
   transform: rotate(-2deg); /* tiny rotation gives a stamp vibe */

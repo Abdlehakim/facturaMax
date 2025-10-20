@@ -7,8 +7,9 @@
   "license": "MIT",
   "scripts": {
     "dev:site": "http-server ./site -p 8080 -c-1",
-    "dev:renderer": "http-server ./src/renderer -p 8081 -c-1",
-    "start": "electron .",
+  "dev:site:localhost": "http-server ./site -p 8080 -a localhost -c-1",
+  "dev:renderer": "http-server ./src/renderer -p 8081 -c-1",
+  "start": "electron .",
     "dist": "electron-builder --win nsis",
     "dist:mac": "electron-builder --mac dmg,zip",
     "dist:mac:arm64": "electron-builder --mac dmg,zip --arm64",
@@ -22,7 +23,8 @@
     "electron": "^31.2.0",
     "electron-builder": "^24.13.3",
     "electronmon": "^2.0.3",
-    "http-server": "^14.1.1"
+    "http-server": "^14.1.1",
+    "vite-plugin-mkcert": "^1.17.9"
   },
   "dependencies": {
     "html2canvas": "^1.4.1",
