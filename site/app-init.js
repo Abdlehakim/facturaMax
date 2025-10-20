@@ -1,4 +1,3 @@
-// ───────── app-init.js ─────────
 (function (w) {
   const SEM = (w.SEM = w.SEM || {});
 
@@ -13,7 +12,7 @@
     qty: "colToggleQty",
     price: "colTogglePrice",
     tva: "colToggleTva",
-    discount: "colToggleDiscount",
+    discount: "colToggleDiscount"
   };
 
   const CLIENTS_DIR_KEY = "clientsDirHandle";
@@ -29,7 +28,7 @@
       vat: getStr("clientVat"),
       phone: getStr("clientPhone"),
       email: getStr("clientEmail"),
-      address: getStr("clientAddress"),
+      address: getStr("clientAddress")
     };
   }
   function fillClientToForm(c = {}) {
@@ -70,7 +69,7 @@
       qty: isEnabled("qty"),
       price: isEnabled("price"),
       tva: isEnabled("tva"),
-      discount: isEnabled("discount"),
+      discount: isEnabled("discount")
     };
     return {
       ref: getStr("addRef"),
@@ -80,7 +79,7 @@
       price: getNum("addPrice", 0),
       tva: getNum("addTva", 19),
       discount: getNum("addDiscount", 0),
-      use,
+      use
     };
   }
   function fillArticleToForm(a = {}) {
@@ -100,11 +99,7 @@
     }
   }
   function pickSuggestedName(a) {
-    const u = {
-      ref: isEnabled("ref"),
-      product: isEnabled("product"),
-      desc: isEnabled("desc"),
-    };
+    const u = { ref: isEnabled("ref"), product: isEnabled("product"), desc: isEnabled("desc") };
     const ref = String(a.ref || "").trim();
     const product = String(a.product || "").trim();
     const desc = String(a.desc || "").trim();
@@ -145,92 +140,131 @@
   function safeCompanyFolderName(s = "Societe") {
     return String(s).trim().replace(/[\/\\:*?"<>|]/g, "-").replace(/\s+/g, " ").slice(0, 80) || "Societe";
   }
-  async function getDocsRootHandle() {
+
+  async function resetStoredHandles() {
+    await idbSet(DOCS_ROOT_KEY, null);
+    await idbSet(ARTICLES_DIR_KEY, null);
+    await idbSet(CLIENTS_DIR_KEY, null);
+  }
+
+  async function getDocsRootHandle(retry) {
     let root = await idbGet(DOCS_ROOT_KEY);
-    if (!root) {
-      if (!window.showDirectoryPicker) throw new Error("showDirectoryPicker not supported");
-      root = await window.showDirectoryPicker({ id: "sem-docs-root", mode: "readwrite", startIn: "documents" });
-      await idbSet(DOCS_ROOT_KEY, root);
+    try {
+      if (!root) {
+        if (!window.showDirectoryPicker) throw new Error("showDirectoryPicker not supported");
+        root = await window.showDirectoryPicker({ id: "sem-docs-root", mode: "readwrite", startIn: "documents" });
+        await idbSet(DOCS_ROOT_KEY, root);
+      }
+      const p = await root.requestPermission({ mode: "readwrite" });
+      if (p !== "granted") throw new Error("permission denied");
+      return root;
+    } catch {
+      if (retry) throw new Error("root failed");
+      await resetStoredHandles();
+      return getDocsRootHandle(true);
     }
-    const p = await root.requestPermission({ mode: "readwrite" });
-    if (p !== "granted") throw new Error("permission denied");
-    return root;
   }
-  async function getCompanyBaseDirHandle() {
-    const root = await getDocsRootHandle();
-    const companyName = getStr?.("companyName")?.trim() || (window.SEM?.state?.company?.name || "").trim() || "Societe";
-    const folder = safeCompanyFolderName(companyName);
-    const base = await root.getDirectoryHandle(folder, { create: true });
-    await base.getDirectoryHandle("Articles", { create: true });
-    await base.getDirectoryHandle("Clients", { create: true });
-    return base;
+
+  async function getCompanyBaseDirHandle(retry) {
+    try {
+      const root = await getDocsRootHandle(false);
+      const companyName = getStr?.("companyName")?.trim() || (window.SEM?.state?.company?.name || "").trim() || "Societe";
+      const folder = safeCompanyFolderName(companyName);
+      const base = await root.getDirectoryHandle(folder, { create: true });
+      await base.getDirectoryHandle("Articles", { create: true });
+      await base.getDirectoryHandle("Clients", { create: true });
+      return base;
+    } catch {
+      if (retry) throw new Error("base failed");
+      await resetStoredHandles();
+      return getCompanyBaseDirHandle(true);
+    }
   }
-  async function getArticlesFolderHandle() {
-    const base = await getCompanyBaseDirHandle();
-    const dir = await base.getDirectoryHandle("Articles", { create: true });
-    const p = await dir.requestPermission({ mode: "readwrite" });
-    if (p !== "granted") throw new Error("permission denied");
-    await idbSet(ARTICLES_DIR_KEY, dir);
-    return dir;
+
+  async function getArticlesFolderHandle(retry) {
+    try {
+      const base = await getCompanyBaseDirHandle(false);
+      const dir = await base.getDirectoryHandle("Articles", { create: true });
+      const p = await dir.requestPermission({ mode: "readwrite" });
+      if (p !== "granted") throw new Error("permission denied");
+      await idbSet(ARTICLES_DIR_KEY, dir);
+      return dir;
+    } catch {
+      if (retry) throw new Error("articles dir failed");
+      await resetStoredHandles();
+      return getArticlesFolderHandle(true);
+    }
   }
-  async function getClientsFolderHandle() {
-    const base = await getCompanyBaseDirHandle();
-    const dir = await base.getDirectoryHandle("Clients", { create: true });
-    const p = await dir.requestPermission({ mode: "readwrite" });
-    if (p !== "granted") throw new Error("permission denied");
-    await idbSet(CLIENTS_DIR_KEY, dir);
-    return dir;
+
+  async function getClientsFolderHandle(retry) {
+    try {
+      const base = await getCompanyBaseDirHandle(false);
+      const dir = await base.getDirectoryHandle("Clients", { create: true });
+      const p = await dir.requestPermission({ mode: "readwrite" });
+      if (p !== "granted") throw new Error("permission denied");
+      await idbSet(CLIENTS_DIR_KEY, dir);
+      return dir;
+    } catch {
+      if (retry) throw new Error("clients dir failed");
+      await resetStoredHandles();
+      return getClientsFolderHandle(true);
+    }
   }
 
   async function browserSaveArticleWithDialog(article, suggested = "article") {
-    if (!window.isSecureContext || !window.showSaveFilePicker) {
-      await showDialog("Votre navigateur ne permet pas d’ouvrir la boîte de dialogue d’enregistrement. Utilisez un navigateur compatible (Chrome/Edge) via HTTPS.", { title: "Enregistrement indisponible" });
-      return false;
-    }
     const data = JSON.stringify(article, null, 2);
     const blob = new Blob([data], { type: "application/json" });
-    try {
-      const dir = await getArticlesFolderHandle();
-      const handle = await window.showSaveFilePicker({
-        suggestedName: `${safeName(suggested)}.article.json`,
-        startIn: dir,
-        types: [{ description: "Article JSON", accept: { "application/json": [".json"] } }],
-        excludeAcceptAllOption: false,
-      });
-      const writable = await handle.createWritable();
-      await writable.write(blob);
-      await writable.close();
-      return true;
-    } catch (e) {
-      if (e && e.name === "AbortError") return false;
-      await showDialog("Échec de l’enregistrement de l’article.", { title: "Erreur" });
-      return false;
+    if (window.isSecureContext && window.showSaveFilePicker) {
+      try {
+        const dir = await getArticlesFolderHandle(false);
+        const handle = await window.showSaveFilePicker({
+          suggestedName: `${safeName(suggested)}.article.json`,
+          startIn: dir,
+          types: [{ description: "Article JSON", accept: { "application/json": [".json"] } }],
+          excludeAcceptAllOption: false
+        });
+        const writable = await handle.createWritable();
+        await writable.write(blob);
+        await writable.close();
+        return true;
+      } catch (e) {
+        if (e && e.name === "AbortError") return false;
+      }
     }
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `${safeName(suggested)}.article.json`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+    return true;
   }
+
   async function browserSaveClientWithDialog(client, suggested = "client") {
-    if (!window.isSecureContext || !window.showSaveFilePicker) {
-      await showDialog("Votre navigateur ne permet pas d’ouvrir la boîte de dialogue d’enregistrement. Utilisez un navigateur compatible (Chrome/Edge) via HTTPS.", { title: "Enregistrement indisponible" });
-      return false;
-    }
     const data = JSON.stringify(client, null, 2);
     const blob = new Blob([data], { type: "application/json" });
-    try {
-      const dir = await getClientsFolderHandle();
-      const handle = await window.showSaveFilePicker({
-        suggestedName: `${safeClientName(suggested)}.client.json`,
-        startIn: dir,
-        types: [{ description: "Client JSON", accept: { "application/json": [".json"] } }],
-        excludeAcceptAllOption: false,
-      });
-      const writable = await handle.createWritable();
-      await writable.write(blob);
-      await writable.close();
-      return true;
-    } catch (e) {
-      if (e && e.name === "AbortError") return false;
-      await showDialog("Échec de l’enregistrement du client.", { title: "Erreur" });
-      return false;
+    if (window.isSecureContext && window.showSaveFilePicker) {
+      try {
+        const dir = await getClientsFolderHandle(false);
+        const handle = await window.showSaveFilePicker({
+          suggestedName: `${safeClientName(suggested)}.client.json`,
+          startIn: dir,
+          types: [{ description: "Client JSON", accept: { "application/json": [".json"] } }],
+          excludeAcceptAllOption: false
+        });
+        const writable = await handle.createWritable();
+        await writable.write(blob);
+        await writable.close();
+        return true;
+      } catch (e) {
+        if (e && e.name === "AbortError") return false;
+      }
     }
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `${safeClientName(suggested)}.client.json`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+    return true;
   }
 
   function enableFirstClickSelectSecondClickCaret(input) {
