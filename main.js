@@ -136,6 +136,7 @@ app.on("window-all-closed", () => {
   if (process.platform !== "darwin") app.quit();
 });
 
+// ===== JSON (invoice) save with cancel-safe dialog =====
 ipcMain.handle("save-invoice-json", async (_evt, payload = {}) => {
   const incoming = (payload && payload.data && typeof payload.data === "object") ? payload.data : payload;
   const meta     = incoming?.meta || payload?.meta || {};
@@ -143,22 +144,28 @@ ipcMain.handle("save-invoice-json", async (_evt, payload = {}) => {
   const numOrDate = sanitizeFileName(meta.number || todayStr());
   const baseName = withJsonExt(`${typeLabel} - ${numOrDate}`);
   const toWrite = incoming;
+
+  // Silent paths (explicit only)
   if (meta?.silent === true || meta?.to || meta?.saveDir) {
     const dir = resolveSaveDir(meta);
     const target = ensureUniquePath(path.join(dir, baseName));
     fs.writeFileSync(target, JSON.stringify(toWrite, null, 2), "utf-8");
     return { ok: true, path: target, name: path.basename(target) };
   }
+
   const { canceled, filePath } = await dialog.showSaveDialog({
     title: "Enregistrer",
     defaultPath: path.join(app.getPath("desktop"), baseName),
     filters: [{ name: "JSON", extensions: ["json"] }],
   });
-  if (canceled || !filePath) return null;
+
+  if (canceled || !filePath) return { ok: false, canceled: true };
+
   fs.writeFileSync(filePath, JSON.stringify(toWrite, null, 2), "utf-8");
   return { ok: true, path: filePath, name: path.basename(filePath) };
 });
 
+// ===== JSON open =====
 ipcMain.handle("open-invoice-json", async () => {
   const { canceled, filePaths } = await dialog.showOpenDialog({
     title: "Ouvrir",
@@ -178,6 +185,7 @@ ipcMain.handle("open-invoice-json", async () => {
   }
 });
 
+// ===== Logo pick =====
 ipcMain.handle("SoukElMeuble:pickLogo", async () => {
   const { canceled, filePaths } = await dialog.showOpenDialog({
     title: "Choisir un logo",
@@ -199,10 +207,12 @@ ipcMain.handle("SoukElMeuble:pickLogo", async () => {
   return { dataUrl: `data:${mime};base64,${base64}` };
 });
 
+// ===== PDF export with cancel-safe dialog =====
 ipcMain.handle("SoukElMeuble:exportPDFFromHTML", async (event, payload) => {
   const { html = "", css = "", meta = {}, silent } = payload || {};
   const isSilent =
     meta.silent === true || silent === true || !!meta.to || !!meta.saveDir;
+
   try {
     const pdfBuffer = await renderToPdfBuffer(html, css);
     const baseName =
@@ -211,12 +221,14 @@ ipcMain.handle("SoukElMeuble:exportPDFFromHTML", async (event, payload) => {
         meta.number || todayStr()
       )}.pdf`;
     const fileName = withPdfExt(sanitizeFileName(baseName));
+
     if (isSilent) {
       const saveDir = resolveSaveDir(meta);
       const target = ensureUniquePath(path.join(saveDir, fileName));
       fs.writeFileSync(target, pdfBuffer);
       return { ok: true, path: target, name: path.basename(target) };
     }
+
     const { canceled, filePath } = await dialog.showSaveDialog(
       BrowserWindow.fromWebContents(event.sender),
       {
@@ -225,16 +237,19 @@ ipcMain.handle("SoukElMeuble:exportPDFFromHTML", async (event, payload) => {
         filters: [{ name: "PDF", extensions: ["pdf"] }],
       }
     );
-    if (canceled || !filePath) return null;
+
+    if (canceled || !filePath) return { ok: false, canceled: true };
+
     fs.writeFileSync(filePath, pdfBuffer);
     return { ok: true, path: filePath, name: path.basename(filePath) };
   } catch (err) {
     console.error("exportPDFFromHTML error:", err);
     dialog.showErrorBox("Erreur PDF", String(err?.message || err));
-    return null;
+    return { ok: false, error: String(err?.message || err) };
   }
 });
 
+// ===== Shell helpers =====
 ipcMain.handle("SoukElMeuble:openPath", async (_evt, absPath) => {
   try {
     const res = await shell.openPath(absPath);
@@ -260,6 +275,7 @@ ipcMain.handle("SoukElMeuble:openExternal", async (_evt, url) => {
   }
 });
 
+// ===== Articles APIs =====
 function ensureSafeName(s = "article") {
   return String(s)
     .trim()

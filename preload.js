@@ -44,10 +44,14 @@ function normalizeSavePayload(p) {
 }
 
 contextBridge.exposeInMainWorld("SoukElMeuble", {
+  // JSON save (invoice)
   saveInvoiceJSON: async (payload) => {
     const normalized = normalizeSavePayload(payload);
+    // returns { ok:true, path, name } or { ok:false, canceled:true }
     return await ipcRenderer.invoke("save-invoice-json", normalized);
   },
+
+  // Explicit silent “Save to Desktop”
   saveInvoiceJSONToDesktop: async (payload) => {
     const normalized = normalizeSavePayload(payload);
     if (!normalized.meta) normalized.meta = {};
@@ -55,10 +59,15 @@ contextBridge.exposeInMainWorld("SoukElMeuble", {
     normalized.meta.silent = true;
     return await ipcRenderer.invoke("save-invoice-json", normalized);
   },
+
   openInvoiceJSON: () => ipcRenderer.invoke("open-invoice-json"),
+
+  // PDF export
   exportPDFFromHTML: async (payload) => {
     const res = await ipcRenderer.invoke("SoukElMeuble:exportPDFFromHTML", payload);
-    if (!res || !res.ok || !res.path) return null;
+    // Pass through cancel/error as-is
+    if (!res || res.ok !== true) return res || { ok: false, canceled: true };
+
     const t = String(payload?.meta?.docType || "facture").toLowerCase();
     const label =
       t === "devis" ? "Devis" :
@@ -68,12 +77,15 @@ contextBridge.exposeInMainWorld("SoukElMeuble", {
     const name =
       payload?.meta?.filename ||
       `${label} - ${payload?.meta?.number || new Date().toISOString().slice(0, 10)}.pdf`;
-    return { ok: true, path: res.path, url: toFileURL(res.path), name };
+
+    return { ...res, url: toFileURL(res.path), name };
   },
+
   pickLogo: () => ipcRenderer.invoke("SoukElMeuble:pickLogo"),
   openPath: (absPath) => ipcRenderer.invoke("SoukElMeuble:openPath", absPath),
   showInFolder: (absPath) => ipcRenderer.invoke("SoukElMeuble:showInFolder", absPath),
   openExternal: (url) => ipcRenderer.invoke("SoukElMeuble:openExternal", url),
+
   onEnterPrintMode: (cb) => {
     ipcRenderer.removeAllListeners("SoukElMeuble:enterPrint");
     ipcRenderer.on("SoukElMeuble:enterPrint", () => cb?.());
@@ -82,9 +94,12 @@ contextBridge.exposeInMainWorld("SoukElMeuble", {
     ipcRenderer.removeAllListeners("SoukElMeuble:exitPrint");
     ipcRenderer.on("SoukElMeuble:exitPrint", () => cb?.());
   },
+
+  // Articles API (already cancel-safe)
   saveArticle: (payload) => ipcRenderer.invoke("articles:save", payload),
   saveArticleAuto: (payload) => ipcRenderer.invoke("articles:saveAuto", payload),
   openArticle: () => ipcRenderer.invoke("articles:open"),
   listArticles: () => ipcRenderer.invoke("articles:list"),
+
   assets: { logo: logoDataURL },
 });
