@@ -2,7 +2,7 @@
 (function (w) {
   const SEM = (w.SEM = w.SEM || {});
 
-  // Configure pdf.js worker (for importing PDF cachets)
+  // pdf.js worker (for importing PDF cachets)
   if (w.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
     pdfjsLib.GlobalWorkerOptions.workerSrc = "./lib/pdfs/pdf.worker.min.js";
   }
@@ -18,41 +18,29 @@
     discount: "colToggleDiscount",
   };
 
-  // Keys for IndexedDB-persisted directory handles
+  // IndexedDB keys (persist chosen folders)
   const CLIENTS_DIR_KEY = "clientsDirHandle";
   const ARTICLES_DIR_KEY = "articlesDirHandle";
   const DOCS_ROOT_KEY = "docsRootHandle";
 
-  // Simple KV store in IndexedDB to persist directory handles
+  // IDB KV store
   const DB_NAME = "sem-fs";
   const STORE = "kv";
 
-  // ───────────────────────── helpers: strings & DOM ─────────────────────────
+  // ───────────────────── helpers: strings & DOM ─────────────────────
   function safeName(s = "article") {
     return (
-      String(s)
-        .trim()
-        .replace(/[\/\\:*?"<>|]/g, "-")
-        .replace(/\s+/g, " ")
-        .slice(0, 80) || "article"
+      String(s).trim().replace(/[\/\\:*?"<>|]/g, "-").replace(/\s+/g, " ").slice(0, 80) || "article"
     );
   }
   function safeClientName(s = "client") {
     return (
-      String(s)
-        .trim()
-        .replace(/[\/\\:*?"<>|]/g, "-")
-        .replace(/\s+/g, " ")
-        .slice(0, 80) || "client"
+      String(s).trim().replace(/[\/\\:*?"<>|]/g, "-").replace(/\s+/g, " ").slice(0, 80) || "client"
     );
   }
   function safeCompanyFolderName(s = "Societe") {
     return (
-      String(s)
-        .trim()
-        .replace(/[\/\\:*?"<>|]/g, "-")
-        .replace(/\s+/g, " ")
-        .slice(0, 80) || "Societe"
+      String(s).trim().replace(/[\/\\:*?"<>|]/g, "-").replace(/\s+/g, " ").slice(0, 80) || "Societe"
     );
   }
   function getCompanyNameFromForm() {
@@ -71,7 +59,7 @@
     el.checked = !!enabled;
   }
 
-  // capture + fill client/article forms
+  // ───────────────────── capture/fill forms ─────────────────────
   function captureClientFromForm() {
     return {
       type: getStr("clientType"),
@@ -145,7 +133,7 @@
     return first;
   }
 
-  // ───────────────────────── helpers: IndexedDB KV ─────────────────────────
+  // ───────────────────── helpers: IndexedDB KV ─────────────────────
   function idbOpen() {
     return new Promise((res, rej) => {
       const r = indexedDB.open(DB_NAME, 1);
@@ -173,7 +161,11 @@
     });
   }
 
-  // ───────────────────── File System Access API: base + folders ─────────────────────
+  // ───────────────────── File System Access: base + folders ─────────────────────
+  function hasFileSystemAccess() {
+    return !!(window.isSecureContext && window.showSaveFilePicker);
+  }
+
   async function pickWritableBaseDir() {
     const handle = await window.showDirectoryPicker({
       id: "sem-company-root",
@@ -191,7 +183,6 @@
       if (base) {
         const p = await base.requestPermission({ mode: "readwrite" });
         if (p === "granted") {
-          // poke to ensure still valid
           await base.getDirectoryHandle(".", { create: false }).catch(() => {});
           return base;
         }
@@ -227,82 +218,78 @@
     return dir;
   }
 
-  // ───────────────────── Save helpers: ALWAYS show Save dialog ─────────────────────
+  // ───────────────────── Save helpers: ALWAYS show Save dialog; cancel-safe ─────────────────────
   async function browserSaveClientWithDialog(client, suggested = "client") {
     const data = JSON.stringify(client, null, 2);
     const blob = new Blob([data], { type: "application/json" });
 
-    if (window.isSecureContext && window.showSaveFilePicker) {
-      try {
-        const startDir = await getClientsFolderHandle(); // Documents/<Company>/Clients
-        const handle = await window.showSaveFilePicker({
-          suggestedName: `${safeClientName(suggested)}.client.json`,
-          startIn: startDir,
-          types: [{ description: "Client JSON", accept: { "application/json": [".json"] } }],
-          excludeAcceptAllOption: false,
-        });
-        const writable = await handle.createWritable();
-        await writable.write(blob);
-        await writable.close();
-        return true;
-      } catch (e) {
-        // If the user cancels the dialog: do NOT save anything.
-        if (e && e.name === "AbortError") return false;
-
-        // Any other picker error (e.g., system folder)
-        await showDialog(
-          "Impossible d’ouvrir ce dossier (protégé par le système). Choisissez un autre dossier — « Documents » est recommandé.",
-          { title: "Dossier non autorisé" }
-        );
-        return false;
-      }
+    if (!hasFileSystemAccess()) {
+      await showDialog(
+        "Votre navigateur ne prend pas en charge la boîte de dialogue d’enregistrement. Utilisez Chrome/Edge récents en HTTPS.",
+        { title: "Fonction non disponible" }
+      );
+      return false; // never save without dialog
     }
 
-    // Fallback (very old browsers without the picker): user gets a normal download
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = `${safeClientName(suggested)}.client.json`;
-    a.click();
-    URL.revokeObjectURL(a.href);
-    return true;
+    try {
+      const startDir = await getClientsFolderHandle(); // Documents/<Company>/Clients
+      const handle = await window.showSaveFilePicker({
+        suggestedName: `${safeClientName(suggested)}.client.json`,
+        startIn: startDir,
+        types: [{ description: "Client JSON", accept: { "application/json": [".json"] } }],
+        excludeAcceptAllOption: false,
+      });
+
+      const writable = await handle.createWritable();
+      await writable.write(blob);
+      await writable.close();
+      return true;
+    } catch (e) {
+      // Cancel → AbortError: do NOT save anything, return false
+      if (e && (e.name === "AbortError" || e.code === 20)) return false;
+
+      // Other picker/permission/system-folder errors
+      await showDialog(
+        "Enregistrement annulé ou dossier non autorisé. Réessayez dans « Documents ».",
+        { title: "Échec" }
+      );
+      return false;
+    }
   }
 
   async function browserSaveArticleWithDialog(article, suggested = "article") {
     const data = JSON.stringify(article, null, 2);
     const blob = new Blob([data], { type: "application/json" });
 
-    if (window.isSecureContext && window.showSaveFilePicker) {
-      try {
-        const startDir = await getArticlesFolderHandle(); // Documents/<Company>/Articles
-        const handle = await window.showSaveFilePicker({
-          suggestedName: `${safeName(suggested)}.article.json`,
-          startIn: startDir,
-          types: [{ description: "Article JSON", accept: { "application/json": [".json"] } }],
-          excludeAcceptAllOption: false,
-        });
-        const writable = await handle.createWritable();
-        await writable.write(blob);
-        await writable.close();
-        return true;
-      } catch (e) {
-        // Cancel: do nothing, do not save.
-        if (e && e.name === "AbortError") return false;
-
-        await showDialog(
-          "Impossible d’ouvrir ce dossier (protégé par le système). Choisissez un autre dossier — « Documents » est recommandé.",
-          { title: "Dossier non autorisé" }
-        );
-        return false;
-      }
+    if (!hasFileSystemAccess()) {
+      await showDialog(
+        "Votre navigateur ne prend pas en charge la boîte de dialogue d’enregistrement. Utilisez Chrome/Edge récents en HTTPS.",
+        { title: "Fonction non disponible" }
+      );
+      return false;
     }
 
-    // Fallback for legacy browsers
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = `${safeName(suggested)}.article.json`;
-    a.click();
-    URL.revokeObjectURL(a.href);
-    return true;
+    try {
+      const startDir = await getArticlesFolderHandle(); // Documents/<Company>/Articles
+      const handle = await window.showSaveFilePicker({
+        suggestedName: `${safeName(suggested)}.article.json`,
+        startIn: startDir,
+        types: [{ description: "Article JSON", accept: { "application/json": [".json"] } }],
+        excludeAcceptAllOption: false,
+      });
+
+      const writable = await handle.createWritable();
+      await writable.write(blob);
+      await writable.close();
+      return true;
+    } catch (e) {
+      if (e && (e.name === "AbortError" || e.code === 20)) return false;
+      await showDialog(
+        "Enregistrement annulé ou dossier non autorisé. Réessayez dans « Documents ».",
+        { title: "Échec" }
+      );
+      return false;
+    }
   }
 
   // ───────────────────── UI niceties ─────────────────────
@@ -314,9 +301,7 @@
       if (document.activeElement !== input || !firstClickDone) {
         setTimeout(() => {
           input.select();
-          try {
-            input.setSelectionRange(0, input.value.length);
-          } catch {}
+          try { input.setSelectionRange(0, input.value.length); } catch {}
         }, 0);
         suppressNextMouseUp = true;
         firstClickDone = true;
@@ -324,16 +309,9 @@
         suppressNextMouseUp = false;
       }
     });
-    input.addEventListener(
-      "mouseup",
-      (e) => {
-        if (suppressNextMouseUp) {
-          e.preventDefault();
-          suppressNextMouseUp = false;
-        }
-      },
-      true
-    );
+    input.addEventListener("mouseup", (e) => {
+      if (suppressNextMouseUp) { e.preventDefault(); suppressNextMouseUp = false; }
+    }, true);
     input.addEventListener("blur", () => {
       firstClickDone = false;
       suppressNextMouseUp = false;
@@ -351,20 +329,15 @@
   }
 
   function unlockAddInputs() {
-    ["addRef", "addProduct", "addDesc", "addQty", "addPrice", "addTva", "addDiscount"].forEach((id) => {
+    ["addRef","addProduct","addDesc","addQty","addPrice","addTva","addDiscount"].forEach((id) => {
       const el = getEl(id);
-      if (el) {
-        el.disabled = false;
-        el.readOnly = false;
-      }
+      if (el) { el.disabled = false; el.readOnly = false; }
     });
   }
 
   function recoverFocus() {
     killOverlays();
-    try {
-      window.focus();
-    } catch {}
+    try { window.focus(); } catch {}
     unlockAddInputs();
   }
 
@@ -390,7 +363,7 @@
 
     installFocusGuards();
 
-    ["addPrice", "addQty", "addTva", "addDiscount"].forEach((id) =>
+    ["addPrice","addQty","addTva","addDiscount"].forEach((id) =>
       enableFirstClickSelectSecondClickCaret(getEl(id))
     );
 
@@ -406,12 +379,11 @@
     });
 
     getEl("btnSave")?.addEventListener("click", () => {
-      try {
-        window.__includeCompanyForSave = true;
-      } catch {}
+      try { window.__includeCompanyForSave = true; } catch {}
       if (w.SEM?.readInputs) w.SEM.readInputs();
       else if (typeof readInputs === "function") readInputs();
-      saveInvoiceJSON(); // app-export.js handles the dialog for invoices
+      // app-export.js handles invoice save dialog (should follow same cancel-safe pattern)
+      saveInvoiceJSON();
     });
 
     getEl("btnPDF")?.addEventListener("click", () => {
@@ -427,7 +399,7 @@
       if (typeof SEM.clearAddFormAndMode === "function") SEM.clearAddFormAndMode();
     });
 
-    ["addRef", "addProduct", "addDesc", "addQty", "addPrice", "addTva", "addDiscount"].forEach((id) => {
+    ["addRef","addProduct","addDesc","addQty","addPrice","addTva","addDiscount"].forEach((id) => {
       const el = getEl(id);
       el?.addEventListener("keydown", (e) => {
         if (e.key === "Enter") {
@@ -436,20 +408,12 @@
         }
       });
       if (el) {
-        el.addEventListener("focus", () => {
-          try {
-            el.select();
-          } catch {}
-        });
-        el.addEventListener("click", () => {
-          try {
-            el.select();
-          } catch {}
-        });
+        el.addEventListener("focus", () => { try { el.select(); } catch {} });
+        el.addEventListener("click", () => { try { el.select(); } catch {} });
       }
     });
 
-    // Logo picker (only if provided by Electron shell)
+    // Click logo to pick (Electron shell feature)
     getEl("companyLogo")?.addEventListener("click", async () => {
       if (!window.SoukElMeuble?.pickLogo) return;
       const res = await window.SoukElMeuble.pickLogo();
@@ -459,11 +423,8 @@
       }
     });
 
-    // Fix focus while overlays are up
-    const addFieldset = getEl("addRef")?.closest("fieldset.section-box");
-    if (addFieldset) {
-      addFieldset.addEventListener("mousedown", recoverFocus, true);
-    }
+    // Keep focus stable while overlays are open
+    getEl("addRef")?.closest("fieldset.section-box")?.addEventListener("mousedown", recoverFocus, true);
 
     // Print mode hooks (Electron)
     window.SoukElMeuble?.onEnterPrintMode?.(() => {
@@ -474,8 +435,8 @@
       recoverFocus();
     });
 
-    // Column toggle bindings
-    ["Ref", "Price", "Product", "Desc", "Qty", "Tva", "Discount"].forEach((k) => {
+    // Column toggles
+    ["Ref","Price","Product","Desc","Qty","Tva","Discount"].forEach((k) => {
       getEl(`colToggle${k}`)?.addEventListener("change", () => {
         if (typeof SEM.applyColumnHiding === "function") SEM.applyColumnHiding();
       });
@@ -495,7 +456,7 @@
       try {
         const ok = await browserSaveArticleWithDialog(article, suggested);
         if (ok) await showDialog("Article enregistré.", { title: "Succès" });
-        // if ok === false => user canceled, do nothing
+        // canceled: ok === false → do nothing
       } catch {
         await showDialog("Échec de l’enregistrement.", { title: "Erreur" });
       }
@@ -531,7 +492,7 @@
       try {
         const ok = await browserSaveClientWithDialog(client, suggested);
         if (ok) await showDialog("Client enregistré.", { title: "Succès" });
-        // if ok === false => user canceled, do nothing
+        // canceled: ok === false → do nothing
       } catch {
         await showDialog("Échec de l’enregistrement du client.", { title: "Erreur" });
       }
