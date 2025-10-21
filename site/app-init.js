@@ -2,10 +2,12 @@
 (function (w) {
   const SEM = (w.SEM = w.SEM || {});
 
+  // pdf.js worker (for PDF stamp import)
   if (w.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
     pdfjsLib.GlobalWorkerOptions.workerSrc = "./lib/pdfs/pdf.worker.min.js";
   }
 
+  // ——— Column toggle map ———
   const fieldToggleMap = {
     ref: "colToggleRef",
     product: "colToggleProduct",
@@ -16,68 +18,96 @@
     discount: "colToggleDiscount",
   };
 
-  const CLIENTS_DIR_KEY = "clientsDirHandle";
-  const DB_NAME = "sem-fs";
-  const STORE = "kv";
+  // ——— FS persistence (IndexedDB keys) ———
+  const CLIENTS_DIR_KEY  = "clientsDirHandle";
   const ARTICLES_DIR_KEY = "articlesDirHandle";
-  const DOCS_ROOT_KEY = "docsRootHandle";
+  const DOCS_ROOT_KEY    = "docsRootHandle";
+  const DB_NAME = "sem-fs";
+  const STORE   = "kv";
 
+  // ============== CLIENT HELPERS ==============
   function captureClientFromForm() {
     return {
-      type: getStr("clientType"),
-      name: getStr("clientName"),
-      vat: getStr("clientVat"),
-      phone: getStr("clientPhone"),
-      email: getStr("clientEmail"),
+      type:    getStr("clientType"),
+      name:    getStr("clientName"),
+      vat:     getStr("clientVat"),
+      phone:   getStr("clientPhone"),
+      email:   getStr("clientEmail"),
       address: getStr("clientAddress"),
     };
   }
   function fillClientToForm(c = {}) {
-    setVal("clientType", c.type ?? "societe");
-    setVal("clientName", c.name ?? "");
-    setVal("clientVat", c.vat ?? "");
-    setVal("clientPhone", c.phone ?? "");
-    setVal("clientEmail", c.email ?? "");
-    setVal("clientAddress", c.address ?? "");
+    setVal("clientType",   c.type ?? "societe");
+    setVal("clientName",   c.name ?? "");
+    setVal("clientVat",    c.vat ?? "");
+    setVal("clientPhone",  c.phone ?? "");
+    setVal("clientEmail",  c.email ?? "");
+    setVal("clientAddress",c.address ?? "");
     if (typeof SEM.updateClientIdLabel === "function") SEM.updateClientIdLabel();
   }
   function safeClientName(s = "client") {
-    return String(s).trim().replace(/[\/\\:*?"<>|]/g, "-").replace(/\s+/g, " ").slice(0, 80) || "client";
+    return String(s).trim()
+      .replace(/[\/\\:*?"<>|]/g, "-")
+      .replace(/\s+/g, " ")
+      .slice(0, 80) || "client";
   }
   function pickSuggestedClientName(c) {
-    const n = String(c.name || "").trim();
-    const v = String(c.vat || "").trim();
+    const n = String(c.name  || "").trim();
+    const v = String(c.vat   || "").trim();
     const e = String(c.email || "").trim();
     const p = String(c.phone || "").trim();
     return safeClientName(n || v || e || p || "client");
   }
 
+  // ============== SMALL UTILS ==============
   function isAbort(e){ return e && (e.name === "AbortError"); }
-function isNotAllowed(e){ return e && (e.name === "NotAllowedError" || e.name === "SecurityError"); }
-async function clearStoredFSRoots(){
-  try {
-    const db = await idbOpen();
-    await new Promise((res, rej)=>{ const tx=db.transaction(STORE,"readwrite"); tx.objectStore(STORE).delete("docsRootHandle"); tx.oncomplete=res; tx.onerror=()=>rej(tx.error); });
-    await new Promise((res, rej)=>{ const tx=db.transaction(STORE,"readwrite"); tx.objectStore(STORE).delete("articlesDirHandle"); tx.oncomplete=res; tx.onerror=()=>rej(tx.error); });
-    await new Promise((res, rej)=>{ const tx=db.transaction(STORE,"readwrite"); tx.objectStore(STORE).delete("clientsDirHandle"); tx.oncomplete=res; tx.onerror=()=>rej(tx.error); });
-  } catch {}
-}
-async function ensureWritable(dirHandle){
-  if (!dirHandle) throw new Error("no handle");
-  let perm;
-  try { perm = await dirHandle.queryPermission({ mode:"readwrite" }); } catch {}
-  if (perm !== "granted"){
-    try { perm = await dirHandle.requestPermission({ mode:"readwrite" }); } catch (e){
-      if (isAbort(e)) throw e; // user cancelled
-    }
+  function isNotAllowed(e){ return e && (e.name === "NotAllowedError" || e.name === "SecurityError"); }
+
+  // ============== IDB HELPERS ==============
+  function idbOpen() {
+    return new Promise((res, rej) => {
+      const r = indexedDB.open(DB_NAME, 1);
+      r.onupgradeneeded = () => r.result.createObjectStore(STORE);
+      r.onsuccess = () => res(r.result);
+      r.onerror   = () => rej(r.error);
+    });
   }
-  if (perm !== "granted") throw new DOMException("Permission denied", "NotAllowedError");
-  // Probe that it still exists and is a directory
-  await dirHandle.getDirectoryHandle(".", { create:false }).catch(()=>{ throw new DOMException("Gone", "NotAllowedError"); });
-  return dirHandle;
-}
+  async function idbSet(key, value) {
+    const db = await idbOpen();
+    return new Promise((res, rej) => {
+      const tx = db.transaction(STORE, "readwrite");
+      tx.objectStore(STORE).put(value, key);
+      tx.oncomplete = () => res();
+      tx.onerror    = () => rej(tx.error);
+    });
+  }
+  async function idbGet(key) {
+    const db = await idbOpen();
+    return new Promise((res, rej) => {
+      const tx  = db.transaction(STORE, "readonly");
+      const req = tx.objectStore(STORE).get(key);
+      req.onsuccess = () => res(req.result);
+      req.onerror   = () => rej(req.error);
+    });
+  }
+  async function idbDel(key) {
+    const db = await idbOpen();
+    return new Promise((res, rej) => {
+      const tx = db.transaction(STORE, "readwrite");
+      tx.objectStore(STORE).delete(key);
+      tx.oncomplete = () => res();
+      tx.onerror    = () => rej(tx.error);
+    });
+  }
+  async function clearStoredFSRoots(){
+    try {
+      await idbDel(DOCS_ROOT_KEY);
+      await idbDel(ARTICLES_DIR_KEY);
+      await idbDel(CLIENTS_DIR_KEY);
+    } catch {}
+  }
 
-
+  // ============== FORM UTILS ==============
   function isEnabled(key) {
     const el = getEl(fieldToggleMap[key]);
     if (!el) return true;
@@ -88,6 +118,7 @@ async function ensureWritable(dirHandle){
     if (!el) return;
     el.checked = !!enabled;
   }
+
   function captureArticleFromForm() {
     const use = {
       ref: isEnabled("ref"),
@@ -109,14 +140,15 @@ async function ensureWritable(dirHandle){
       use,
     };
   }
+
   function fillArticleToForm(a = {}) {
-    setVal("addRef", a.ref ?? "");
-    setVal("addProduct", a.product ?? "");
-    setVal("addDesc", a.desc ?? "");
-    setVal("addQty", String(a.qty ?? 1));
-    setVal("addPrice", String(a.price ?? 0));
-    setVal("addTva", String(a.tva ?? 19));
-    setVal("addDiscount", String(a.discount ?? 0));
+    setVal("addRef",       a.ref ?? "");
+    setVal("addProduct",   a.product ?? "");
+    setVal("addDesc",      a.desc ?? "");
+    setVal("addQty",       String(a.qty ?? 1));
+    setVal("addPrice",     String(a.price ?? 0));
+    setVal("addTva",       String(a.tva ?? 19));
+    setVal("addDiscount",  String(a.discount ?? 0));
     if (a.use && typeof a.use === "object") {
       Object.keys(fieldToggleMap).forEach((k) => {
         const enabled = a.use[k];
@@ -125,235 +157,174 @@ async function ensureWritable(dirHandle){
       if (typeof SEM.applyColumnHiding === "function") SEM.applyColumnHiding();
     }
   }
+
   function pickSuggestedName(a) {
     const u = {
       ref: isEnabled("ref"),
       product: isEnabled("product"),
       desc: isEnabled("desc"),
     };
-    const ref = String(a.ref || "").trim();
+    const ref     = String(a.ref     || "").trim();
     const product = String(a.product || "").trim();
-    const desc = String(a.desc || "").trim();
+    const desc    = String(a.desc    || "").trim();
     const first = (u.ref && ref) || (u.product && product) || (u.desc && desc) || "article";
     return first;
   }
 
-  function idbOpen() {
-    return new Promise((res, rej) => {
-      const r = indexedDB.open(DB_NAME, 1);
-      r.onupgradeneeded = () => r.result.createObjectStore(STORE);
-      r.onsuccess = () => res(r.result);
-      r.onerror = () => rej(r.error);
-    });
-  }
-  async function idbSet(key, value) {
-    const db = await idbOpen();
-    return new Promise((res, rej) => {
-      const tx = db.transaction(STORE, "readwrite");
-      tx.objectStore(STORE).put(value, key);
-      tx.oncomplete = () => res();
-      tx.onerror = () => rej(tx.error);
-    });
-  }
-  async function idbGet(key) {
-    const db = await idbOpen();
-    return new Promise((res, rej) => {
-      const tx = db.transaction(STORE, "readonly");
-      const req = tx.objectStore(STORE).get(key);
-      req.onsuccess = () => res(req.result);
-      req.onerror = () => rej(req.error);
-    });
-  }
-
   function safeName(s = "article") {
-    return String(s).trim().replace(/[\/\\:*?"<>|]/g, "-").replace(/\s+/g, " ").slice(0, 80) || "article";
-  }
-  function safeCompanyFolderName(s = "Societe") {
-    return String(s).trim().replace(/[\/\\:*?"<>|]/g, "-").replace(/\s+/g, " ").slice(0, 80) || "Societe";
-  }
-
-  async function pickWritableBaseDir() {
-    const handle = await window.showDirectoryPicker({ id: "sem-company-folder", mode: "readwrite", startIn: "documents" });
-    const p = await handle.requestPermission({ mode: "readwrite" });
-    if (p !== "granted") throw new Error("permission denied");
-    return handle;
+    return String(s).trim()
+      .replace(/[\/\\:*?"<>|]/g, "-")
+      .replace(/\s+/g, " ")
+      .slice(0, 80) || "article";
   }
 
-async function getCompanyBaseDirHandle() {
-  // Try the stored root first
-  let base = await idbGet(DOCS_ROOT_KEY);
-  if (base) {
-    try {
-      base = await ensureWritable(base);
-      // Ensure subfolders
-      await base.getDirectoryHandle("Articles", { create: true });
-      await base.getDirectoryHandle("Clients", { create: true });
-      return base;
-    } catch (e) {
-      // stale or denied -> purge and fall through
-      await clearStoredFSRoots();
+  // ============== FILE SYSTEM ACCESS (Browser) ==============
+  async function ensureWritable(dirHandle){
+    if (!dirHandle) throw new Error("no handle");
+    let perm;
+    try { perm = await dirHandle.queryPermission({ mode:"readwrite" }); } catch {}
+    if (perm !== "granted"){
+      try { perm = await dirHandle.requestPermission({ mode:"readwrite" }); } catch (e){
+        if (isAbort(e)) throw e; // user cancelled
+      }
     }
+    if (perm !== "granted") throw new DOMException("Permission denied", "NotAllowedError");
+    // Probe the directory still exists
+    await dirHandle.getDirectoryHandle(".", { create:false }).catch(()=>{ throw new DOMException("Gone", "NotAllowedError"); });
+    return dirHandle;
   }
 
-  // Ask the user to (re)pick any folder (we suggest Documents)
-  let picked;
-  try {
-    picked = await window.showDirectoryPicker({ id:"sem-company-folder", mode:"readwrite", startIn:"documents" });
-  } catch (e) {
-    if (isAbort(e)) throw e;            // user hit Cancel -> let caller handle
-    throw e;
-  }
-  try {
-    await ensureWritable(picked);
-  } catch (e) {
-    // user refused or OS disallows this location
-    throw new DOMException("Chosen folder not writable", "NotAllowedError");
-  }
-
-  // Create expected structure and persist
-  await picked.getDirectoryHandle("Articles", { create: true });
-  await picked.getDirectoryHandle("Clients",  { create: true });
-  await idbSet(DOCS_ROOT_KEY, picked);
-  // Also refresh cached subfolders
-  await idbSet(ARTICLES_DIR_KEY, await picked.getDirectoryHandle("Articles", { create: true }));
-  await idbSet(CLIENTS_DIR_KEY,  await picked.getDirectoryHandle("Clients",  { create: true }));
-  return picked;
-}
-
-async function getArticlesFolderHandle() {
-  try {
-    const base = await getCompanyBaseDirHandle();
-    const dir = await base.getDirectoryHandle("Articles", { create: true });
-    await ensureWritable(dir);
-    await idbSet(ARTICLES_DIR_KEY, dir);
-    return dir;
-  } catch (e) {
-    if (isAbort(e)) throw e; // user cancelled the folder picker
-    // As a last resort, let the save dialog run without startIn
-    return null;
-  }
-}
-async function getClientsFolderHandle() {
-  try {
-    const base = await getCompanyBaseDirHandle();
-    const dir = await base.getDirectoryHandle("Clients", { create: true });
-    await ensureWritable(dir);
-    await idbSet(CLIENTS_DIR_KEY, dir);
-    return dir;
-  } catch (e) {
-    if (isAbort(e)) throw e;
-    return null;
-  }
-}
-
-// Replace the whole function with this
-async function browserSaveArticleWithDialog(article, suggested="article") {
-  const data = JSON.stringify(article, null, 2);
-  const blob = new Blob([data], { type:"application/json" });
-
-  if (window.isSecureContext && typeof window.showSaveFilePicker === "function") {
-    try {
-      let startIn = null;
-      try { startIn = await getArticlesFolderHandle(); } catch {}
-      const handle = await window.showSaveFilePicker({
-        suggestedName: `${safeName(suggested)}.article.json`,
-        ...(startIn ? { startIn } : {}),
-        types: [{ description:"Article JSON", accept:{ "application/json": [".json"] } }],
-        excludeAcceptAllOption: false
-      });
-      const writable = await handle.createWritable();
-      await writable.write(blob); await writable.close();
-      return true;
-    } catch (e) {
-      // Cancel -> false; any other error -> false (no auto-download)
-      return false;
-    }
-  }
-
-  // legacy fallback (no picker support)
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = `${safeName(suggested)}.article.json`;
-  document.body.appendChild(a);
-  a.click();
-  setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); },0);
-  return true;
-}
-
-async function browserSaveClientWithDialog(client, suggested="client") {
-  const data = JSON.stringify(client, null, 2);
-  const blob = new Blob([data], { type:"application/json" });
-
-  if (window.isSecureContext && typeof window.showSaveFilePicker === "function") {
-    try {
-      let startIn = null;
-      try { startIn = await getClientsFolderHandle(); } catch {}
-      const handle = await window.showSaveFilePicker({
-        suggestedName: `${safeClientName(suggested)}.client.json`,
-        ...(startIn ? { startIn } : {}),
-        types: [{ description:"Client JSON", accept:{ "application/json": [".json"] } }],
-        excludeAcceptAllOption: false
-      });
-      const writable = await handle.createWritable();
-      await writable.write(blob); await writable.close();
-      return true;
-    } catch (e) {
-      return false;
-    }
-  }
-
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = `${safeClientName(suggested)}.client.json`;
-  document.body.appendChild(a);
-  a.click();
-  setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); },0);
-  return true;
-}
-
-
-// Replace the whole function with this
-async function browserSaveClientWithDialog(client, suggested = "client") {
-  const data = JSON.stringify(client, null, 2);
-  const blob = new Blob([data], { type: "application/json" });
-
-  // If the modern picker exists, use it and NEVER auto-download on error/cancel
-  if (window.isSecureContext && typeof window.showSaveFilePicker === "function") {
-    try {
-      let startIn;
+  async function getCompanyBaseDirHandle() {
+    // Try stored root first
+    let base = await idbGet(DOCS_ROOT_KEY);
+    if (base) {
       try {
-        // Best-effort: if this fails (permissions etc.), we still show a picker without startIn
-        startIn = await getClientsFolderHandle();
-      } catch {}
+        base = await ensureWritable(base);
+        await base.getDirectoryHandle("Articles", { create: true });
+        await base.getDirectoryHandle("Clients",  { create: true });
+        return base;
+      } catch {
+        await clearStoredFSRoots(); // stale/denied -> purge and reprompt
+      }
+    }
 
-      const handle = await window.showSaveFilePicker({
-        suggestedName: `${safeClientName(suggested)}.client.json`,
-        ...(startIn ? { startIn } : {}),
-        types: [{ description: "Client JSON", accept: { "application/json": [".json"] } }],
-        excludeAcceptAllOption: false,
-      });
-
-      const writable = await handle.createWritable();
-      await writable.write(blob);
-      await writable.close();
-      return true; // saved successfully
+    // Ask user (suggest "documents")
+    let picked;
+    try {
+      picked = await window.showDirectoryPicker({ id:"sem-company-folder", mode:"readwrite", startIn:"documents" });
     } catch (e) {
-      // User canceled (AbortError) or any other error -> DO NOT fallback download
-      return false;
+      if (isAbort(e)) throw e; // user Cancel
+      throw e;
+    }
+    try {
+      await ensureWritable(picked);
+    } catch {
+      throw new DOMException("Chosen folder not writable", "NotAllowedError");
+    }
+
+    await picked.getDirectoryHandle("Articles", { create: true });
+    await picked.getDirectoryHandle("Clients",  { create: true });
+    await idbSet(DOCS_ROOT_KEY, picked);
+    await idbSet(ARTICLES_DIR_KEY, await picked.getDirectoryHandle("Articles", { create: true }));
+    await idbSet(CLIENTS_DIR_KEY,  await picked.getDirectoryHandle("Clients",  { create: true }));
+    return picked;
+  }
+
+  async function getArticlesFolderHandle() {
+    try {
+      const base = await getCompanyBaseDirHandle();
+      const dir  = await base.getDirectoryHandle("Articles", { create: true });
+      await ensureWritable(dir);
+      await idbSet(ARTICLES_DIR_KEY, dir);
+      return dir;
+    } catch (e) {
+      if (isAbort(e)) throw e; // user cancelled
+      return null;             // allow save dialog without startIn
     }
   }
 
-  // Legacy fallback: only used when the picker is not available
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = `${safeClientName(suggested)}.client.json`;
-  document.body.appendChild(a);
-  a.click();
-  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 0);
-  return true;
-}
+  async function getClientsFolderHandle() {
+    try {
+      const base = await getCompanyBaseDirHandle();
+      const dir  = await base.getDirectoryHandle("Clients", { create: true });
+      await ensureWritable(dir);
+      await idbSet(CLIENTS_DIR_KEY, dir);
+      return dir;
+    } catch (e) {
+      if (isAbort(e)) throw e;
+      return null;
+    }
+  }
 
+  // ============== SAVE HELPERS (cancel-safe; no forced fallback) ==============
+  async function browserSaveArticleWithDialog(article, suggested="article") {
+    const data = JSON.stringify(article, null, 2);
+    const blob = new Blob([data], { type:"application/json" });
 
+    if (window.isSecureContext && typeof window.showSaveFilePicker === "function") {
+      try {
+        let startIn = null;
+        try { startIn = await getArticlesFolderHandle(); } catch {}
+        const handle = await window.showSaveFilePicker({
+          suggestedName: `${safeName(suggested)}.article.json`,
+          ...(startIn ? { startIn } : {}),
+          types: [{ description:"Article JSON", accept:{ "application/json": [".json"] } }],
+          excludeAcceptAllOption: false
+        });
+        const writable = await handle.createWritable();
+        await writable.write(blob);
+        await writable.close();
+        return true;
+      } catch {
+        // Cancel or any error -> no fallback download
+        return false;
+      }
+    }
+
+    // Legacy fallback (only if no picker support at all)
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `${safeName(suggested)}.article.json`;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); },0);
+    return true;
+  }
+
+  async function browserSaveClientWithDialog(client, suggested="client") {
+    const data = JSON.stringify(client, null, 2);
+    const blob = new Blob([data], { type:"application/json" });
+
+    if (window.isSecureContext && typeof window.showSaveFilePicker === "function") {
+      try {
+        let startIn = null;
+        try { startIn = await getClientsFolderHandle(); } catch {}
+        const handle = await window.showSaveFilePicker({
+          suggestedName: `${safeClientName(suggested)}.client.json`,
+          ...(startIn ? { startIn } : {}),
+          types: [{ description:"Client JSON", accept:{ "application/json": [".json"] } }],
+          excludeAcceptAllOption: false
+        });
+        const writable = await handle.createWritable();
+        await writable.write(blob);
+        await writable.close();
+        return true;
+      } catch {
+        return false;
+      }
+    }
+
+    // Legacy fallback (only if no picker support at all)
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `${safeClientName(suggested)}.client.json`;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); },0);
+    return true;
+  }
+
+  // ============== UI FOCUS GUARDS ==============
   function enableFirstClickSelectSecondClickCaret(input) {
     if (!input) return;
     let suppressNextMouseUp = false;
@@ -362,9 +333,7 @@ async function browserSaveClientWithDialog(client, suggested = "client") {
       if (document.activeElement !== input || !firstClickDone) {
         setTimeout(() => {
           input.select();
-          try {
-            input.setSelectionRange(0, input.value.length);
-          } catch {}
+          try { input.setSelectionRange(0, input.value.length); } catch {}
         }, 0);
         suppressNextMouseUp = true;
         firstClickDone = true;
@@ -372,16 +341,9 @@ async function browserSaveClientWithDialog(client, suggested = "client") {
         suppressNextMouseUp = false;
       }
     });
-    input.addEventListener(
-      "mouseup",
-      (e) => {
-        if (suppressNextMouseUp) {
-          e.preventDefault();
-          suppressNextMouseUp = false;
-        }
-      },
-      true
-    );
+    input.addEventListener("mouseup", (e) => {
+      if (suppressNextMouseUp) { e.preventDefault(); suppressNextMouseUp = false; }
+    }, true);
     input.addEventListener("blur", () => {
       firstClickDone = false;
       suppressNextMouseUp = false;
@@ -399,20 +361,15 @@ async function browserSaveClientWithDialog(client, suggested = "client") {
   }
 
   function unlockAddInputs() {
-    ["addRef", "addProduct", "addDesc", "addQty", "addPrice", "addTva", "addDiscount"].forEach((id) => {
+    ["addRef","addProduct","addDesc","addQty","addPrice","addTva","addDiscount"].forEach((id) => {
       const el = getEl(id);
-      if (el) {
-        el.disabled = false;
-        el.readOnly = false;
-      }
+      if (el) { el.disabled = false; el.readOnly = false; }
     });
   }
 
   function recoverFocus() {
     killOverlays();
-    try {
-      window.focus();
-    } catch {}
+    try { window.focus(); } catch {}
     unlockAddInputs();
   }
 
@@ -427,6 +384,7 @@ async function browserSaveClientWithDialog(client, suggested = "client") {
     });
   }
 
+  // ============== INIT ==============
   function init() {
     if (!SEM.COMPANY_LOCKED && typeof SEM.loadCompanyFromLocal === "function") {
       SEM.loadCompanyFromLocal();
@@ -437,24 +395,26 @@ async function browserSaveClientWithDialog(client, suggested = "client") {
 
     installFocusGuards();
 
-    ["addPrice", "addQty", "addTva", "addDiscount"].forEach((id) => enableFirstClickSelectSecondClickCaret(getEl(id)));
+    ["addPrice", "addQty", "addTva", "addDiscount"]
+      .forEach((id) => enableFirstClickSelectSecondClickCaret(getEl(id)));
 
-getEl("btnNew")?.insertAdjacentHTML("afterend",
-  '<button id="btnResetFolders" class="btn">Réinitialiser les dossiers…</button>');
-getEl("btnResetFolders")?.addEventListener("click", async () => {
-  await clearStoredFSRoots();
-  await showDialog('Réinitialisé. Au prochain enregistrement, choisissez un dossier (ex: "Documents").', { title:"Dossiers réinitialisés" });
-});
+    // Reset folders control
+    getEl("btnNew")?.insertAdjacentHTML(
+      "afterend",
+      '<button id="btnResetFolders" class="btn">Réinitialiser les dossiers…</button>'
+    );
+    getEl("btnResetFolders")?.addEventListener("click", async () => {
+      await clearStoredFSRoots();
+      await showDialog('Réinitialisé. Au prochain enregistrement, choisissez un dossier (ex: "Documents").', { title:"Dossiers réinitialisés" });
+    });
 
-
+    // Toolbar
     getEl("btnOpen")?.addEventListener("click", () => {
       if (typeof onOpenInvoiceClick === "function") onOpenInvoiceClick();
     });
 
     getEl("btnSave")?.addEventListener("click", () => {
-      try {
-        window.__includeCompanyForSave = true;
-      } catch {}
+      try { window.__includeCompanyForSave = true; } catch {}
       if (w.SEM?.readInputs) w.SEM.readInputs();
       else if (typeof readInputs === "function") readInputs();
       saveInvoiceJSON();
@@ -464,15 +424,16 @@ getEl("btnResetFolders")?.addEventListener("click", async () => {
       if (typeof exportCurrentPDF === "function") exportCurrentPDF();
     });
 
+    // Items form actions
     getEl("btnSubmitItem")?.addEventListener("click", () => {
       if (typeof SEM.submitItemForm === "function") SEM.submitItemForm();
     });
-
     getEl("btnNewItem")?.addEventListener("click", () => {
       if (typeof SEM.clearAddFormAndMode === "function") SEM.clearAddFormAndMode();
     });
 
-    ["addRef", "addProduct", "addDesc", "addQty", "addPrice", "addTva", "addDiscount"].forEach((id) => {
+    // Enter-to-submit in add fields
+    ["addRef","addProduct","addDesc","addQty","addPrice","addTva","addDiscount"].forEach((id) => {
       const el = getEl(id);
       el?.addEventListener("keydown", (e) => {
         if (e.key === "Enter") {
@@ -481,19 +442,12 @@ getEl("btnResetFolders")?.addEventListener("click", async () => {
         }
       });
       if (el) {
-        el.addEventListener("focus", () => {
-          try {
-            el.select();
-          } catch {}
-        });
-        el.addEventListener("click", () => {
-          try {
-            el.select();
-          } catch {}
-        });
+        el.addEventListener("focus", () => { try { el.select(); } catch {} });
+        el.addEventListener("click", () => { try { el.select(); } catch {} });
       }
     });
 
+    // Logo picker (desktop integration if available)
     getEl("companyLogo")?.addEventListener("click", async () => {
       if (!window.SoukElMeuble?.pickLogo) return;
       const res = await window.SoukElMeuble.pickLogo();
@@ -503,11 +457,11 @@ getEl("btnResetFolders")?.addEventListener("click", async () => {
       }
     });
 
+    // Keep add form inputs focusable even after print overlay
     const addFieldset = getEl("addRef")?.closest("fieldset.section-box");
-    if (addFieldset) {
-      addFieldset.addEventListener("mousedown", recoverFocus, true);
-    }
+    if (addFieldset) addFieldset.addEventListener("mousedown", recoverFocus, true);
 
+    // Print mode hooks (desktop)
     window.SoukElMeuble?.onEnterPrintMode?.(() => {
       window.PDFView?.show?.(SEM.state, window.SoukElMeuble?.assets || {});
     });
@@ -516,33 +470,18 @@ getEl("btnResetFolders")?.addEventListener("click", async () => {
       recoverFocus();
     });
 
-    getEl("colToggleRef")?.addEventListener("change", () => {
-      if (typeof SEM.applyColumnHiding === "function") SEM.applyColumnHiding();
-    });
-    getEl("colTogglePrice")?.addEventListener("change", () => {
-      if (typeof SEM.applyColumnHiding === "function") SEM.applyColumnHiding();
-    });
-    getEl("colToggleProduct")?.addEventListener("change", () => {
-      if (typeof SEM.applyColumnHiding === "function") SEM.applyColumnHiding();
-    });
-    getEl("colToggleDesc")?.addEventListener("change", () => {
-      if (typeof SEM.applyColumnHiding === "function") SEM.applyColumnHiding();
-    });
-    getEl("colToggleQty")?.addEventListener("change", () => {
-      if (typeof SEM.applyColumnHiding === "function") SEM.applyColumnHiding();
-    });
-    getEl("colToggleTva")?.addEventListener("change", () => {
-      if (typeof SEM.applyColumnHiding === "function") SEM.applyColumnHiding();
-    });
-    getEl("colToggleDiscount")?.addEventListener("change", () => {
-      if (typeof SEM.applyColumnHiding === "function") SEM.applyColumnHiding();
-    });
+    // Column visibility toggles
+    ["colToggleRef","colTogglePrice","colToggleProduct","colToggleDesc","colToggleQty","colToggleTva","colToggleDiscount"]
+      .forEach(id => getEl(id)?.addEventListener("change", () => {
+        if (typeof SEM.applyColumnHiding === "function") SEM.applyColumnHiding();
+      }));
     if (typeof SEM.applyColumnHiding === "function") SEM.applyColumnHiding();
 
+    // Save / Load Article
     getEl("btnSaveArticle")?.addEventListener("click", async () => {
       const article = captureArticleFromForm();
       const hasProduct = article.use?.product && String(article.product || "").trim().length > 0;
-      const hasDesc = article.use?.desc && String(article.desc || "").trim().length > 0;
+      const hasDesc    = article.use?.desc    && String(article.desc    || "").trim().length > 0;
       if (!hasProduct && !hasDesc) {
         await showDialog("Veuillez saisir au moins un Produit ou une Description.", { title: "Article incomplet" });
         return;
@@ -575,6 +514,7 @@ getEl("btnResetFolders")?.addEventListener("click", async () => {
       }
     });
 
+    // Save / Load Client
     getEl("btnSaveClient")?.addEventListener("click", async () => {
       const client = captureClientFromForm();
       if (!client.name && !client.email && !client.phone) {

@@ -5,24 +5,51 @@
   const getEl = (id) => document.getElementById(id);
 
   const setVal = (id, v) => { const el = getEl(id); if (el) el.value = v; };
-  const getStr = (id, def = "") => { const el = getEl(id); return el ? el.value.trim() : def; };
+  const getStr = (id, def = "") => { const el = getEl(id); return el ? String(el.value ?? "").trim() : def; };
   const getNum = (id, def = 0) => {
     const val = getStr(id, String(def));
-    const n = Number(val.replace?.(",", ".") ?? val);
+    const n = Number((val.replace?.(",", ".") ?? val));
     return Number.isFinite(n) ? n : def;
   };
   const setText = (id, v) => { const el = getEl(id); if (el) el.textContent = v; };
   const setSrc  = (id, v) => { const el = getEl(id); if (el) el.src = v; };
 
+  // Safer filename sanitizer (Windows/macOS)
+  // - strips reserved characters
+  // - collapses whitespace
+  // - avoids trailing dot/space (Windows)
+  // - avoids reserved device names (CON, PRN, AUX, NUL, COM1.., LPT1..)
   function slugForFile(s = "") {
-    return String(s).trim()
-      .replace(/[\/\\:*?"<>|]/g, "-")
+    let out = String(s ?? "")
+      .replace(/[\/\\:*?"<>|]/g, "-")   // illegal on Windows
+      .replace(/[\u0000-\u001f]/g, "")  // control chars
       .replace(/\s+/g, " ")
-      .replace(/[\u0000-\u001f]/g, "")
       .trim();
+
+    // Avoid reserved DOS names (case-insensitive)
+    const base = out.split(".")[0]?.trim().toUpperCase();
+    const reserved = /^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])$/i;
+    if (!base || reserved.test(base)) out = `file-${Date.now()}`;
+
+    // No trailing dot/space on Windows
+    out = out.replace(/[.\s]+$/g, "");
+
+    // Keep it reasonable
+    if (out.length > 120) out = out.slice(0, 120).trim();
+
+    return out || "file";
   }
-  function ensurePdfExt(name){ return name.toLowerCase().endsWith(".pdf") ? name : (name + ".pdf"); }
-  function ensureJsonExt(name){ return name.toLowerCase().endsWith(".json") ? name : (name + ".json"); }
+  const sanitizeFilename = slugForFile; // alias, if you prefer the name elsewhere
+
+  function ensurePdfExt(name){
+    const n = String(name || "document").trim();
+    return n.toLowerCase().endsWith(".pdf") ? n : (n + ".pdf");
+  }
+  function ensureJsonExt(name){
+    const n = String(name || "data").trim();
+    return n.toLowerCase().endsWith(".json") ? n : (n + ".json");
+  }
+
   function docTypeLabel(t){
     const map = { facture:"Facture", devis:"Devis", bl:"Bon de livraison", bc:"Bon de commande" };
     return map[String(t || "").toLowerCase()] || "Document";
@@ -31,13 +58,18 @@
   function formatMoney(v, currency){
     const n = Number(v || 0);
     try {
+      // Let the runtime pick the current locale; if currency is bad, fall back
       return new Intl.NumberFormat(undefined, { style: "currency", currency }).format(n);
     } catch {
-      return new Intl.NumberFormat(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n) + " " + (currency || "");
+      return new Intl.NumberFormat(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n) + (currency ? (" " + currency) : "");
     }
   }
-  function formatInt(v){ return new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 }).format(Number(v || 0)); }
-  function formatPct(v){ return new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(Number(v || 0)); }
+  function formatInt(v){
+    return new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 }).format(Number(v || 0));
+  }
+  function formatPct(v){
+    return new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(Number(v || 0));
+  }
 
   function enableFirstClickSelectSecondClickCaret(input){
     if (!input) return;
@@ -179,23 +211,42 @@
     });
   }
 
+  // More robust download (revokes URL even if errors happen)
   function downloadBlob(filename, blob){
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = filename;
+    a.download = filename || "download";
     document.body.appendChild(a);
-    a.click();
-    setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 0);
+    try { a.click(); } finally {
+      setTimeout(() => { try { URL.revokeObjectURL(a.href); } catch {} a.remove(); }, 0);
+    }
   }
 
+  // Convert OS paths to safe file:// URLs (Windows/macOS)
   function toFileURL(p){
     if (!p) return null;
     if (/^(file|https?):\/\//i.test(p)) return p;
-    const normalized = String(p).replace(/\\/g, "/");
-    if (/^[a-zA-Z]:\//.test(normalized)) return "file:///" + encodeURI(normalized);
-    if (normalized.startsWith("//")) return "file:" + normalized;
-    return "file://" + encodeURI(normalized.startsWith("/") ? normalized : "/" + normalized);
+    let normalized = String(p).replace(/\\/g, "/");
+
+    // UNC paths (\\server\share\...)
+    if (normalized.startsWith("//")) {
+      return "file:" + encodeURI(normalized);
+    }
+
+    // Windows drive letter: C:/...
+    if (/^[a-zA-Z]:\//.test(normalized)) {
+      return "file:///" + encodeURI(normalized);
+    }
+
+    // POSIX absolute path: /Users/...
+    if (normalized.startsWith("/")) {
+      return "file://" + encodeURI(normalized);
+    }
+
+    // Relative -> best-effort
+    return "file://" + encodeURI("/" + normalized);
   }
+
   async function openPDFFile(path){
     if (!path) return false;
     if (window.SoukElMeuble?.openPath)      { try { return !!(await window.SoukElMeuble.openPath(path)); } catch {} }
@@ -216,7 +267,7 @@
   // ---- Expose: keep old globals AND offer SEM namespace
   const helpers = {
     $, $$, getEl, setVal, getStr, getNum, setText, setSrc,
-    slugForFile, ensurePdfExt, ensureJsonExt, docTypeLabel,
+    slugForFile, sanitizeFilename, ensurePdfExt, ensureJsonExt, docTypeLabel,
     formatMoney, formatInt, formatPct,
     enableFirstClickSelectSecondClickCaret,
     ensureDialog, showDialog, showConfirm,

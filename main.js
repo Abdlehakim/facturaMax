@@ -36,8 +36,21 @@ function createWindow() {
 }
 
 function sanitizeFileName(name = "") {
-  return String(name).replace(/[<>:"/\\|?*\u0000-\u001F]/g, "_").trim();
+  let out = String(name)
+    .replace(/[<>:"/\\|?*\u0000-\u001F]/g, "_")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  // Avoid reserved DOS names and trailing dot/space (Windows)
+  const base = out.split(".")[0]?.trim();
+  if (!base || /^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i.test(base)) {
+    out = `file-${Date.now()}`;
+  }
+  out = out.replace(/[.\s]+$/g, "");
+  if (out.length > 120) out = out.slice(0, 120).trim();
+  return out || "file";
 }
+
 function withPdfExt(name = "document") {
   return name.toLowerCase().endsWith(".pdf") ? name : `${name}.pdf`;
 }
