@@ -522,6 +522,37 @@
         return;
       }
       const suggested = pickSuggestedClientName(client);
+
+      // 1) Ensure the special folder exists (Windows may prompt UAC once)
+      if (window.SoukElMeuble?.ensureClientsSystemFolder) {
+        const res = await window.SoukElMeuble.ensureClientsSystemFolder();
+        if (res && res.ok === false) {
+          if (res.canceled) {
+            await showDialog("Installation annulée. Le dossier système n’a pas été créé.", { title: "Action annulée" });
+            // If you want to enforce installation first, uncomment:
+            // return;
+          } else if (res.error) {
+            await showDialog("Impossible de créer le dossier système.\n" + res.error, { title: "Erreur" });
+            // return; // enforce installation
+          }
+        } else if (res && res.ok && res.elevated) {
+          await showDialog(`Dossier créé :\n${res.path}\n\nDroits accordés à tous les utilisateurs.`, { title: "Installation terminée" });
+        }
+      }
+
+      // 2) Try direct save into system folder (desktop app)
+      if (window.SoukElMeuble?.saveClientDirect) {
+        const out = await window.SoukElMeuble.saveClientDirect({ client, suggestedName: suggested });
+        if (out?.ok) {
+          await showDialog(`Client enregistré dans le dossier système.\n\n${out.path}`, { title: "Succès" });
+          // Optionally reveal the file in Explorer/Finder:
+          // await window.SoukElMeuble?.showInFolder?.(out.path);
+          return;
+        }
+        // If it failed (permissions/cancel/other), fall back to browser dialog.
+      }
+
+      // 3) Fallback: regular browser save (user chooses location)
       try {
         const ok = await browserSaveClientWithDialog(client, suggested);
         if (ok) await showDialog("Client enregistré.", { title: "Succès" });

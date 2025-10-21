@@ -4,6 +4,8 @@ const { app, BrowserWindow, ipcMain, dialog, shell } = require("electron");
 const path = require("path");
 const fs = require("fs");
 const fsp = fs.promises;
+const os = require("os");
+const { spawn } = require("child_process");
 
 if (!app.isPackaged) {
   const temp = process.env.TEMP || process.env.TMP || "C:\\Windows\\Temp";
@@ -149,7 +151,125 @@ app.on("window-all-closed", () => {
   if (process.platform !== "darwin") app.quit();
 });
 
-// ===== JSON (invoice) save with cancel-safe dialog =====
+// ===================== CLIENTS SYSTEM FOLDER (NEW) =====================
+
+// Where we want to store client files
+function getClientsSystemFolder() {
+  if (process.platform === "win32") {
+    // Requires elevation the first time
+    return "C:\\Program Files\\FacturaMax\\Clients";
+  }
+  // macOS/Linux → user Documents
+  return path.join(app.getPath("documents"), "FacturaMax", "Clients");
+}
+
+async function canWriteTo(dir) {
+  try {
+    await fsp.mkdir(dir, { recursive: true });
+    const test = path.join(dir, `.write-test-${Date.now()}.tmp`);
+    await fsp.writeFile(test, "ok", "utf-8");
+    await fsp.unlink(test);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function runElevatedWin(commands) {
+  // commands: a single cmd.exe string (no quotes at ends)
+  // Uses PowerShell to invoke UAC
+  return new Promise((resolve) => {
+    const args = [
+      "-NoProfile",
+      "-ExecutionPolicy",
+      "Bypass",
+      "-Command",
+      `Start-Process cmd -Verb RunAs -ArgumentList '/c ${commands.replace(/'/g, "''")}'`,
+    ];
+    const child = spawn("powershell.exe", args, { windowsHide: true, stdio: "ignore" });
+    child.on("error", () => resolve({ ok: false, error: "spawn error" }));
+    child.on("exit", (code) => resolve({ ok: code === 0 }));
+    // Note: Start-Process returns immediately — we'll verify by writing later.
+    setTimeout(() => resolve({ ok: true, deferred: true }), 1200);
+  });
+}
+
+async function ensureClientsFolderWin() {
+  const dir = getClientsSystemFolder();
+
+  // 1) Try without elevation
+  try {
+    await fsp.mkdir(dir, { recursive: true });
+    if (await canWriteTo(dir)) return { ok: true, path: dir, elevated: false };
+  } catch {}
+
+  // 2) Try elevate with UAC (create + grant Users modify rights)
+  //   - *S-1-5-32-545 == BUILTIN\Users
+  const icacls = `icacls "${dir}" /grant *S-1-5-32-545:(OI)(CI)M /T /C`;
+  const mk = `mkdir "${dir}"`;
+  const commands = `${mk} && ${icacls}`;
+
+  const res = await runElevatedWin(commands);
+  if (res.ok) {
+    // Give the OS a moment, then validate write access
+    for (let i = 0; i < 10; i++) {
+      if (await canWriteTo(dir)) return { ok: true, path: dir, elevated: true };
+      await new Promise((r) => setTimeout(r, 250));
+    }
+    return { ok: false, error: "UAC completed but write test failed", path: dir };
+  }
+  return { ok: false, error: "UAC prompt dismissed or failed", canceled: true };
+}
+
+async function ensureClientsSystemFolder() {
+  const dir = getClientsSystemFolder();
+  if (process.platform === "win32") {
+    return await ensureClientsFolderWin();
+  }
+  // macOS/Linux → create in Documents
+  try {
+    await fsp.mkdir(dir, { recursive: true });
+    if (await canWriteTo(dir)) return { ok: true, path: dir, elevated: false };
+    return { ok: false, error: "Cannot write to folder", path: dir };
+  } catch (e) {
+    return { ok: false, error: String(e?.message || e), path: dir };
+  }
+}
+
+function uniqueClientPath(baseDir, baseName) {
+  const safe = sanitizeFileName(baseName);
+  const fp = path.join(baseDir, withJsonExt(safe));
+  return ensureUniquePath(fp);
+}
+
+// IPC: one-time installation / ensure folder
+ipcMain.handle("clients:ensureSystemFolder", async () => {
+  try {
+    const res = await ensureClientsSystemFolder();
+    return res;
+  } catch (e) {
+    return { ok: false, error: String(e?.message || e) };
+  }
+});
+
+// IPC: direct save client JSON into the system folder
+ipcMain.handle("clients:saveDirect", async (_evt, payload = {}) => {
+  try {
+    const { client = {}, suggestedName = "client" } = payload || {};
+    const ensure = await ensureClientsSystemFolder();
+    if (!ensure.ok) return { ok: false, ...ensure };
+
+    const base = ensure.path || getClientsSystemFolder();
+    const pretty = JSON.stringify(client, null, 2);
+    const finalPath = uniqueClientPath(base, suggestedName || client.name || "client");
+    await fsp.writeFile(finalPath, pretty, "utf-8");
+    return { ok: true, path: finalPath, name: path.basename(finalPath) };
+  } catch (e) {
+    return { ok: false, error: String(e?.message || e) };
+  }
+});
+
+// ===================== JSON (invoice) save with cancel-safe dialog =====================
 ipcMain.handle("save-invoice-json", async (_evt, payload = {}) => {
   const incoming = (payload && payload.data && typeof payload.data === "object") ? payload.data : payload;
   const meta     = incoming?.meta || payload?.meta || {};
@@ -178,7 +298,7 @@ ipcMain.handle("save-invoice-json", async (_evt, payload = {}) => {
   return { ok: true, path: filePath, name: path.basename(filePath) };
 });
 
-// ===== JSON open =====
+// ===================== JSON open =====================
 ipcMain.handle("open-invoice-json", async () => {
   const { canceled, filePaths } = await dialog.showOpenDialog({
     title: "Ouvrir",
@@ -198,7 +318,7 @@ ipcMain.handle("open-invoice-json", async () => {
   }
 });
 
-// ===== Logo pick =====
+// ===================== Logo pick =====================
 ipcMain.handle("SoukElMeuble:pickLogo", async () => {
   const { canceled, filePaths } = await dialog.showOpenDialog({
     title: "Choisir un logo",
@@ -220,7 +340,7 @@ ipcMain.handle("SoukElMeuble:pickLogo", async () => {
   return { dataUrl: `data:${mime};base64,${base64}` };
 });
 
-// ===== PDF export with cancel-safe dialog =====
+// ===================== PDF export with cancel-safe dialog =====================
 ipcMain.handle("SoukElMeuble:exportPDFFromHTML", async (event, payload) => {
   const { html = "", css = "", meta = {}, silent } = payload || {};
   const isSilent =
@@ -262,7 +382,7 @@ ipcMain.handle("SoukElMeuble:exportPDFFromHTML", async (event, payload) => {
   }
 });
 
-// ===== Shell helpers =====
+// ===================== Shell helpers =====================
 ipcMain.handle("SoukElMeuble:openPath", async (_evt, absPath) => {
   try {
     const res = await shell.openPath(absPath);
@@ -288,7 +408,7 @@ ipcMain.handle("SoukElMeuble:openExternal", async (_evt, url) => {
   }
 });
 
-// ===== Articles APIs =====
+// ===================== Articles APIs =====================
 function ensureSafeName(s = "article") {
   return String(s)
     .trim()

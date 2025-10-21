@@ -7,9 +7,9 @@
   "license": "MIT",
   "scripts": {
     "dev:site": "http-server ./site -p 8080 -c-1",
-  "dev:site:localhost": "http-server ./site -p 8080 -a localhost -c-1",
-  "dev:renderer": "http-server ./src/renderer -p 8081 -c-1",
-  "start": "electron .",
+    "dev:site:localhost": "http-server ./site -p 8080 -a localhost -c-1",
+    "dev:renderer": "http-server ./src/renderer -p 8081 -c-1",
+    "start": "electron .",
     "dist": "electron-builder --win nsis",
     "dist:mac": "electron-builder --mac dmg,zip",
     "dist:mac:arm64": "electron-builder --mac dmg,zip --arm64",
@@ -29,7 +29,8 @@
   "dependencies": {
     "html2canvas": "^1.4.1",
     "jspdf": "^3.0.3",
-    "pdfjs-dist": "^3.11.174"
+    "pdfjs-dist": "^3.11.174",
+    "sudo-prompt": "^9.2.1"
   },
   "build": {
     "afterAllArtifactBuild": "scripts/trim-artifacts.js",

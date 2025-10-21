@@ -44,10 +44,10 @@ function normalizeSavePayload(p) {
 }
 
 contextBridge.exposeInMainWorld("SoukElMeuble", {
-  // JSON save (invoice)
+  // ===== Invoices (JSON) =====
   saveInvoiceJSON: async (payload) => {
     const normalized = normalizeSavePayload(payload);
-    // returns { ok:true, path, name } or { ok:false, canceled:true }
+    // -> { ok:true, path, name } | { ok:false, canceled:true }
     return await ipcRenderer.invoke("save-invoice-json", normalized);
   },
 
@@ -62,7 +62,7 @@ contextBridge.exposeInMainWorld("SoukElMeuble", {
 
   openInvoiceJSON: () => ipcRenderer.invoke("open-invoice-json"),
 
-  // PDF export
+  // ===== PDF export =====
   exportPDFFromHTML: async (payload) => {
     const res = await ipcRenderer.invoke("SoukElMeuble:exportPDFFromHTML", payload);
     // Pass through cancel/error as-is
@@ -81,6 +81,7 @@ contextBridge.exposeInMainWorld("SoukElMeuble", {
     return { ...res, url: toFileURL(res.path), name };
   },
 
+  // ===== OS helpers =====
   pickLogo: () => ipcRenderer.invoke("SoukElMeuble:pickLogo"),
   openPath: (absPath) => ipcRenderer.invoke("SoukElMeuble:openPath", absPath),
   showInFolder: (absPath) => ipcRenderer.invoke("SoukElMeuble:showInFolder", absPath),
@@ -95,11 +96,17 @@ contextBridge.exposeInMainWorld("SoukElMeuble", {
     ipcRenderer.on("SoukElMeuble:exitPrint", () => cb?.());
   },
 
-  // Articles API (already cancel-safe)
+  // ===== Articles API (unchanged) =====
   saveArticle: (payload) => ipcRenderer.invoke("articles:save", payload),
   saveArticleAuto: (payload) => ipcRenderer.invoke("articles:saveAuto", payload),
   openArticle: () => ipcRenderer.invoke("articles:open"),
   listArticles: () => ipcRenderer.invoke("articles:list"),
+
+  // ===== NEW: Clients system folder integration =====
+  // One-time installation / ensure folder exists & writable
+  ensureClientsSystemFolder: () => ipcRenderer.invoke("clients:ensureSystemFolder"),
+  // Save client JSON directly into that folder (unique filename)
+  saveClientDirect: (payload) => ipcRenderer.invoke("clients:saveDirect", payload),
 
   assets: { logo: logoDataURL },
 });
