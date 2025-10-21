@@ -246,9 +246,10 @@
         await writable.close();
         return true;
       } catch (e) {
-        // User cancelled
+        // If the user cancels the dialog: do NOT save anything.
         if (e && e.name === "AbortError") return false;
-        // Blocked/system folder or other error
+
+        // Any other picker error (e.g., system folder)
         await showDialog(
           "Impossible d’ouvrir ce dossier (protégé par le système). Choisissez un autre dossier — « Documents » est recommandé.",
           { title: "Dossier non autorisé" }
@@ -257,7 +258,7 @@
       }
     }
 
-    // Fallback (legacy browsers): download
+    // Fallback (very old browsers without the picker): user gets a normal download
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
     a.download = `${safeClientName(suggested)}.client.json`;
@@ -284,7 +285,9 @@
         await writable.close();
         return true;
       } catch (e) {
+        // Cancel: do nothing, do not save.
         if (e && e.name === "AbortError") return false;
+
         await showDialog(
           "Impossible d’ouvrir ce dossier (protégé par le système). Choisissez un autre dossier — « Documents » est recommandé.",
           { title: "Dossier non autorisé" }
@@ -293,7 +296,7 @@
       }
     }
 
-    // Fallback
+    // Fallback for legacy browsers
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
     a.download = `${safeName(suggested)}.article.json`;
@@ -492,6 +495,7 @@
       try {
         const ok = await browserSaveArticleWithDialog(article, suggested);
         if (ok) await showDialog("Article enregistré.", { title: "Succès" });
+        // if ok === false => user canceled, do nothing
       } catch {
         await showDialog("Échec de l’enregistrement.", { title: "Erreur" });
       }
@@ -527,6 +531,7 @@
       try {
         const ok = await browserSaveClientWithDialog(client, suggested);
         if (ok) await showDialog("Client enregistré.", { title: "Succès" });
+        // if ok === false => user canceled, do nothing
       } catch {
         await showDialog("Échec de l’enregistrement du client.", { title: "Erreur" });
       }
