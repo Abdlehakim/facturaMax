@@ -52,6 +52,32 @@
     return safeClientName(n || v || e || p || "client");
   }
 
+  function isAbort(e){ return e && (e.name === "AbortError"); }
+function isNotAllowed(e){ return e && (e.name === "NotAllowedError" || e.name === "SecurityError"); }
+async function clearStoredFSRoots(){
+  try {
+    const db = await idbOpen();
+    await new Promise((res, rej)=>{ const tx=db.transaction(STORE,"readwrite"); tx.objectStore(STORE).delete("docsRootHandle"); tx.oncomplete=res; tx.onerror=()=>rej(tx.error); });
+    await new Promise((res, rej)=>{ const tx=db.transaction(STORE,"readwrite"); tx.objectStore(STORE).delete("articlesDirHandle"); tx.oncomplete=res; tx.onerror=()=>rej(tx.error); });
+    await new Promise((res, rej)=>{ const tx=db.transaction(STORE,"readwrite"); tx.objectStore(STORE).delete("clientsDirHandle"); tx.oncomplete=res; tx.onerror=()=>rej(tx.error); });
+  } catch {}
+}
+async function ensureWritable(dirHandle){
+  if (!dirHandle) throw new Error("no handle");
+  let perm;
+  try { perm = await dirHandle.queryPermission({ mode:"readwrite" }); } catch {}
+  if (perm !== "granted"){
+    try { perm = await dirHandle.requestPermission({ mode:"readwrite" }); } catch (e){
+      if (isAbort(e)) throw e; // user cancelled
+    }
+  }
+  if (perm !== "granted") throw new DOMException("Permission denied", "NotAllowedError");
+  // Probe that it still exists and is a directory
+  await dirHandle.getDirectoryHandle(".", { create:false }).catch(()=>{ throw new DOMException("Gone", "NotAllowedError"); });
+  return dirHandle;
+}
+
+
   function isEnabled(key) {
     const el = getEl(fieldToggleMap[key]);
     if (!el) return true;
@@ -153,100 +179,138 @@
     return handle;
   }
 
-  async function getCompanyBaseDirHandle() {
-    let base = await idbGet(DOCS_ROOT_KEY);
+async function getCompanyBaseDirHandle() {
+  // Try the stored root first
+  let base = await idbGet(DOCS_ROOT_KEY);
+  if (base) {
     try {
-      if (base) {
-        const p = await base.requestPermission({ mode: "readwrite" });
-        if (p === "granted") {
-          await base.getDirectoryHandle(".", { create: false }).catch(() => {});
-          await base.getDirectoryHandle("Articles", { create: true });
-          await base.getDirectoryHandle("Clients", { create: true });
-          return base;
-        }
-      }
-    } catch {}
-    const picked = await pickWritableBaseDir();
-    await idbSet(DOCS_ROOT_KEY, picked);
-    await picked.getDirectoryHandle("Articles", { create: true });
-    await picked.getDirectoryHandle("Clients", { create: true });
-    return picked;
-  }
-
-  async function getArticlesFolderHandle() {
-    try {
-      const base = await getCompanyBaseDirHandle();
-      const dir = await base.getDirectoryHandle("Articles", { create: true });
-      const p = await dir.requestPermission({ mode: "readwrite" });
-      if (p !== "granted") throw new Error("permission denied");
-      await idbSet(ARTICLES_DIR_KEY, dir);
-      return dir;
-    } catch {
-      const picked = await pickWritableBaseDir();
-      await idbSet(DOCS_ROOT_KEY, picked);
-      const dir = await picked.getDirectoryHandle("Articles", { create: true });
-      await idbSet(ARTICLES_DIR_KEY, dir);
-      return dir;
+      base = await ensureWritable(base);
+      // Ensure subfolders
+      await base.getDirectoryHandle("Articles", { create: true });
+      await base.getDirectoryHandle("Clients", { create: true });
+      return base;
+    } catch (e) {
+      // stale or denied -> purge and fall through
+      await clearStoredFSRoots();
     }
   }
 
-  async function getClientsFolderHandle() {
-    try {
-      const base = await getCompanyBaseDirHandle();
-      const dir = await base.getDirectoryHandle("Clients", { create: true });
-      const p = await dir.requestPermission({ mode: "readwrite" });
-      if (p !== "granted") throw new Error("permission denied");
-      await idbSet(CLIENTS_DIR_KEY, dir);
-      return dir;
-    } catch {
-      const picked = await pickWritableBaseDir();
-      await idbSet(DOCS_ROOT_KEY, picked);
-      const dir = await picked.getDirectoryHandle("Clients", { create: true });
-      await idbSet(CLIENTS_DIR_KEY, dir);
-      return dir;
-    }
+  // Ask the user to (re)pick any folder (we suggest Documents)
+  let picked;
+  try {
+    picked = await window.showDirectoryPicker({ id:"sem-company-folder", mode:"readwrite", startIn:"documents" });
+  } catch (e) {
+    if (isAbort(e)) throw e;            // user hit Cancel -> let caller handle
+    throw e;
   }
+  try {
+    await ensureWritable(picked);
+  } catch (e) {
+    // user refused or OS disallows this location
+    throw new DOMException("Chosen folder not writable", "NotAllowedError");
+  }
+
+  // Create expected structure and persist
+  await picked.getDirectoryHandle("Articles", { create: true });
+  await picked.getDirectoryHandle("Clients",  { create: true });
+  await idbSet(DOCS_ROOT_KEY, picked);
+  // Also refresh cached subfolders
+  await idbSet(ARTICLES_DIR_KEY, await picked.getDirectoryHandle("Articles", { create: true }));
+  await idbSet(CLIENTS_DIR_KEY,  await picked.getDirectoryHandle("Clients",  { create: true }));
+  return picked;
+}
+
+async function getArticlesFolderHandle() {
+  try {
+    const base = await getCompanyBaseDirHandle();
+    const dir = await base.getDirectoryHandle("Articles", { create: true });
+    await ensureWritable(dir);
+    await idbSet(ARTICLES_DIR_KEY, dir);
+    return dir;
+  } catch (e) {
+    if (isAbort(e)) throw e; // user cancelled the folder picker
+    // As a last resort, let the save dialog run without startIn
+    return null;
+  }
+}
+async function getClientsFolderHandle() {
+  try {
+    const base = await getCompanyBaseDirHandle();
+    const dir = await base.getDirectoryHandle("Clients", { create: true });
+    await ensureWritable(dir);
+    await idbSet(CLIENTS_DIR_KEY, dir);
+    return dir;
+  } catch (e) {
+    if (isAbort(e)) throw e;
+    return null;
+  }
+}
 
 // Replace the whole function with this
-async function browserSaveArticleWithDialog(article, suggested = "article") {
+async function browserSaveArticleWithDialog(article, suggested="article") {
   const data = JSON.stringify(article, null, 2);
-  const blob = new Blob([data], { type: "application/json" });
+  const blob = new Blob([data], { type:"application/json" });
 
-  // If the modern picker exists, use it and NEVER auto-download on error/cancel
   if (window.isSecureContext && typeof window.showSaveFilePicker === "function") {
     try {
-      let startIn;
-      try {
-        // Best-effort: if this fails (permissions etc.), we still show a picker without startIn
-        startIn = await getArticlesFolderHandle();
-      } catch {}
-
+      let startIn = null;
+      try { startIn = await getArticlesFolderHandle(); } catch {}
       const handle = await window.showSaveFilePicker({
         suggestedName: `${safeName(suggested)}.article.json`,
         ...(startIn ? { startIn } : {}),
-        types: [{ description: "Article JSON", accept: { "application/json": [".json"] } }],
-        excludeAcceptAllOption: false,
+        types: [{ description:"Article JSON", accept:{ "application/json": [".json"] } }],
+        excludeAcceptAllOption: false
       });
-
       const writable = await handle.createWritable();
-      await writable.write(blob);
-      await writable.close();
-      return true;  // saved successfully
+      await writable.write(blob); await writable.close();
+      return true;
     } catch (e) {
-      // User canceled (AbortError) or any other error -> DO NOT fallback download
+      // Cancel -> false; any other error -> false (no auto-download)
       return false;
     }
   }
 
-  // Legacy fallback: only used when the picker is not available
+  // legacy fallback (no picker support)
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
   a.download = `${safeName(suggested)}.article.json`;
   document.body.appendChild(a);
   a.click();
-  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 0);
+  setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); },0);
   return true;
 }
+
+async function browserSaveClientWithDialog(client, suggested="client") {
+  const data = JSON.stringify(client, null, 2);
+  const blob = new Blob([data], { type:"application/json" });
+
+  if (window.isSecureContext && typeof window.showSaveFilePicker === "function") {
+    try {
+      let startIn = null;
+      try { startIn = await getClientsFolderHandle(); } catch {}
+      const handle = await window.showSaveFilePicker({
+        suggestedName: `${safeClientName(suggested)}.client.json`,
+        ...(startIn ? { startIn } : {}),
+        types: [{ description:"Client JSON", accept:{ "application/json": [".json"] } }],
+        excludeAcceptAllOption: false
+      });
+      const writable = await handle.createWritable();
+      await writable.write(blob); await writable.close();
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `${safeClientName(suggested)}.client.json`;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); },0);
+  return true;
+}
+
 
 // Replace the whole function with this
 async function browserSaveClientWithDialog(client, suggested = "client") {
@@ -375,11 +439,13 @@ async function browserSaveClientWithDialog(client, suggested = "client") {
 
     ["addPrice", "addQty", "addTva", "addDiscount"].forEach((id) => enableFirstClickSelectSecondClickCaret(getEl(id)));
 
-    getEl("btnNew")?.addEventListener("click", () => {
-      if (typeof SEM.newInvoice === "function") SEM.newInvoice();
-      if (typeof SEM.clearAddFormAndMode === "function") SEM.clearAddFormAndMode();
-      if (typeof SEM.bind === "function") SEM.bind();
-    });
+getEl("btnNew")?.insertAdjacentHTML("afterend",
+  '<button id="btnResetFolders" class="btn">Réinitialiser les dossiers…</button>');
+getEl("btnResetFolders")?.addEventListener("click", async () => {
+  await clearStoredFSRoots();
+  await showDialog('Réinitialisé. Au prochain enregistrement, choisissez un dossier (ex: "Documents").', { title:"Dossiers réinitialisés" });
+});
+
 
     getEl("btnOpen")?.addEventListener("click", () => {
       if (typeof onOpenInvoiceClick === "function") onOpenInvoiceClick();
