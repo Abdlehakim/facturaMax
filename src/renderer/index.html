@@ -2,16 +2,17 @@
 <html lang="fr">
   <head>
     <meta charset="UTF-8" />
-    <meta http-equiv="Content-Security-Policy"
-content="
-  default-src 'self' data: blob: file:;
-  script-src 'self' 'unsafe-eval';
-  style-src 'self' 'unsafe-inline';
-  img-src 'self' data: blob: file:;
-  font-src 'self' data:;
-  connect-src 'self';
-  worker-src 'self' blob:;
-">
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="
+        default-src 'self' data: blob:;
+        script-src 'self';
+        style-src 'self' 'unsafe-inline';
+        img-src 'self' data: blob: file:;
+        font-src 'self' data:;
+        connect-src 'self';
+      "
+    />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>SoukElMeuble – Gestionnaire de société</title>
     <link rel="stylesheet" href="./styles.css" />
@@ -152,6 +153,18 @@ content="
         width: 100%;
       }
 
+      /* === FODEC (nouveau) === */
+      #extrasBox #fodecFields {
+        display: none;
+        grid-template-columns: 2fr 1fr 1fr 1fr 1fr;
+        gap: 12px;
+        align-items: end;
+        width: 100%;
+      }
+      #extrasBox .grid.two:has(#fodecEnabled:checked) #fodecFields {
+        display: grid;
+      }
+
       /* Retenue: Taux | Base | Seuil | Libellé (large) | Montant */
       #whBox #whFields {
         margin-top: 10px;
@@ -184,7 +197,8 @@ content="
       }
       @media (max-width: 720px) {
         #extrasBox #shipFields,
-        #extrasBox #stampFields {
+        #extrasBox #stampFields,
+        #extrasBox #fodecFields {
           grid-template-columns: 1fr;
         }
       }
@@ -198,7 +212,11 @@ content="
       <header class="header">
         <div class="brand">
           <div class="logo-wrap">
-            <img id="companyLogo" src="./assets/logoIMG.png" alt="Logo SoukElMeuble" />
+            <img
+              id="companyLogo"
+              src="./assets/logoIMG.png"
+              alt="Logo SoukElMeuble"
+            />
           </div>
           <div><h1>SoukElMeuble – Créateur de factures</h1></div>
         </div>
@@ -259,36 +277,78 @@ content="
 
           <fieldset class="section-box">
             <legend>Informations entreprise :</legend>
+
             <div class="grid two">
-              <label
-                >Nom de l’entreprise
-                <input id="companyName" placeholder="SoukElMeuble SARL"
-              /></label>
-              <label
-                >Identifiant fiscal / TVA
-                <input id="companyVat" placeholder="1891628/W/A/M000"
-              /></label>
-              <label
-                >Téléphone
-                <input id="companyPhone" placeholder="+216 27 673 561"
-              /></label>
-              <label
-                >E-mail
-                <input id="companyEmail" placeholder="contact@SoukElMeuble.com"
-              /></label>
-              <label class="full"
-                >Adresse
+              <label>
+                Nom de l’entreprise
+                <input id="companyName" placeholder="SoukElMeuble SARL" />
+              </label>
+
+              <label>
+                Identifiant fiscal / TVA
+                <input id="companyVat" placeholder="1891628/W/A/M000" />
+              </label>
+
+              <label>
+                Téléphone
+                <input id="companyPhone" placeholder="+216 27 673 561" />
+              </label>
+
+              <label>
+                E-mail
+                <input
+                  id="companyEmail"
+                  placeholder="contact@SoukElMeuble.com"
+                />
+              </label>
+
+              <label class="full">
+                Adresse
                 <input
                   id="companyAddress"
                   placeholder="Rue Mahbouba Soussia 2080 Teboulba"
-              /></label>
+                />
+              </label>
+
+              <!-- ───────── Cachet de l’entreprise (scan & dropzone retirés) ───────── -->
+              <div class="full" style="margin-top: 8px">
+                <div class="label-inline" style="margin-bottom: 6px">
+                  <span class="label-text">Afficher le cachet</span>
+                  <input id="sealEnabled" type="checkbox" class="col-toggle" />
+                </div>
+
+                <div id="sealFields" style="display: none">
+                  <div class="grid two" style="gap: 12px; align-items: center">
+                    <button id="btnPickSeal" type="button" class="btn">
+                      Joindre un cachet scanné…
+                    </button>
+                  </div>
+
+                  <div
+                    id="sealPreviewWrap"
+                    class="muted"
+                    style="margin-top: 10px; display: none"
+                  >
+                    <img
+                      id="sealPreview"
+                      alt="Aperçu cachet"
+                      style="
+                        max-width: 220px;
+                        max-height: 160px;
+                        display: block;
+                      "
+                    />
+                  </div>
+                </div>
+              </div>
+              <!-- ───────── fin cachet ───────── -->
             </div>
           </fieldset>
 
           <fieldset class="section-box">
             <legend>Client</legend>
             <div class="grid two">
-              <label class="full" >
+              <label class="full">
                 Type de client
                 <select id="clientType">
                   <option value="societe" selected>
@@ -300,8 +360,8 @@ content="
 
               <label
                 >Nom du client
-                <input id="clientName" placeholder="Client ou Entreprise"
-              /></label>
+                <input id="clientName" placeholder="Client ou Entreprise" />
+              </label>
 
               <label>
                 <span id="clientIdLabel">Identifiant fiscal / TVA</span>
@@ -310,17 +370,21 @@ content="
 
               <label
                 >Téléphone du client
-                <input id="clientPhone" placeholder="+216 ..."
-              /></label>
+                <input id="clientPhone" placeholder="+216 ..." />
+              </label>
               <label
                 >E-mail du client
-                <input id="clientEmail" placeholder="client@email.com"
-              /></label>
+                <input id="clientEmail" placeholder="client@email.com" />
+              </label>
               <label class="full"
                 >Adresse du client
-                <input id="clientAddress" placeholder="Rue, Ville, Pays"
-              /></label>
+                <input id="clientAddress" placeholder="Rue, Ville, Pays" />
+              </label>
             </div>
+            <div class="full" style="display:flex; gap:8px; margin-top:8px">
+  <button id="btnSaveClient" type="button" class="btn">Enregistrer le client</button>
+  <button id="btnLoadClient" type="button" class="btn">Charger un client…</button>
+</div>
           </fieldset>
         </section>
 
@@ -352,10 +416,17 @@ content="
                   <td id="miniShip" class="right">0</td>
                 </tr>
 
+                <!-- FODEC APRES livraison et AVANT Total HT -->
+                <tr id="miniFODECRow" style="display: none">
+                  <td id="miniFODECLabel">FODEC (1%)</td>
+                  <td id="miniFODEC" class="right">0</td>
+                </tr>
+
                 <tr class="head">
                   <th>Total HT</th>
                   <th id="miniHT" class="right">0</th>
                 </tr>
+
                 <tr>
                   <td>TVA</td>
                   <td id="miniTVA" class="right">0</td>
@@ -507,9 +578,12 @@ content="
               </div>
 
               <div class="add-actions end">
+                
                 <button id="btnSubmitItem" type="button" class="btn">
                   + Ajouter
                 </button>
+                <button id="btnSaveArticle" type="button" class="btn">Enregistrer l’article</button>
+<button id="btnLoadArticle" type="button" class="btn">Charger un article…</button>
                 <button id="btnNewItem" type="button" class="btn" disabled>
                   Nouveau
                 </button>
@@ -521,8 +595,63 @@ content="
             <legend>Frais & options</legend>
 
             <div class="grid two">
+              <!-- === FODEC (nouveau / OFF par défaut) === -->
               <div class="full">
                 <div class="label-inline">
+                  <span class="label-text">Activer le FODEC</span>
+                  <input
+                    id="fodecEnabled"
+                    type="checkbox"
+                    class="col-toggle"
+                    aria-label="Activer le FODEC"
+                  />
+                </div>
+              </div>
+
+              <div id="fodecFields" class="full">
+                <label>
+                  Libellé
+                  <input id="fodecLabel" placeholder="FODEC" value="FODEC" />
+                </label>
+                <label>
+                  Taux %
+                  <input
+                    id="fodecRate"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value="1"
+                  />
+                </label>
+                <label>
+                  Base de calcul
+                  <select id="fodecBase">
+                    <option value="ht" selected>Total HT (lignes)</option>
+                    <option value="ht_plus">
+                      HT + Livraison (sans timbre)
+                    </option>
+                    <option value="ttc_sans_fodec">TTC (sans FODEC)</option>
+                  </select>
+                </label>
+                <label>
+                  TVA %
+                  <input
+                    id="fodecTva"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value="19"
+                  />
+                </label>
+                <label>
+                  Montant (auto)
+                  <input id="fodecAmount" readonly />
+                </label>
+              </div>
+              <!-- === fin FODEC === -->
+
+              <div class="full">
+                <div class="label-inline" style="margin-top: 0.5rem">
                   <span class="label-text">Activer les frais de livraison</span>
                   <input
                     id="shipEnabled"
@@ -636,7 +765,6 @@ content="
                 </select>
               </label>
 
-              <!-- NEW threshold field -->
               <label>
                 Seuil (Montant &gt;)
                 <input
@@ -685,8 +813,19 @@ content="
       </footer>
     </div>
 
+    <script src="./lib/html2canvas.min.js" defer></script>
+<script src="./lib/jspdf.umd.min.js" defer></script>
+<script src="./web-shim.js" defer></script>
 <script src="./pdfView.js" defer></script>
 <script src="./pdfWH.js" defer></script>
-<script src="./renderer.js" defer></script>
+<script src="helpers.js"></script>
+<script src="app-state.js"></script>
+
+<!-- pdf.js (for importing PDF cachets) -->
+<script src="./lib/pdfs/pdf.min.js" defer></script>
+
+<script src="app-bindings.js"></script>
+<script src="app-init.js"></script>
+<script src="app-export.js"></script>
   </body>
 </html>
