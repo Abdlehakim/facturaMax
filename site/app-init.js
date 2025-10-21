@@ -207,61 +207,88 @@
     }
   }
 
-  async function browserSaveArticleWithDialog(article, suggested = "article") {
-    const data = JSON.stringify(article, null, 2);
-    const blob = new Blob([data], { type: "application/json" });
-    if (window.isSecureContext && window.showSaveFilePicker) {
+// Replace the whole function with this
+async function browserSaveArticleWithDialog(article, suggested = "article") {
+  const data = JSON.stringify(article, null, 2);
+  const blob = new Blob([data], { type: "application/json" });
+
+  // If the modern picker exists, use it and NEVER auto-download on error/cancel
+  if (window.isSecureContext && typeof window.showSaveFilePicker === "function") {
+    try {
+      let startIn;
       try {
-        const dir = await getArticlesFolderHandle();
-        const handle = await window.showSaveFilePicker({
-          suggestedName: `${safeName(suggested)}.article.json`,
-          startIn: dir,
-          types: [{ description: "Article JSON", accept: { "application/json": [".json"] } }],
-          excludeAcceptAllOption: false,
-        });
-        const writable = await handle.createWritable();
-        await writable.write(blob);
-        await writable.close();
-        return true;
-      } catch (e) {
-        if (e && e.name === "AbortError") return false;
-      }
+        // Best-effort: if this fails (permissions etc.), we still show a picker without startIn
+        startIn = await getArticlesFolderHandle();
+      } catch {}
+
+      const handle = await window.showSaveFilePicker({
+        suggestedName: `${safeName(suggested)}.article.json`,
+        ...(startIn ? { startIn } : {}),
+        types: [{ description: "Article JSON", accept: { "application/json": [".json"] } }],
+        excludeAcceptAllOption: false,
+      });
+
+      const writable = await handle.createWritable();
+      await writable.write(blob);
+      await writable.close();
+      return true;  // saved successfully
+    } catch (e) {
+      // User canceled (AbortError) or any other error -> DO NOT fallback download
+      return false;
     }
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = `${safeName(suggested)}.article.json`;
-    a.click();
-    URL.revokeObjectURL(a.href);
-    return true;
   }
 
-  async function browserSaveClientWithDialog(client, suggested = "client") {
-    const data = JSON.stringify(client, null, 2);
-    const blob = new Blob([data], { type: "application/json" });
-    if (window.isSecureContext && window.showSaveFilePicker) {
+  // Legacy fallback: only used when the picker is not available
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `${safeName(suggested)}.article.json`;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 0);
+  return true;
+}
+
+// Replace the whole function with this
+async function browserSaveClientWithDialog(client, suggested = "client") {
+  const data = JSON.stringify(client, null, 2);
+  const blob = new Blob([data], { type: "application/json" });
+
+  // If the modern picker exists, use it and NEVER auto-download on error/cancel
+  if (window.isSecureContext && typeof window.showSaveFilePicker === "function") {
+    try {
+      let startIn;
       try {
-        const dir = await getClientsFolderHandle();
-        const handle = await window.showSaveFilePicker({
-          suggestedName: `${safeClientName(suggested)}.client.json`,
-          startIn: dir,
-          types: [{ description: "Client JSON", accept: { "application/json": [".json"] } }],
-          excludeAcceptAllOption: false,
-        });
-        const writable = await handle.createWritable();
-        await writable.write(blob);
-        await writable.close();
-        return true;
-      } catch (e) {
-        if (e && e.name === "AbortError") return false;
-      }
+        // Best-effort: if this fails (permissions etc.), we still show a picker without startIn
+        startIn = await getClientsFolderHandle();
+      } catch {}
+
+      const handle = await window.showSaveFilePicker({
+        suggestedName: `${safeClientName(suggested)}.client.json`,
+        ...(startIn ? { startIn } : {}),
+        types: [{ description: "Client JSON", accept: { "application/json": [".json"] } }],
+        excludeAcceptAllOption: false,
+      });
+
+      const writable = await handle.createWritable();
+      await writable.write(blob);
+      await writable.close();
+      return true; // saved successfully
+    } catch (e) {
+      // User canceled (AbortError) or any other error -> DO NOT fallback download
+      return false;
     }
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = `${safeClientName(suggested)}.client.json`;
-    a.click();
-    URL.revokeObjectURL(a.href);
-    return true;
   }
+
+  // Legacy fallback: only used when the picker is not available
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `${safeClientName(suggested)}.client.json`;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 0);
+  return true;
+}
+
 
   function enableFirstClickSelectSecondClickCaret(input) {
     if (!input) return;
