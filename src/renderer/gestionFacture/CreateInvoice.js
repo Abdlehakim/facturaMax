@@ -1,4 +1,4 @@
-// createInvoice/CreateInvoice.js
+// gestionFacture/CreateInvoice.js
 export function mount(root) {
   root.id = "invoice";
   root.classList.add("paper");
@@ -31,10 +31,10 @@ export function mount(root) {
           </label>
           <label>
             <span id="invNumberLabel">
-              <span class="for-facture">N° de facture</span>
-              <span class="for-devis">N° de devis</span>
-              <span class="for-bl">N° de bon de livraison</span>
-              <span class="for-bc">N° de bon de commande</span>
+              <span class="for-facture">No de facture</span>
+              <span class="for-devis">No de devis</span>
+              <span class="for-bl">No de bon de livraison</span>
+              <span class="for-bc">No de bon de commande</span>
             </span>
             <input id="invNumber" />
           </label>
@@ -50,10 +50,14 @@ export function mount(root) {
             Date
             <input id="invDate" type="date" />
           </label>
+          <label>
+            Date d'echeance
+            <input id="invDue" type="date" />
+          </label>
         </div>
 
         <div id="recentInvoices" class="full">
-          <h4>Dernières factures</h4>
+          <h4>Dernieres factures</h4>
           <div id="recentInvoicesList" class="muted"></div>
         </div>
       </fieldset>
@@ -61,13 +65,13 @@ export function mount(root) {
       <fieldset class="section-box">
         <legend>Informations entreprise :</legend>
         <div class="grid two">
-          <label>Nom de l’entreprise
+          <label>Nom de l'entreprise
             <input id="companyName" placeholder="SoukElMeuble SARL" />
           </label>
           <label>Identifiant fiscal / TVA
             <input id="companyVat" placeholder="1891628/W/A/M000" />
           </label>
-          <label>Téléphone
+          <label>Telephone
             <input id="companyPhone" placeholder="+216 27 673 561" />
           </label>
           <label>E-mail
@@ -84,10 +88,10 @@ export function mount(root) {
             </div>
             <div id="sealFields" style="display: none">
               <div class="grid two" style="gap: 12px; align-items: center">
-                <button id="btnPickSeal" type="button" class="btn">Joindre un cachet scanné…</button>
+                <button id="btnPickSeal" type="button" class="btn">Joindre un cachet scanne...</button>
               </div>
               <div id="sealPreviewWrap" class="muted" style="margin-top: 10px; display: none">
-                <img id="sealPreview" alt="Aperçu cachet" style="max-width: 220px; max-height: 160px; display: block;" />
+                <img id="sealPreview" alt="Apercu cachet" style="max-width: 220px; max-height: 160px; display: block;" />
               </div>
             </div>
           </div>
@@ -99,7 +103,7 @@ export function mount(root) {
         <div class="grid two">
           <label class="full">Type de client
             <select id="clientType">
-              <option value="societe" selected>Société / personne morale</option>
+              <option value="societe" selected>Societe / personne morale</option>
               <option value="particulier">Particulier</option>
             </select>
           </label>
@@ -113,7 +117,7 @@ export function mount(root) {
             </span>
             <input id="clientVat" placeholder="XXXXXXXXX" />
           </label>
-          <label>Téléphone du client
+          <label>Telephone du client
             <input id="clientPhone" placeholder="+216 ..." />
           </label>
           <label>E-mail du client
@@ -125,7 +129,7 @@ export function mount(root) {
         </div>
         <div class="full" style="display:flex; gap:8px; margin-top:8px">
           <button id="btnSaveClient" type="button" class="btn">Enregistrer le client</button>
-          <button id="btnLoadClient" type="button" class="btn">Charger un client…</button>
+          <button id="btnLoadClient" type="button" class="btn">Charger un client...</button>
         </div>
       </fieldset>
     </section>
@@ -135,10 +139,10 @@ export function mount(root) {
         <table id="items">
           <thead>
             <tr>
-              <th style="width: 10%">Réf.</th>
+              <th style="width: 10%">Ref.</th>
               <th style="width: 15%">Produit(s)</th>
               <th style="width: 20%">Description(s)</th>
-              <th>Qté</th>
+              <th>Qte</th>
               <th>Prix HT</th>
               <th>TVA %</th>
               <th>Remise %</th>
@@ -178,11 +182,11 @@ export function mount(root) {
               <th id="miniTTC" class="right">0</th>
             </tr>
             <tr id="miniWHRow" style="display: none">
-              <td id="miniWHLabel">Retenue à la source</td>
+              <td id="miniWHLabel">Retenue a la source</td>
               <td id="miniWH" class="right">0</td>
             </tr>
             <tr id="miniNETRow" class="grand" style="display: none">
-              <th>Net à payer</th>
+              <th>Net a payer</th>
               <th id="miniNET" class="right">0</th>
             </tr>
           </tbody>
@@ -195,8 +199,8 @@ export function mount(root) {
           <div class="grid four">
             <div class="field field-ref">
               <div class="label-inline">
-                <label for="addRef" class="label-text">Référence</label>
-                <input id="colToggleRef" type="checkbox" class="col-toggle" aria-label="Masquer colonne Référence" checked />
+                <label for="addRef" class="label-text">Reference</label>
+                <input id="colToggleRef" type="checkbox" class="col-toggle" aria-label="Masquer colonne Reference" checked />
               </div>
               <input id="addRef" placeholder="ex. : SKU-12345" />
             </div>
@@ -214,13 +218,13 @@ export function mount(root) {
                 <label for="addDesc" class="label-text">Description</label>
                 <input id="colToggleDesc" type="checkbox" class="col-toggle" aria-label="Masquer colonne Description" checked />
               </div>
-              <input id="addDesc" placeholder="ex. : Garantie 2 ans, couleur noire…" />
+              <input id="addDesc" placeholder="ex. : Garantie 2 ans, couleur noire..." />
             </div>
 
             <div class="field field-qty">
               <div class="label-inline">
-                <label for="addQty" class="label-text">Qté</label>
-                <input id="colToggleQty" type="checkbox" class="col-toggle" aria-label="Masquer colonne Qté" checked />
+                <label for="addQty" class="label-text">Qte</label>
+                <input id="colToggleQty" type="checkbox" class="col-toggle" aria-label="Masquer colonne Qte" checked />
               </div>
               <input id="addQty" type="number" min="0" step="1" value="1" />
             </div>
@@ -253,8 +257,8 @@ export function mount(root) {
           <div class="add-actions end" style="display:flex; gap:8px; flex-wrap:wrap;">
             <button id="btnSubmitItem" type="button" class="btn">+ Ajouter</button>
             <button id="btnNewItem" type="button" class="btn">Nouveau</button>
-            <button id="btnSaveItem" type="button" class="btn">Enregistrer l’article</button>
-            <button id="btnLoadItem" type="button" class="btn">Charger un article…</button>
+            <button id="btnSaveItem" type="button" class="btn">Enregistrer l'article</button>
+            <button id="btnLoadItem" type="button" class="btn">Charger un article...</button>
           </div>
         </div>
       </fieldset>
@@ -270,7 +274,7 @@ export function mount(root) {
           </div>
 
           <div id="fodecFields" class="full">
-            <label>Libellé
+            <label>Libelle
               <input id="fodecLabel" placeholder="FODEC" value="FODEC" />
             </label>
             <label>Taux %
@@ -298,7 +302,7 @@ export function mount(root) {
             </div>
           </div>
           <div id="shipFields" class="full">
-            <label>Libellé
+            <label>Libelle
               <input id="shipLabel" placeholder="Frais de livraison" />
             </label>
             <label>Montant HT
@@ -316,7 +320,7 @@ export function mount(root) {
             </div>
           </div>
           <div id="stampFields" class="full">
-            <label>Libellé
+            <label>Libelle
               <input id="stampLabel" placeholder="Timbre fiscal" />
             </label>
             <label>Montant HT
@@ -330,11 +334,11 @@ export function mount(root) {
       </fieldset>
 
       <fieldset class="section-box" id="whBox">
-        <legend>Retenue à la source</legend>
+        <legend>Retenue a la source</legend>
         <div class="full" style="margin-top: 0.5rem">
           <div class="label-inline">
-            <span class="label-text">Activer la retenue à la source</span>
-            <input id="whEnabled" type="checkbox" class="col-toggle" aria-label="Activer la retenue à la source" />
+            <span class="label-text">Activer la retenue a la source</span>
+            <input id="whEnabled" type="checkbox" class="col-toggle" aria-label="Activer la retenue a la source" />
           </div>
         </div>
         <div id="whFields">
@@ -350,8 +354,8 @@ export function mount(root) {
           <label>Seuil (Montant &gt;)
             <input id="whThreshold" type="number" min="0" step="0.01" value="1000" />
           </label>
-          <label class="full">Libellé (facultatif)
-            <input id="whLabel" placeholder="Retenue à la source" />
+          <label class="full">Libelle (facultatif)
+            <input id="whLabel" placeholder="Retenue a la source" />
           </label>
           <label>Montant (auto)
             <input id="whAmount" readonly />
@@ -364,22 +368,65 @@ export function mount(root) {
       <fieldset class="section-box">
         <legend>Notes</legend>
         <label>
-          <textarea id="notes" class="notes" rows="4" maxlength="700" placeholder="Conditions de paiement, coordonnées bancaires, notes de projet…"></textarea>
+          <textarea id="notes" class="notes" rows="4" maxlength="700" placeholder="Conditions de paiement, coordonnees bancaires, notes de projet..."></textarea>
         </label>
       </fieldset>
     </section>
   `;
 
-  // 1) Let the per-panel initializer wire events/IPC
+  const forceExtrasVisibilityFromCheckboxes = () => {
+    try {
+      const cbF = document.getElementById("fodecEnabled");
+      const cbS = document.getElementById("shipEnabled");
+      const cbT = document.getElementById("stampEnabled");
+      const cbW = document.getElementById("whEnabled");
+      if (window.SEM?.toggleFodecFields) window.SEM.toggleFodecFields(!!cbF?.checked);
+      if (window.SEM?.toggleShipFields)  window.SEM.toggleShipFields(!!cbS?.checked);
+      if (window.SEM?.toggleStampFields) window.SEM.toggleStampFields(!!cbT?.checked);
+      if (window.SEM?.toggleWHFields)    window.SEM.toggleWHFields(!!cbW?.checked);
+    } catch {}
+  };
+
+  // NEW: JS fallback to switch the label & placeholder when client type changes
+  const updateClientIdVisual = () => {
+    const sel = document.getElementById("clientType");
+    const type = String(sel?.value || "").toLowerCase();
+    const isPart = type === "particulier";
+    const soc = document.querySelector("#clientIdLabel .for-soc");
+    const part = document.querySelector("#clientIdLabel .for-part");
+    const idInput = document.getElementById("clientVat");
+    if (soc)  soc.style.display  = isPart ? "none"   : "inline";
+    if (part) part.style.display = isPart ? "inline" : "none";
+    if (idInput) idInput.placeholder = isPart ? "CIN / passeport" : "XXXXXXXXX";
+  };
+
+  const updateDocTypeVisual = () => {
+    const select = document.getElementById("docType");
+    const value = String(select?.value || "facture").toLowerCase();
+    const types = ["facture", "devis", "bl", "bc"];
+    types.forEach((slug) => {
+      const show = slug === value;
+      document
+        .querySelectorAll(`#docTypeLegend .for-${slug}, #invNumberLabel .for-${slug}`)
+        .forEach((node) => {
+          node.style.display = show ? "inline" : "none";
+        });
+    });
+  };
+  if (window.SEM) {
+    window.SEM.updateDocTypeVisual = updateDocTypeVisual;
+  }
+
+  document.getElementById("clientType")?.addEventListener("change", updateClientIdVisual);
+  document.getElementById("clientType")?.addEventListener("input", updateClientIdVisual);
+  document.getElementById("docType")?.addEventListener("change", updateDocTypeVisual);
+  document.getElementById("docType")?.addEventListener("input", updateDocTypeVisual);
+
   try {
-    if (window.SEM?.initCreateInvoice) {
-      window.SEM.initCreateInvoice(root);
-    } else {
-      setTimeout(() => window.SEM?.initCreateInvoice?.(root), 0);
-    }
+    if (window.SEM?.initCreateInvoice) window.SEM.initCreateInvoice(root);
+    else setTimeout(() => window.SEM?.initCreateInvoice?.(root), 0);
   } catch (e) { console.error("initCreateInvoice error:", e); }
 
-  // 2) Seed + first render (works whether lib renderer or SEM.bind is used)
   const seedAndRender = () => {
     try {
       if (!Array.isArray(window.SEM?.state?.items) || window.SEM.state.items.length === 0) {
@@ -388,7 +435,11 @@ export function mount(root) {
       if (window.SEM?.UI?.render) window.SEM.UI.render();
       else if (window.SEM?.bind) window.SEM.bind();
     } catch (e) { console.error(e); }
+    forceExtrasVisibilityFromCheckboxes();
+    updateClientIdVisual();
+    updateDocTypeVisual();
   };
+
   seedAndRender();
   setTimeout(seedAndRender, 0);
 }
@@ -397,5 +448,4 @@ export function unmount(root) {
   root.innerHTML = "";
 }
 
-// Some desktop bundlers import default
 export default { mount, unmount };

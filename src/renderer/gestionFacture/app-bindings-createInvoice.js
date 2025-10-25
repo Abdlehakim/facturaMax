@@ -1,9 +1,50 @@
-// createInvoice/app-bindings-CreateInvoice.js
+// gestionFacture/app-bindings-CreateInvoice.js
 (function (w) {
   const SEM = (w.SEM = w.SEM || {});
   const state = () => SEM.state;
+  const CLIENT_STORE_KEY = "sem_saved_clients_v1";
+  const MAX_STORED_CLIENTS = 8;
 
-  // ===== Cachet (SEAL) helpers =====
+  function clientKey(item) {
+    return String(item?.vat || item?.email || item?.name || "")
+      .trim()
+      .toLowerCase();
+  }
+
+  function readSavedClients() {
+    if (typeof localStorage === "undefined") return [];
+    try {
+      const raw = localStorage.getItem(CLIENT_STORE_KEY);
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) return [];
+      return parsed
+        .map((item) => {
+          if (!item || typeof item !== "object") return null;
+          return {
+            type: typeof item.type === "string" && item.type ? item.type : "societe",
+            name: typeof item.name === "string" ? item.name : "",
+            email: typeof item.email === "string" ? item.email : "",
+            phone: typeof item.phone === "string" ? item.phone : "",
+            vat: typeof item.vat === "string" ? item.vat : "",
+            address: typeof item.address === "string" ? item.address : "",
+            savedAt: typeof item.savedAt === "string" ? item.savedAt : "",
+          };
+        })
+        .filter(Boolean);
+    } catch {
+      return [];
+    }
+  }
+
+  function writeSavedClients(list) {
+    if (typeof localStorage === "undefined") return;
+    try {
+      const slim = Array.isArray(list) ? list.slice(0, MAX_STORED_CLIENTS) : [];
+      localStorage.setItem(CLIENT_STORE_KEY, JSON.stringify(slim));
+    } catch {}
+  }
+
   SEM.toggleSealFields = function (enabled) {
     const f = getEl("sealFields");
     if (f) f.style.display = enabled ? "" : "none";
@@ -15,26 +56,14 @@
     const img = getEl("sealPreview");
     if (!wrap || !img) return;
     const seal = st.company?.seal || {};
-    if (seal.enabled && seal.image) {
-      img.src = seal.image;
-      wrap.style.display = "";
-    } else {
-      img.src = "";
-      wrap.style.display = "none";
-    }
+    if (seal.enabled && seal.image) { img.src = seal.image; wrap.style.display = ""; }
+    else { img.src = ""; wrap.style.display = "none"; }
   };
 
   SEM.setSealImage = function (dataUrl) {
     const st = state();
     st.company = st.company || {};
-    st.company.seal = st.company.seal || {
-      enabled: false,
-      image: "",
-      maxWidthMm: 38,
-      maxHeightMm: 38,
-      opacity: 0.88,
-      rotateDeg: -2
-    };
+    st.company.seal = st.company.seal || { enabled:false, image:"", maxWidthMm:38, maxHeightMm:38, opacity:0.88, rotateDeg:-2 };
     st.company.seal.image = dataUrl || "";
     if (st.company.seal.image) st.company.seal.enabled = true;
     SEM.refreshSealPreview();
@@ -49,70 +78,52 @@
       return;
     }
     if (file.type === "application/pdf") {
-      if (!w.pdfjsLib) {
-        await showDialog(
-          "Impossible de lire le PDF sans pdf.js. Veuillez l’installer/charger localement, ou joignez une image.",
-          { title: "Cachet PDF" }
-        );
-        return;
-      }
+      if (!w.pdfjsLib) { await showDialog("Impossible de lire le PDF sans pdf.js. Veuillez l'installer/charger localement, ou joignez une image.", { title: "Cachet PDF" }); return; }
       try {
         const buf = await file.arrayBuffer();
         const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
         const page = await pdf.getPage(1);
-        const viewport = page.getViewport({ scale: 2.0 });
+        const viewport = page.getViewport({ scale: 2 });
         const canvas = document.createElement("canvas");
         const ctx = canvas.getContext("2d");
-        canvas.width = viewport.width;
-        canvas.height = viewport.height;
+        canvas.width = viewport.width; canvas.height = viewport.height;
         await page.render({ canvasContext: ctx, viewport }).promise;
-        const dataUrl = canvas.toDataURL("image/png", 0.92);
-        SEM.setSealImage(dataUrl);
+        SEM.setSealImage(canvas.toDataURL("image/png", 0.92));
       } catch {
-        await showDialog(
-          "Échec du chargement du PDF. Essayez un autre fichier ou convertissez-le en image.",
-          { title: "Cachet PDF" }
-        );
+        await showDialog("Echec du chargement du PDF. Essayez un autre fichier ou convertissez-le en image.", { title: "Cachet PDF" });
       }
       return;
     }
-    await showDialog("Format de fichier non supporté. Joignez une image ou un PDF.", { title: "Cachet" });
+    await showDialog("Format de fichier non supporte. Joignez une image ou un PDF.", { title: "Cachet" });
   };
 
-  // ===== Client ID placeholder =====
   SEM.updateClientIdPlaceholder = function () {
     const typeSel = getEl("clientType");
     const type = (typeSel?.value || state().client?.type || "societe").toLowerCase();
     const idInput = getEl("clientVat");
-    if (!idInput) return;
-    idInput.placeholder = type === "particulier" ? "CIN ou Passeport" : "XXXXXXXXX";
+    if (idInput) idInput.placeholder = type === "particulier" ? "CIN ou Passeport" : "XXXXXXXXX";
   };
 
-  // ===== Toggle blocks =====
-  SEM.toggleWHFields = function (enabled) {
-    const fields = getEl("whFields"); if (fields) fields.style.display = enabled ? "" : "none";
-    const r1 = getEl("miniWHRow"); const r2 = getEl("miniNETRow");
-    if (r1) r1.style.display = enabled ? "" : "none";
-    if (r2) r2.style.display = enabled ? "" : "none";
-  };
-  SEM.toggleShipFields = function (enabled) {
-    const f = getEl("shipFields"); if (f) f.style.display = enabled ? "" : "none";
-    const r = getEl("miniShipRow"); if (r) r.style.display = enabled ? "" : "none";
-  };
-  SEM.toggleStampFields = function (enabled) {
-    const f = getEl("stampFields"); if (f) f.style.display = enabled ? "" : "none";
-    const r = getEl("miniStampRow"); if (r) r.style.display = enabled ? "" : "none";
-  };
-  SEM.toggleFodecFields = function (enabled) {
-    const f = getEl("fodecFields"); if (f) f.style.display = enabled ? "" : "none";
-    const r = getEl("miniFODECRow"); if (r) r.style.display = enabled ? "" : "none";
-  };
+  function setBlockDisplay(id, on) { const el = getEl(id); if (el) el.style.display = on ? "grid" : "none"; }
 
-  // ===== Mini summary =====
+  function forceExtrasVisibility() {
+    setBlockDisplay("fodecFields", !!getEl("fodecEnabled")?.checked);
+    setBlockDisplay("shipFields",  !!getEl("shipEnabled") ?.checked);
+    setBlockDisplay("stampFields", !!getEl("stampEnabled")?.checked);
+    const whOn = !!getEl("whEnabled")?.checked;
+    const whFields = getEl("whFields");
+    if (whFields) whFields.style.display = whOn ? "grid" : "none";
+  }
+
+  SEM.toggleWHFields   = (on) => setBlockDisplay("whFields",   on);
+  SEM.toggleShipFields = (on) => setBlockDisplay("shipFields",  on);
+  SEM.toggleStampFields= (on) => setBlockDisplay("stampFields", on);
+  SEM.toggleFodecFields= (on) => setBlockDisplay("fodecFields", on);
+
   SEM.updateWHAmountPreview = function () {
     const { whAmount } = SEM.computeTotalsReturn();
     setVal("whAmount", formatMoney(whAmount, state().meta.currency || "TND"));
-    const lbl = state().meta.withholding?.label?.trim() || "Retenue à la source";
+    const lbl = state().meta.withholding?.label?.trim() || "Retenue a la source";
     setText("miniWHLabel", lbl);
   };
 
@@ -139,11 +150,8 @@
     const fLabel = (f.label || "FODEC").trim();
     const fRate = Number(f.rate || 0);
     const fodecHT = fEnabled ? (totals?.extras?.fodecHT || 0) : 0;
-    const rateStr = (Number.isInteger(Math.abs(fRate)) ? String(Math.abs(fRate))
-      : String(Math.abs(fRate)).replace(/\.?0+$/, "")) + "%";
-    const miniRow = getEl("miniFODECRow");
-    const miniLbl = getEl("miniFODECLabel");
-    const miniVal = getEl("miniFODEC");
+    const rateStr = (Number.isInteger(Math.abs(fRate)) ? String(Math.abs(fRate)) : String(Math.abs(fRate)).replace(/\.?0+$/, "")) + "%";
+    const miniRow = getEl("miniFODECRow"); const miniLbl = getEl("miniFODECLabel"); const miniVal = getEl("miniFODEC");
     if (miniRow) miniRow.style.display = fEnabled ? "" : "none";
     if (miniLbl) miniLbl.textContent = fEnabled ? `${fLabel} (${rateStr})` : fLabel;
     if (miniVal) miniVal.textContent = formatMoney(fodecHT, cur);
@@ -152,14 +160,12 @@
     if (fodecAuto) fodecAuto.value = fEnabled ? formatMoney(fodecHT, cur) : "";
   };
 
-  // ===== Bind form from state =====
   SEM.bind = function () {
     const st = state();
     st.items = Array.isArray(st.items) ? st.items : [];
 
     [["companyName","name"],["companyVat","vat"],["companyPhone","phone"],["companyEmail","email"],["companyAddress","address"]]
-      .forEach(([id, key]) => {
-        const el = getEl(id); if (!el) return;
+      .forEach(([id, key]) => { const el = getEl(id); if (!el) return;
         el.value = st.company[key] || "";
         if (SEM.COMPANY_LOCKED) { el.readOnly = true; el.classList.add("locked"); el.setAttribute("tabindex", "-1"); }
       });
@@ -170,26 +176,25 @@
     SEM.toggleSealFields(!!seal.enabled);
     SEM.refreshSealPreview();
 
-    setVal("docType",  st.meta.docType || "facture");
+    setVal("docType", st.meta.docType || "facture");
     setVal("invNumber", st.meta.number);
-    setVal("currency",  st.meta.currency);
-    setVal("invDate",   st.meta.date);
-    setVal("invDue",    st.meta.due);
+    setVal("currency", st.meta.currency);
+    setVal("invDate", st.meta.date);
+    setVal("invDue", st.meta.due);
 
-    setVal("clientType",    st.client.type || "societe");
-    setVal("clientName",    st.client.name);
-    setVal("clientEmail",   st.client.email);
-    setVal("clientPhone",   st.client.phone);
-    setVal("clientVat",     st.client.vat);
+    setVal("clientType", st.client.type || "societe");
+    setVal("clientName", st.client.name);
+    setVal("clientEmail", st.client.email);
+    setVal("clientPhone", st.client.phone);
+    setVal("clientVat", st.client.vat);
     setVal("clientAddress", st.client.address);
 
-    const wh = st.meta.withholding || { enabled:false, rate:1.5, base:"ht", label:"Retenue à la source", threshold:1000 };
+    const wh = st.meta.withholding || { enabled:false, rate:1.5, base:"ht", label:"Retenue a la source", threshold:1000 };
     if (getEl("whEnabled")) getEl("whEnabled").checked = !!wh.enabled;
-    setVal("whRate",  String(wh.rate ?? 1.5));
-    setVal("whBase",  String(wh.base ?? "ht"));
-    setVal("whLabel", String(wh.label ?? "Retenue à la source"));
+    setVal("whRate", String(wh.rate ?? 1.5));
+    setVal("whBase", String(wh.base ?? "ht"));
+    setVal("whLabel", String(wh.label ?? "Retenue a la source"));
     setVal("whThreshold", String(wh.threshold ?? 0));
-    SEM.toggleWHFields(!!wh.enabled);
 
     const ex = st.meta.extras || {};
     const s = ex.shipping || {};
@@ -197,23 +202,23 @@
     const f = ex.fodec || {};
 
     if (getEl("shipEnabled")) getEl("shipEnabled").checked = !!s.enabled;
-    setVal("shipLabel",  String(s.label ?? "Frais de livraison"));
+    setVal("shipLabel", String(s.label ?? "Frais de livraison"));
     setVal("shipAmount", String(s.amount ?? 7));
-    setVal("shipTva",    String(s.tva ?? 19));
-    SEM.toggleShipFields(!!s.enabled);
+    setVal("shipTva", String(s.tva ?? 19));
 
     if (getEl("stampEnabled")) getEl("stampEnabled").checked = !!t.enabled;
-    setVal("stampLabel",  String(t.label ?? "Timbre fiscal"));
+    setVal("stampLabel", String(t.label ?? "Timbre fiscal"));
     setVal("stampAmount", String(t.amount ?? 1));
-    setVal("stampTva",    String(t.tva ?? 0));
-    SEM.toggleStampFields(!!t.enabled);
+    setVal("stampTva", String(t.tva ?? 0));
 
     if (getEl("fodecEnabled")) getEl("fodecEnabled").checked = !!f.enabled;
     setVal("fodecLabel", String(f.label ?? "FODEC"));
-    setVal("fodecRate",  String(f.rate  ?? 1));
-    setVal("fodecBase",  String(f.base  ?? "ht"));
-    setVal("fodecTva",   String(f.tva   ?? 19));
-    SEM.toggleFodecFields(!!f.enabled);
+    setVal("fodecRate", String(f.rate ?? 1));
+    setVal("fodecBase", String(f.base ?? "ht"));
+    setVal("fodecTva", String(f.tva ?? 19));
+
+    // make the blocks match the checkboxes **now**
+    forceExtrasVisibility();
 
     const bundled = "./assets/logoIMG.png";
     const logo = w.SoukElMeuble?.assets?.logo || st.company.logo || bundled;
@@ -223,9 +228,11 @@
     setVal("notes", st.notes);
     setText("year", new Date().getFullYear());
 
-    // ensure all toggles default to checked
     ["colToggleRef","colToggleProduct","colToggleDesc","colToggleQty","colTogglePrice","colToggleTva","colToggleDiscount"]
       .forEach(id => { const el = getEl(id); if (el && el.checked === false) el.checked = true; });
+
+    // ensure the visibility toggles are active
+    SEM.wireColumnToggles?.();
 
     SEM.renderItems();
     SEM.computeTotals();
@@ -235,7 +242,6 @@
     SEM.updateClientIdPlaceholder();
   };
 
-  // ===== Totals =====
   SEM.computeTotals = function () {
     SEM.readInputs();
     const currency = state().meta.currency || "TND";
@@ -251,7 +257,7 @@
     if (whRow)  whRow.style.display  = wh.enabled ? "" : "none";
     if (netRow) netRow.style.display = wh.enabled ? "" : "none";
     if (wh.enabled) {
-      const lbl = wh.label?.trim() || "Retenue à la source";
+      const lbl = wh.label?.trim() || "Retenue a la source";
       setText("miniWHLabel", lbl);
       setText("miniWH", "- " + formatMoney(totals.whAmount, currency));
       setText("miniNET", formatMoney(totals.net, currency));
@@ -264,7 +270,6 @@
     SEM.updateExtrasMiniRows();
   };
 
-  // ===== Add/Edit items =====
   SEM.clearAddForm = function () {
     setVal("addRef",""); setVal("addProduct",""); setVal("addDesc","");
     setVal("addQty","1"); setVal("addPrice","0"); setVal("addTva","19"); setVal("addDiscount","0");
@@ -284,15 +289,8 @@
     const submitBtn = getEl("btnSubmitItem");
     const newBtn = getEl("btnNewItem");
     if (!submitBtn || !newBtn) return;
-    if (mode === "update") {
-      submitBtn.textContent = "Mettre à jour";
-      submitBtn.dataset.mode = "update";
-      newBtn.disabled = false;
-    } else {
-      submitBtn.textContent = "+ Ajouter";
-      submitBtn.dataset.mode = "add";
-      newBtn.disabled = true;
-    }
+    if (mode === "update") { submitBtn.textContent = "Mettre a jour"; submitBtn.dataset.mode = "update"; newBtn.disabled = false; }
+    else { submitBtn.textContent = "+ Ajouter"; submitBtn.dataset.mode = "add"; newBtn.disabled = true; }
   };
 
   SEM.clearAddFormAndMode = function () {
@@ -322,16 +320,12 @@
       return;
     }
     const mode = getEl("btnSubmitItem")?.dataset.mode || "add";
-    if (mode === "update" && SEM.selectedItemIndex !== null) {
-      state().items[SEM.selectedItemIndex] = item;
-    } else {
-      state().items.push(item);
-    }
+    if (mode === "update" && SEM.selectedItemIndex !== null) { state().items[SEM.selectedItemIndex] = item; }
+    else { state().items.push(item); }
     SEM.renderItems();
     SEM.clearAddFormAndMode();
   };
 
-  // ===== Render table =====
   SEM.renderItems = function () {
     const body = getEl("itemBody"); if (!body) return;
     body.innerHTML = "";
@@ -344,19 +338,15 @@
       tr.innerHTML = `
         <td style="color:#64748b;">EX-001</td>
         <td style="color:#64748b;">Chaise (exemple)</td>
-        <td style="color:#64748b;">Ligne de démonstration — ajoutez votre premier article.</td>
+        <td style="color:#64748b;">Ligne de demonstration  ajoutez votre premier article.</td>
         <td class="right" style="color:#64748b;">1</td>
         <td class="right" style="color:#64748b;">${formatMoney(100, currency)}</td>
         <td class="right" style="color:#64748b;">${formatPct(19)}</td>
         <td class="right" style="color:#64748b;">${formatPct(0)}</td>
         <td class="right" style="color:#64748b;">${formatMoney(119, currency)}</td>
-        <td class="add-actions" style="color:#64748b;">—</td>`;
+        <td class="add-actions" style="color:#64748b;"></td>`;
       body.appendChild(tr);
-
-      SEM.computeTotals();
-      SEM.applyColumnHiding();
-      SEM.updateWHAmountPreview();
-      SEM.updateExtrasMiniRows();
+      SEM.computeTotals(); SEM.applyColumnHiding(); SEM.updateWHAmountPreview(); SEM.updateExtrasMiniRows();
       return;
     }
 
@@ -387,7 +377,7 @@
         <td class="cell-discount right">${formatPct(it.discount)}</td>
         <td class="cell-ttc right">${formatMoney(lineTotal, currency)}</td>
         <td class="add-actions">
-          <button class="btn tiny sel" data-sel="${i}">Éditer</button>
+          <button class="btn tiny sel" data-sel="${i}">Editer</button>
           <button class="del" data-del="${i}">Supprimer</button>
         </td>`;
       body.appendChild(tr);
@@ -411,7 +401,6 @@
     SEM.updateExtrasMiniRows();
   };
 
-  // ===== Column visibility =====
   function setColumnVisibility(table, oneBasedIndex, visible) {
     if (!table) return;
     const th = table.tHead?.rows?.[0]?.cells?.[oneBasedIndex - 1];
@@ -423,21 +412,18 @@
     }
   }
 
-  // Hide/show full field blocks in “Ajouter un article”
   function setAddInputVisibility({ ref, product, desc, qty, price, tva, discount }) {
     const bySel = [
-      [".field-ref",      ref],
-      [".field-product",  product],
-      [".field-desc",     desc],
-      [".field-qty",      qty],
-      [".field-price",    price],
-      [".field-tva",      tva],
+      [".field-ref", ref],
+      [".field-product", product],
+      [".field-desc", desc],
+      [".field-qty", qty],
+      [".field-price", price],
+      [".field-tva", tva],
       [".field-discount", discount],
     ];
     bySel.forEach(([sel, vis]) => {
-      document.querySelectorAll(sel).forEach(node => {
-        node.style.display = vis ? "" : "none";
-      });
+      document.querySelectorAll(sel).forEach(node => { node.style.display = vis ? "" : "none"; });
     });
   }
 
@@ -450,7 +436,6 @@
     const tvaVis      = !!getEl('colToggleTva')?.checked;
     const discountVis = !!getEl('colToggleDiscount')?.checked;
 
-    // classes used by your CSS rules (.hide-col-*)
     document.body.classList.toggle('hide-col-ref',      !refVis);
     document.body.classList.toggle('hide-col-product',  !productVis);
     document.body.classList.toggle('hide-col-desc',     !descVis);
@@ -458,43 +443,29 @@
     document.body.classList.toggle('hide-col-price',    !priceVis);
     document.body.classList.toggle('hide-col-tva',      !tvaVis);
     document.body.classList.toggle('hide-col-discount', !discountVis);
-
-    // hide Total TTC column if price hidden (keeps layout consistent)
     document.body.classList.toggle('hide-col-ttc', !priceVis);
 
-    // table cells/headers (8th = Total TTC) – keep TTC aligned to price visibility
     const itemsTable = getEl('items');
     setColumnVisibility(itemsTable, 8, priceVis);
 
-    // mini summary follows price visibility
     const mini = document.querySelector('.mini-sum');
     if (mini) mini.style.display = priceVis ? '' : 'none';
 
-    // add-item field blocks
-    setAddInputVisibility({
-      ref: refVis, product: productVis, desc: descVis,
-      qty: qtyVis, price: priceVis, tva: tvaVis, discount: discountVis
-    });
+    setAddInputVisibility({ ref: refVis, product: productVis, desc: descVis, qty: qtyVis, price: priceVis, tva: tvaVis, discount: discountVis });
   };
 
-  // Exposed helper: initialize and wire the toggle checkboxes
   SEM.wireColumnToggles = function () {
     const ids = ["colToggleRef","colToggleProduct","colToggleDesc","colToggleQty","colTogglePrice","colToggleTva","colToggleDiscount"];
-    // default all checked
     ids.forEach(id => { const el = getEl(id); if (el) el.checked = true; });
-    // initial apply
     SEM.applyColumnHiding();
-    // listeners
     ids.forEach(id => getEl(id)?.addEventListener("change", () => {
       SEM.applyColumnHiding();
-      // re-render bits that depend on visibility (safe no-ops if unchanged)
       SEM.computeTotals();
       SEM.updateWHAmountPreview();
       SEM.updateExtrasMiniRows();
     }));
   };
 
-  // ===== Live wiring =====
   SEM.wireLiveBindings = function () {
     if (!SEM.COMPANY_LOCKED) {
       const map = [
@@ -504,9 +475,7 @@
         ["companyEmail",  v => state().company.email = v],
         ["companyAddress",v => state().company.address = v],
       ];
-      map.forEach(([id, set]) =>
-        getEl(id)?.addEventListener("input", () => { set(getStr(id, "")); SEM.saveCompanyToLocal?.(); })
-      );
+      map.forEach(([id, set]) => getEl(id)?.addEventListener("input", () => { set(getStr(id, "")); SEM.saveCompanyToLocal?.(); }));
     }
 
     const sealCb = getEl("sealEnabled");
@@ -526,10 +495,7 @@
         const inp = document.createElement("input");
         inp.type = "file";
         inp.accept = "image/*,application/pdf";
-        inp.onchange = async () => {
-          const f = inp.files && inp.files[0];
-          await SEM.loadSealFromFile(f);
-        };
+        inp.onchange = async () => { const f = inp.files && inp.files[0]; await SEM.loadSealFromFile(f); };
         inp.click();
       });
     }
@@ -544,16 +510,13 @@
     });
 
     document.addEventListener("change", (e) => {
-      if ((e.target)?.id === "clientType") {
-        state().client.type = getStr("clientType", state().client.type || "societe");
-        SEM.updateClientIdPlaceholder();
+      if ((e.target)?.id === "clientType") { state().client.type = getStr("clientType", state().client.type || "societe"); SEM.updateClientIdPlaceholder(); }
+      if ((e.target)?.id === "fodecEnabled" || (e.target)?.id === "shipEnabled" || (e.target)?.id === "stampEnabled" || (e.target)?.id === "whEnabled") {
+        forceExtrasVisibility();
       }
     });
     document.addEventListener("input", (e) => {
-      if ((e.target)?.id === "clientType") {
-        state().client.type = getStr("clientType", state().client.type || "societe");
-        SEM.updateClientIdPlaceholder();
-      }
+      if ((e.target)?.id === "clientType") { state().client.type = getStr("clientType", state().client.type || "societe"); SEM.updateClientIdPlaceholder(); }
     });
 
     getEl("clientName")   ?.addEventListener("input", () => { state().client.name    = getStr("clientName",    state().client.name); });
@@ -563,103 +526,134 @@
     getEl("clientAddress")?.addEventListener("input", () => { state().client.address = getStr("clientAddress", state().client.address); });
     getEl("notes")?.addEventListener("input", () => { state().notes = getStr("notes", state().notes); });
 
-    // Column toggles are also wired by SEM.wireColumnToggles(), but keep this as a backup.
+    const btnSaveClient = getEl("btnSaveClient");
+    if (btnSaveClient) {
+      btnSaveClient.addEventListener("click", async () => {
+        SEM.readInputs?.();
+        const source = state().client || {};
+        const entry = {
+          type: String(source.type || "societe").trim() || "societe",
+          name: String(source.name || "").trim(),
+          email: String(source.email || "").trim(),
+          phone: String(source.phone || "").trim(),
+          vat: String(source.vat || "").trim(),
+          address: String(source.address || "").trim(),
+          savedAt: new Date().toISOString(),
+        };
+        if (!entry.name && !entry.vat) {
+          if (typeof showDialog === "function") {
+            await showDialog("Renseignez au moins un nom ou un identifiant avant d'enregistrer.", { title: "Clients" });
+          }
+          return;
+        }
+        const existing = readSavedClients().filter((item) => clientKey(item) !== clientKey(entry));
+        existing.unshift(entry);
+        writeSavedClients(existing);
+        if (typeof showDialog === "function") {
+          await showDialog("Client enregistre.", { title: "Clients" });
+        }
+      });
+    }
+
+    const btnLoadClient = getEl("btnLoadClient");
+    if (btnLoadClient) {
+      btnLoadClient.addEventListener("click", async () => {
+        const records = readSavedClients();
+        if (!records.length) {
+          if (typeof showDialog === "function") {
+            await showDialog("Aucun client enregistre pour le moment.", { title: "Clients" });
+          }
+          return;
+        }
+        for (const item of records) {
+          const name = item.name || item.vat || item.email || "Client";
+          const lines = [
+            name,
+            item.vat ? `Identifiant: ${item.vat}` : "",
+            item.email ? `Email: ${item.email}` : "",
+            item.phone ? `Telephone: ${item.phone}` : "",
+            item.address ? item.address : "",
+          ].filter(Boolean).join("\n");
+          let ok = false;
+          if (typeof showConfirm === "function") {
+            ok = await showConfirm(`Charger ce client ?\n\n${lines}`, {
+              title: "Clients",
+              okText: "Charger",
+              cancelText: "Suivant",
+            });
+          } else {
+            ok = window.confirm(`Charger ce client ?\n\n${lines}`);
+          }
+          if (ok) {
+            const st = state();
+            st.client = st.client || {};
+            st.client.type = item.type || st.client.type || "societe";
+            st.client.name = item.name || "";
+            st.client.email = item.email || "";
+            st.client.phone = item.phone || "";
+            st.client.vat = item.vat || "";
+            st.client.address = item.address || "";
+            setVal("clientType", st.client.type);
+            setVal("clientName", st.client.name);
+            setVal("clientEmail", st.client.email);
+            setVal("clientPhone", st.client.phone);
+            setVal("clientVat", st.client.vat);
+            setVal("clientAddress", st.client.address);
+            SEM.updateClientIdPlaceholder?.();
+            SEM.computeTotals?.();
+            SEM.updateWHAmountPreview?.();
+            break;
+          }
+        }
+      });
+    }
+
     ["colToggleRef","colToggleProduct","colToggleDesc","colToggleQty","colTogglePrice","colToggleTva","colToggleDiscount"]
       .forEach(id => getEl(id)?.addEventListener("change", SEM.applyColumnHiding));
 
-    // Withholding
     getEl("whEnabled")?.addEventListener("change", () => {
       state().meta.withholding.enabled = !!getEl("whEnabled").checked;
       SEM.toggleWHFields(state().meta.withholding.enabled);
-      SEM.computeTotals();
-      SEM.updateWHAmountPreview();
-    });
-    getEl("whRate")?.addEventListener("input", () => {
-      state().meta.withholding.rate = getNum("whRate", state().meta.withholding.rate);
       SEM.computeTotals(); SEM.updateWHAmountPreview();
     });
-    getEl("whBase")?.addEventListener("change", () => {
-      state().meta.withholding.base = getStr("whBase", state().meta.withholding.base);
-      SEM.computeTotals(); SEM.updateWHAmountPreview();
-    });
-    getEl("whThreshold")?.addEventListener("input", () => {
-      state().meta.withholding.threshold = getNum("whThreshold", state().meta.withholding.threshold ?? 0);
-      SEM.computeTotals(); SEM.updateWHAmountPreview();
-    });
-    getEl("whLabel")?.addEventListener("input", () => {
-      state().meta.withholding.label = getStr("whLabel", state().meta.withholding.label);
-      SEM.updateWHAmountPreview();
-    });
+    getEl("whRate")?.addEventListener("input", () => { state().meta.withholding.rate = getNum("whRate", state().meta.withholding.rate); SEM.computeTotals(); SEM.updateWHAmountPreview(); });
+    getEl("whBase")?.addEventListener("change", () => { state().meta.withholding.base = getStr("whBase", state().meta.withholding.base); SEM.computeTotals(); SEM.updateWHAmountPreview(); });
+    getEl("whThreshold")?.addEventListener("input", () => { state().meta.withholding.threshold = getNum("whThreshold", state().meta.withholding.threshold ?? 0); SEM.computeTotals(); SEM.updateWHAmountPreview(); });
+    getEl("whLabel")?.addEventListener("input", () => { state().meta.withholding.label = getStr("whLabel", state().meta.withholding.label); SEM.updateWHAmountPreview(); });
 
-    // Shipping
     getEl("shipEnabled")?.addEventListener("change", () => {
       state().meta.extras.shipping.enabled = !!getEl("shipEnabled").checked;
       SEM.toggleShipFields(state().meta.extras.shipping.enabled);
       SEM.computeTotals(); SEM.updateExtrasMiniRows(); SEM.updateWHAmountPreview();
     });
-    getEl("shipLabel")?.addEventListener("input", () => {
-      state().meta.extras.shipping.label = getStr("shipLabel", state().meta.extras.shipping.label);
-      SEM.updateExtrasMiniRows();
-    });
-    getEl("shipAmount")?.addEventListener("input", () => {
-      state().meta.extras.shipping.amount = getNum("shipAmount", state().meta.extras.shipping.amount);
-      SEM.computeTotals(); SEM.updateExtrasMiniRows(); SEM.updateWHAmountPreview();
-    });
-    getEl("shipTva")?.addEventListener("input", () => {
-      state().meta.extras.shipping.tva = getNum("shipTva", state().meta.extras.shipping.tva);
-      SEM.computeTotals(); SEM.updateExtrasMiniRows(); SEM.updateWHAmountPreview();
-    });
+    getEl("shipLabel")?.addEventListener("input", () => { state().meta.extras.shipping.label = getStr("shipLabel", state().meta.extras.shipping.label); SEM.updateExtrasMiniRows(); });
+    getEl("shipAmount")?.addEventListener("input", () => { state().meta.extras.shipping.amount = getNum("shipAmount", state().meta.extras.shipping.amount); SEM.computeTotals(); SEM.updateExtrasMiniRows(); SEM.updateWHAmountPreview(); });
+    getEl("shipTva")?.addEventListener("input", () => { state().meta.extras.shipping.tva = getNum("shipTva", state().meta.extras.shipping.tva); SEM.computeTotals(); SEM.updateExtrasMiniRows(); SEM.updateWHAmountPreview(); });
 
-    // Stamp
     getEl("stampEnabled")?.addEventListener("change", () => {
       state().meta.extras.stamp.enabled = !!getEl("stampEnabled").checked;
       SEM.toggleStampFields(state().meta.extras.stamp.enabled);
       SEM.computeTotals(); SEM.updateExtrasMiniRows(); SEM.updateWHAmountPreview();
     });
-    getEl("stampLabel")?.addEventListener("input", () => {
-      state().meta.extras.stamp.label = getStr("stampLabel", state().meta.extras.stamp.label);
-      SEM.updateExtrasMiniRows();
-    });
-    getEl("stampAmount")?.addEventListener("input", () => {
-      state().meta.extras.stamp.amount = getNum("stampAmount", state().meta.extras.stamp.amount);
-      SEM.computeTotals(); SEM.updateExtrasMiniRows(); SEM.updateWHAmountPreview();
-    });
-    getEl("stampTva")?.addEventListener("input", () => {
-      state().meta.extras.stamp.tva = getNum("stampTva", state().meta.extras.stamp.tva);
-      SEM.computeTotals(); SEM.updateExtrasMiniRows(); SEM.updateWHAmountPreview();
-    });
+    getEl("stampLabel")?.addEventListener("input", () => { state().meta.extras.stamp.label = getStr("stampLabel", state().meta.extras.stamp.label); SEM.updateExtrasMiniRows(); });
+    getEl("stampAmount")?.addEventListener("input", () => { state().meta.extras.stamp.amount = getNum("stampAmount", state().meta.extras.stamp.amount); SEM.computeTotals(); SEM.updateExtrasMiniRows(); SEM.updateWHAmountPreview(); });
+    getEl("stampTva")?.addEventListener("input", () => { state().meta.extras.stamp.tva = getNum("stampTva", state().meta.extras.stamp.tva); SEM.computeTotals(); SEM.updateExtrasMiniRows(); SEM.updateWHAmountPreview(); });
 
-    // FODEC
     getEl("fodecEnabled")?.addEventListener("change", () => {
       const f = state().meta.extras.fodec || (state().meta.extras.fodec = {});
       f.enabled = !!getEl("fodecEnabled").checked;
       SEM.toggleFodecFields(f.enabled);
       SEM.computeTotals(); SEM.updateExtrasMiniRows(); SEM.updateWHAmountPreview();
     });
-    getEl("fodecLabel")?.addEventListener("input", () => {
-      state().meta.extras.fodec.label = getStr("fodecLabel", state().meta.extras.fodec.label || "FODEC");
-      SEM.updateExtrasMiniRows();
-    });
-    getEl("fodecRate")?.addEventListener("input", () => {
-      state().meta.extras.fodec.rate = getNum("fodecRate", state().meta.extras.fodec.rate ?? 1);
-      SEM.computeTotals(); SEM.updateExtrasMiniRows(); SEM.updateWHAmountPreview();
-    });
-    getEl("fodecBase")?.addEventListener("change", () => {
-      state().meta.extras.fodec.base = getStr("fodecBase", state().meta.extras.fodec.base || "ht");
-      SEM.computeTotals(); SEM.updateExtrasMiniRows(); SEM.updateWHAmountPreview();
-    });
-    getEl("fodecTva")?.addEventListener("input", () => {
-      state().meta.extras.fodec.tva = getNum("fodecTva", state().meta.extras.fodec.tva ?? 19);
-      SEM.computeTotals(); SEM.updateExtrasMiniRows(); SEM.updateWHAmountPreview();
-    });
+    getEl("fodecLabel")?.addEventListener("input", () => { state().meta.extras.fodec.label = getStr("fodecLabel", state().meta.extras.fodec.label || "FODEC"); SEM.updateExtrasMiniRows(); });
+    getEl("fodecRate")?.addEventListener("input", () => { state().meta.extras.fodec.rate = getNum("fodecRate", state().meta.extras.fodec.rate ?? 1); SEM.computeTotals(); SEM.updateExtrasMiniRows(); SEM.updateWHAmountPreview(); });
+    getEl("fodecBase")?.addEventListener("change", () => { state().meta.extras.fodec.base = getStr("fodecBase", state().meta.extras.fodec.base || "ht"); SEM.computeTotals(); SEM.updateExtrasMiniRows(); SEM.updateWHAmountPreview(); });
+    getEl("fodecTva")?.addEventListener("input", () => { state().meta.extras.fodec.tva = getNum("fodecTva", state().meta.extras.fodec.tva ?? 19); SEM.computeTotals(); SEM.updateExtrasMiniRows(); SEM.updateWHAmountPreview(); });
   };
 
-  // Placeholder init for the placeholder text
   if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", () => {
-      SEM.updateClientIdPlaceholder();
-    }, { once: true });
+    document.addEventListener("DOMContentLoaded", () => { SEM.updateClientIdPlaceholder(); forceExtrasVisibility(); }, { once: true });
   } else {
-    SEM.updateClientIdPlaceholder();
+    SEM.updateClientIdPlaceholder(); forceExtrasVisibility();
   }
 })(window);

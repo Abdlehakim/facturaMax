@@ -1,4 +1,4 @@
-// createInvoice/app-export-CreateInvoice.js
+// gestionFacture/app-export-CreateInvoice.js
 (function () {
   async function saveInvoiceJSON() {
     if (window.SEM?.readInputs) window.SEM.readInputs();
@@ -26,12 +26,12 @@
           filename,
         });
         if (res && res.path) {
-          await showDialog("Document enregistré :\n" + res.path, { title: "Enregistrer" });
+          await showDialog("Document enregistre :\n" + res.path, { title: "Enregistrer" });
         } else {
-          await showDialog("Enregistrement annulé.", { title: "Enregistrer" });
+          await showDialog("Enregistrement annule.", { title: "Enregistrer" });
         }
       } catch {
-        await showDialog("Impossible d’enregistrer via l’app. Téléchargement via le navigateur…", { title: "Enregistrer" });
+        await showDialog("Impossible d'enregistrer via l'app. Telechargement via le navigateur...", { title: "Enregistrer" });
         const blob = new Blob([JSON.stringify(snapshot, null, 2)], { type: "application/json" });
         downloadBlob(filename, blob);
       }
@@ -40,7 +40,7 @@
 
     const blob = new Blob([JSON.stringify(snapshot, null, 2)], { type: "application/json" });
     downloadBlob(filename, blob);
-    await showDialog("Fichier téléchargé.", { title: "Enregistrer" });
+    await showDialog("Fichier telecharge.", { title: "Enregistrer" });
   }
 
   async function openInvoiceFromFilePicker(){
@@ -135,7 +135,7 @@
     if (st.meta?.withholding?.enabled && window.PDFWH) {
       const htmlWH = window.PDFWH.build(st, assets);
       const cssWH  = window.PDFWH.css;
-      const baseWH = ensurePdfExt(`${base} - Retenue à la source`);
+      const baseWH = ensurePdfExt(`${base} - Retenue a la source`);
       const tryWH = await window.SoukElMeuble?.exportPDFFromHTML?.({
         html: htmlWH,
         css: cssWH,
@@ -145,11 +145,11 @@
     }
 
     const invLabel = resInv?.name || fileName;
-    const whLabel  = resWH ? (resWH?.name || "Retenue à la source.pdf") : null;
+    const whLabel  = resWH ? (resWH?.name || "Retenue a la source.pdf") : null;
 
     const msg =
-      "PDF exporté : " + invLabel +
-      (whLabel ? "\nCertificat exporté : " + whLabel : "");
+      "PDF exporte : " + invLabel +
+      (whLabel ? "\nCertificat exporte : " + whLabel : "");
 
     const okBtnText = (() => {
       const t = String(st.meta.docType || "").toLowerCase();

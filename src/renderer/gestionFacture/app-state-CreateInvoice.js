@@ -1,4 +1,4 @@
-// createInvoice/app-state-CreateInvoice.js
+// gestionFacture/app-state-CreateInvoice.js
 (function (w) {
   const SEM = (w.SEM = w.SEM || {});
   const IS_DESKTOP = !!(w.SoukElMeuble && (w.SoukElMeuble.isDesktop ?? true));
@@ -37,7 +37,7 @@
     date: todayISO(),
     due: plusDaysISO(7),
     docType: "facture",
-    withholding: { enabled: false, rate: 1.5, base: "ht", label: "Retenue à la source", threshold: 1000 },
+    withholding: { enabled: false, rate: 1.5, base: "ht", label: "Retenue a la source", threshold: 1000 },
     extras: {
       shipping: { enabled: false, label: "Frais de livraison", amount: 7, tva: 19 },
       stamp:    { enabled: false, label: "Timbre fiscal", amount: 1, tva: 0 },
@@ -170,7 +170,7 @@
     st.client.vat     = getStr("clientVat", st.client.vat);
     st.client.address = getStr("clientAddress", st.client.address);
 
-    const wh = st.meta.withholding || (st.meta.withholding = { enabled:false, rate:1.5, base:"ht", label:"Retenue à la source", threshold:1000 });
+    const wh = st.meta.withholding || (st.meta.withholding = { enabled:false, rate:1.5, base:"ht", label:"Retenue a la source", threshold:1000 });
     wh.enabled   = !!getEl("whEnabled")?.checked;
     wh.rate      = getNum("whRate", wh.rate);
     wh.base      = getStr("whBase", wh.base);
@@ -221,7 +221,7 @@
     st.meta.date = todayISO();
     st.meta.due  = plusDaysISO(7);
     st.meta.docType = "facture";
-    st.meta.withholding = { enabled:false, rate:1.5, base:"ht", label:"Retenue à la source", threshold:1000 };
+    st.meta.withholding = { enabled:false, rate:1.5, base:"ht", label:"Retenue a la source", threshold:1000 };
     st.meta.extras = {
       shipping: { enabled: false, label: "Frais de livraison", amount: 7, tva: 19 },
       stamp:    { enabled: false, label: "Timbre fiscal", amount: 1, tva: 0 },
@@ -262,7 +262,7 @@
     const whCb = getEl("whEnabled"); if (whCb) whCb.checked = !!wh.enabled;
     setVal("whRate",       wh.rate ?? 1.5);
     setVal("whBase",       wh.base || "ht");
-    setVal("whLabel",      wh.label || "Retenue à la source");
+    setVal("whLabel",      wh.label || "Retenue a la source");
     setVal("whThreshold",  wh.threshold ?? 0);
 
     const ex = st.meta.extras || {};
@@ -320,7 +320,7 @@
           <td>${n(it.discount)}</td>
           <td>${fmtMoney(cur, lineTTC)}</td>
           <td>
-            <button class="btn btn-light" data-action="edit">Éditer</button>
+            <button class="btn btn-light" data-action="edit">Editer</button>
             <button class="del" data-action="delete">Supprimer</button>
           </td>
         </tr>`;
@@ -369,6 +369,9 @@
     renderInputsFromState();
     renderItemsTable();
     renderMiniSummary();
+    if (SEM.updateDocTypeVisual) {
+      try { SEM.updateDocTypeVisual(); } catch {}
+    }
   };
 
   // Column hiding hook (no-op here; wired in bindings file)

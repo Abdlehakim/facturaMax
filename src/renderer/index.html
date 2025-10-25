@@ -13,40 +13,41 @@
       " />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="color-scheme" content="light dark" />
-    <title>SoukElMeuble – Gestionnaire de société</title>
+    <title>SoukElMeuble - Gestionnaire de societe</title>
     <link rel="stylesheet" href="./styles.css" />
     <link rel="stylesheet" href="./SideBarStyles.css" />
-    <link rel="stylesheet" href="./CreateInvoiceStyles.css" />
+    <link rel="stylesheet" href="./gestionFacture/CreateInvoiceStyles.css" />
+    <link rel="stylesheet" href="./gestionStock/StockStyles.css" />
     <link rel="stylesheet" href="./InvoiceTable.css" />
     <link rel="stylesheet" href="./footerStyles.css" />
-    <link rel="modulepreload" href="./createInvoice/CreateInvoice.js" />
+    <link rel="modulepreload" href="./gestionFacture/CreateInvoice.js" />
     <link rel="modulepreload" href="./InvoiceTable.js" />
   </head>
   <body>
     <div id="pdfRoot" aria-hidden="true" style="display:none"></div>
     <div class="with-sidebar">
-      <aside id="sidebar-root" data-initial="create-facture" aria-label="Navigation latérale"></aside>
+      <aside id="sidebar-root" data-initial="create-facture" aria-label="Navigation laterale"></aside>
       <div class="app" role="main" aria-live="polite">
         <div id="panels-root"></div>
         <footer class="footer muted">
-          <span>© <span id="year"></span> SoukElMeuble. Tous droits réservés.</span>
-          <span>Pour Windows • Hors ligne • Export PDF</span>
+          <span> <span id="year"></span> SoukElMeuble. Tous droits reserves.</span>
+          <span>Pour Windows  Hors ligne  Export PDF</span>
         </footer>
       </div>
     </div>
     <noscript>
-      <div class="noscript">Cette application nécessite JavaScript pour fonctionner.</div>
+      <div class="noscript">Cette application necessite JavaScript pour fonctionner.</div>
     </noscript>
     <script src="./helpers.js" defer></script>
     <script src="./app-state.js" defer></script>
-    <script src="./createInvoice/app-state-CreateInvoice.js" defer></script>
-    <script src="./createInvoice/app-bindings-createInvoice.js" defer></script>
-    <script src="./createInvoice/app-export-createInvoice.js" defer></script>
+    <script src="./gestionFacture/app-state-CreateInvoice.js" defer></script>
+    <script src="./gestionFacture/app-bindings-createInvoice.js" defer></script>
+    <script src="./gestionFacture/app-export-createInvoice.js" defer></script>
     <script src="./pdfView.js" defer></script>
     <script src="./pdfWH.js" defer></script>
     <script src="./sidebar.js" defer></script>
     <script type="module" src="./app-init-sideBar.js"></script>
-    <script type="module" src="./createInvoice/app-init-CreateInvoice.js"></script>
+    <script type="module" src="./gestionFacture/app-init-CreateInvoice.js"></script>
     <script src="./app-init.js"></script>
   </body>
 </html>

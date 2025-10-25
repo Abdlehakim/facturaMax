@@ -11,9 +11,9 @@
   if (w.pdfjsLib && pdfjsLib.GlobalWorkerOptions) pdfjsLib.GlobalWorkerOptions.workerSrc = "./lib/pdfs/pdf.worker.min.js";
 
   const ROUTES = {
-    "create-facture": { id: "invoice",           title: "Créer facture",       loader: loadCreateFacture },
+    "create-facture": { id: "invoice",           title: "Creer facture",       loader: loadCreateFacture },
     "all-factures":   { id: "screenAllFactures", title: "Toutes les factures", loader: loadAllFactures   },
-    "stock":          { id: "screenStock",       title: "Gestion de stock",    loader: loadCard          },
+    "stock":          { id: "screenStock",       title: "Gestion de stock",    loader: loadStock         },
     "clients":        { id: "screenClients",     title: "Gestion de clients",  loader: loadCard          },
   };
   const MOUNTED = Object.create(null);
@@ -27,7 +27,7 @@
       <section class="grid">
         <fieldset class="section-box">
           <legend>${title}</legend>
-          <div class="muted">Chargement…</div>
+          <div class="muted">Chargement...</div>
         </fieldset>
       </section>`;
     const app = document.querySelector(".app");
@@ -54,19 +54,23 @@
   }
 
   async function loadCreateFacture(host) {
-    try { const { mount } = await import("./createInvoice/CreateInvoice.js"); mount(host); }
-    catch (e) { loadCard(host, "Créer facture"); console.warn("[router] CreateInvoice.js failed:", e); }
+    try { const { mount } = await import("./gestionFacture/CreateInvoice.js"); mount(host); }
+    catch (e) { loadCard(host, "Creer facture"); console.warn("[router] CreateInvoice.js failed:", e); }
   }
   async function loadAllFactures(host) {
     try { const { mount } = await import("./InvoiceTable.js"); mount(host); }
     catch (e) { loadCard(host, "Toutes les factures"); console.warn("[router] InvoiceTable.js failed:", e); }
+  }
+  async function loadStock(host) {
+    try { const { mount } = await import("./gestionStock/Stock.js"); mount(host); }
+    catch (e) { loadCard(host, "Gestion de stock"); console.warn("[router] Stock.js failed:", e); }
   }
   async function loadCard(host, title) {
     host.innerHTML = `
       <section class="grid">
         <fieldset class="section-box">
           <legend>${title}</legend>
-          <div class="muted">Cette section est prête. Vous pouvez l’alimenter plus tard.</div>
+          <div class="muted">Cette section est prete. Vous pouvez l'alimenter plus tard.</div>
         </fieldset>
       </section>`;
   }

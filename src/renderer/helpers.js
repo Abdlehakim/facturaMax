@@ -81,7 +81,7 @@
     const panel  = document.createElement("div"); panel.className = "swbDialog__panel";
     const header = document.createElement("div"); header.className = "swbDialog__header";
     const title  = document.createElement("div"); title.id = "swbDialogTitle"; title.className = "swbDialog__title";
-    const closeX = document.createElement("button"); closeX.type = "button"; closeX.className = "swbDialog__close"; closeX.textContent = "×";
+    const closeX = document.createElement("button"); closeX.type = "button"; closeX.className = "swbDialog__close"; closeX.textContent = "";
     header.appendChild(title); header.appendChild(closeX);
 
     const msg    = document.createElement("div"); msg.id = "swbDialogMsg"; msg.className = "swbDialog__msg";
@@ -167,7 +167,7 @@
   }
 
   function showConfirm(message, {
-    title="Export terminé", okText="Ouvrir", cancelText="Fermer",
+    title="Export termine", okText="Ouvrir", cancelText="Fermer",
     onOk, openUrls, extra, okKeepsOpen=false
   } = {}){
     const overlay = ensureDialog();

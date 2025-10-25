@@ -1,4 +1,4 @@
-// createInvoice/app-init-CreateInvoice.js
+// gestionFacture/app-init-CreateInvoice.js
 /*
   Responsibilities (Create facture screen only):
   - Wire buttons & fields inside #invoice after CreateInvoice.js mounts
@@ -59,6 +59,8 @@
     st.meta.number = next;
     setVal("invNumber", next);
   }
+  SEM.autoNumberFromRegistryIfEmpty = autoNumberFromRegistryIfEmpty;
+  w.autoNumberFromRegistryIfEmpty = autoNumberFromRegistryIfEmpty;
 
   function buildRegistryEntryFromSnapshot(snap, saveResult) {
     const st = snap || {}; const m = st.meta || {}; const cli = st.client || {};
@@ -92,7 +94,7 @@
         const res = await w.SoukElMeuble.invoicesListRecent({ limit: 4 });
         const items = Array.isArray(res?.items) ? res.items : [];
         if (!items.length) {
-          const d = document.createElement("div"); d.className = "muted"; d.textContent = "Aucune facture récente.";
+          const d = document.createElement("div"); d.className = "muted"; d.textContent = "Aucune facture recente.";
           wrap.appendChild(d); return;
         }
         items.forEach((it) => {
@@ -105,7 +107,7 @@
           const info = document.createElement("div"); info.className = "muted"; info.textContent = it.clientShort || ""; if (it.clientFull) info.title = it.clientFull;
 
           const actions = document.createElement("div"); actions.className = "actions";
-          const btnEdit = document.createElement("button"); btnEdit.className = "btn tiny"; btnEdit.textContent = "Éditer";
+          const btnEdit = document.createElement("button"); btnEdit.className = "btn tiny"; btnEdit.textContent = "Editer";
           btnEdit.addEventListener("click", async () => {
             try {
               const r = await w.SoukElMeuble.invoicesRead({ path: it.path });
@@ -135,7 +137,7 @@
 
     // Fallback to browser registry (also used on desktop if no native list)
     const items = readRegistry().filter((r) => String(r.typeLabel || "").toLowerCase() === "facture");
-    if (!items.length) { const d = document.createElement("div"); d.className = "muted"; d.textContent = "Aucune facture récente."; wrap.appendChild(d); return; }
+    if (!items.length) { const d = document.createElement("div"); d.className = "muted"; d.textContent = "Aucune facture recente."; wrap.appendChild(d); return; }
     items.forEach((it) => {
       const row = document.createElement("div"); row.className = "recent-row";
       const meta = document.createElement("div"); meta.className = "meta";
@@ -146,7 +148,7 @@
       const info = document.createElement("div"); info.className = "muted"; info.textContent = it.client || "";
 
       const actions = document.createElement("div"); actions.className = "actions";
-      const btnEdit = document.createElement("button"); btnEdit.className = "btn tiny"; btnEdit.textContent = "Éditer";
+      const btnEdit = document.createElement("button"); btnEdit.className = "btn tiny"; btnEdit.textContent = "Editer";
       btnEdit.addEventListener("click", () => {
         try {
           if (it.snapshot && typeof w.mergeInvoiceDataIntoState === "function") {
@@ -205,7 +207,7 @@
       }
       const res = await w.SoukElMeuble.saveInvoiceJSON({ data: snap });
       if (res?.ok) {
-        await w.showDialog?.("Document enregistré.", { title: "Succès" });
+        await w.showDialog?.("Document enregistre.", { title: "Succes" });
         // Desktop: refresh native recent list; Browser: update registry
         if (IS_DESKTOP) {
           renderRecentList();
