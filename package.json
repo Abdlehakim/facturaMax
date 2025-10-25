@@ -2,7 +2,7 @@
   "name": "facturamax",
   "version": "1.0.0",
   "description": "FacturaMax Maker (Windows) – create, save and export invoices to PDF for development, marketing, graphics and design services.",
-  "main": "main.js",
+  "main": "main.desktop.js",
   "author": "Adelhakim Sabkhi",
   "license": "MIT",
   "scripts": {
@@ -10,6 +10,7 @@
     "dev:site:localhost": "http-server ./site -p 8080 -a localhost -c-1",
     "dev:renderer": "http-server ./src/renderer -p 8081 -c-1",
     "start": "electron .",
+    "start:desktop": "electron .",
     "dist": "electron-builder --win nsis",
     "dist:mac": "electron-builder --mac dmg,zip",
     "dist:mac:arm64": "electron-builder --mac dmg,zip --arm64",
@@ -29,19 +30,18 @@
   "dependencies": {
     "html2canvas": "^1.4.1",
     "jspdf": "^3.0.3",
-    "pdfjs-dist": "^3.11.174",
-    "sudo-prompt": "^9.2.1"
+    "pdfjs-dist": "^3.11.174"
   },
   "build": {
     "afterAllArtifactBuild": "scripts/trim-artifacts.js",
-    "appId": "FacturaMax",
+    "appId": "com.soukelmeuble.facturamax",
     "productName": "FacturaMax",
     "directories": {
       "output": "dist"
     },
     "files": [
-      "main.js",
-      "preload.js",
+      "main.desktop.js",
+      "preload.desktop.js",
       "src/renderer/**",
       "package.json"
     ],
@@ -87,7 +87,7 @@
       "installerHeaderIcon": "build/icon.ico",
       "uninstallerIcon": "build/icon.ico",
       "oneClick": false,
-      "perMachine": false,
+      "perMachine": true,
       "allowToChangeInstallationDirectory": false,
       "displayLanguageSelector": true,
       "installerLanguages": [
@@ -95,7 +95,8 @@
       ],
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "FacturaMax"
+      "shortcutName": "FacturaMax",
+      "include": "build/installer.nsh"
     },
     "compression": "maximum"
   }

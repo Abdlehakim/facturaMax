@@ -1,521 +1,195 @@
-// ───────── app-init.js ─────────
-(function (w) {
-  const SEM = (w.SEM = w.SEM || {});
+async function saveInvoiceJSON() {
+  if (window.SEM?.readInputs) window.SEM.readInputs();
+  else if (typeof readInputs === "function") readInputs();
 
-  // pdf.js worker (for importing PDF cachets)
-  if (w.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
-    pdfjsLib.GlobalWorkerOptions.workerSrc = "./lib/pdfs/pdf.worker.min.js";
+  const snapshot = (window.SEM?.captureForm
+    ? window.SEM.captureForm({ includeCompany: true })
+    : captureForm({ includeCompany: true })
+  );
+
+  const st = (window.SEM?.state || window.state);
+  const invNum = slugForFile(st.meta.number || "");
+  const dateStr = slugForFile(st.meta.date || new Date().toISOString().slice(0, 10));
+  const base = [dateStr, invNum].filter(Boolean).join(" - ");
+  const filename = ensureJsonExt(base || "Document");
+
+  if (window.SoukElMeuble?.saveInvoiceJSON) {
+    try {
+      const res = await window.SoukElMeuble.saveInvoiceJSON({
+        ...snapshot,
+        meta: snapshot.meta || {},
+        filename,
+      });
+
+      if (res && res.path) {
+        await showDialog("Document enregistré :\n" + res.path, { title: "Enregistrer" });
+      } else {
+        await showDialog("Enregistrement annulé.", { title: "Enregistrer" });
+      }
+    } catch {
+      await showDialog("Impossible d’enregistrer via l’app. Téléchargement via le navigateur…", { title: "Enregistrer" });
+      const blob = new Blob([JSON.stringify(snapshot, null, 2)], { type: "application/json" });
+      downloadBlob(filename, blob);
+    }
+    return;
   }
 
-  // Column toggle map (for add-item form)
-  const fieldToggleMap = {
-    ref: "colToggleRef",
-    product: "colToggleProduct",
-    desc: "colToggleDesc",
-    qty: "colToggleQty",
-    price: "colTogglePrice",
-    tva: "colToggleTva",
-    discount: "colToggleDiscount",
+  const blob = new Blob([JSON.stringify(snapshot, null, 2)], { type: "application/json" });
+  downloadBlob(filename, blob);
+  await showDialog("Fichier téléchargé.", { title: "Enregistrer" });
+}
+
+async function openInvoiceFromFilePicker(){
+  return new Promise((resolve) => {
+    const inp = document.createElement("input");
+    inp.type = "file"; inp.accept = "application/json";
+    inp.addEventListener("change", () => {
+      const file = inp.files?.[0];
+      if (!file) return resolve(null);
+      const reader = new FileReader();
+      reader.onload = () => {
+        try { resolve(JSON.parse(String(reader.result || "null"))); }
+        catch { resolve(null); }
+      };
+      reader.readAsText(file, "utf-8");
+    });
+    inp.click();
+  });
+}
+
+function mergeInvoiceDataIntoState(data){
+  if (!data || typeof data !== "object") return;
+
+  const src = data.data && typeof data.data === "object" ? data.data : data;
+
+  const st = (window.SEM?.state || window.state);
+
+  if (src.company) {
+    st.company = { ...st.company, ...src.company };
+  }
+
+  if (src.client) {
+    st.client = { ...st.client, ...src.client };
+  }
+
+  if (src.meta) {
+    const cur = st.meta || {};
+    const incoming = src.meta;
+
+    const mergedWH = { ...(cur.withholding || {}), ...(incoming.withholding || {}) };
+    const curExtras = cur.extras || {};
+    const incExtras = incoming.extras || {};
+    const mergedExtras = {
+      ...curExtras,
+      shipping: { ...(curExtras.shipping || {}), ...(incExtras.shipping || {}) },
+      stamp:    { ...(curExtras.stamp    || {}), ...(incExtras.stamp    || {}) },
+      fodec:    { ...(curExtras.fodec    || {}), ...(incExtras.fodec    || {}) },
+    };
+
+    st.meta = {
+      ...cur,
+      ...incoming,
+      withholding: mergedWH,
+      extras: mergedExtras,
+    };
+  }
+
+  if (Array.isArray(src.items)) {
+    st.items = src.items.map(x => ({ ...x }));
+  }
+
+  if (typeof src.notes === "string") {
+    st.notes = src.notes;
+  }
+}
+
+async function onOpenInvoiceClick(){
+  const raw = (await window.SoukElMeuble?.openInvoiceJSON?.()) || (await openInvoiceFromFilePicker());
+  if (!raw) return;
+
+  mergeInvoiceDataIntoState(raw);
+
+  const st = (window.SEM?.state || window.state);
+
+  const data = raw.data && typeof raw.data === "object" ? raw.data : raw;
+  if (!data.company && st.company && !st.company.logo) {
+    st.company.logo = getEl("companyLogo")?.src || st.company.logo || "";
+  }
+
+  (window.SEM?.bind ? window.SEM.bind() : bind());
+}
+
+async function exportCurrentPDF(){
+  (window.SEM?.readInputs ? window.SEM.readInputs() : readInputs());
+  (window.SEM?.computeTotals ? window.SEM.computeTotals() : computeTotals());
+
+  const st = (window.SEM?.state || window.state);
+  const assets  = window.SoukElMeuble?.assets || {};
+  const htmlInv = window.PDFView.build(st, assets);
+  const cssInv  = window.PDFView.css;
+
+  const invNum  = slugForFile(st.meta.number || "");
+  const dateStr = slugForFile(st.meta.date || new Date().toISOString().slice(0, 10));
+  const fileName = ensurePdfExt([dateStr, invNum].filter(Boolean).join(" - "));
+
+  const resInv = await window.SoukElMeuble?.exportPDFFromHTML?.({
+    html: htmlInv,
+    css: cssInv,
+    meta: { number: st.meta.number, docType: st.meta.docType, filename: fileName, deferOpen: true }
+  });
+
+  if (!resInv || resInv.ok !== true) {
+    return;
+  }
+
+  let resWH = null;
+  if (st.meta?.withholding?.enabled && window.PDFWH) {
+    const htmlWH = window.PDFWH.build(st, assets);
+    const cssWH  = window.PDFWH.css;
+    const baseWH = ensurePdfExt([dateStr, invNum, "Retenue à la source"].filter(Boolean).join(" - "));
+    const tryWH = await window.SoukElMeuble?.exportPDFFromHTML?.({
+      html: htmlWH,
+      css: cssWH,
+      meta: { number: st.meta.number, docType: "retenue", filename: baseWH, deferOpen: true }
+    });
+    if (tryWH && tryWH.ok === true) resWH = tryWH;
+  }
+
+  const invLabel = resInv?.name || fileName;
+  const whLabel  = resWH ? (resWH?.name || "Retenue à la source.pdf") : null;
+
+  const msg =
+    "PDF exporté : " + invLabel +
+    (whLabel ? "\nCertificat exporté : " + whLabel : "");
+
+  const okBtnText = (() => {
+    const t = String(st.meta.docType || "").toLowerCase();
+    if (t === "facture") return "Ouvrir la facture";
+    if (t === "devis")   return "Ouvrir le devis";
+    if (t === "bl")      return "Ouvrir le bon de livraison";
+    if (t === "bc")      return "Ouvrir le bon de commande";
+    return "Ouvrir le document";
+  })();
+
+  const openViaAnchor = (url) => {
+    if (!url) return;
+    const a = document.createElement("a");
+    a.href = url; a.target = "_blank"; a.rel = "noopener";
+    document.body.appendChild(a); a.click(); a.remove();
   };
 
-  // IndexedDB keys (persist chosen folders)
-  const CLIENTS_DIR_KEY = "clientsDirHandle";
-  const ARTICLES_DIR_KEY = "articlesDirHandle";
-  const DOCS_ROOT_KEY = "docsRootHandle";
-
-  // IDB KV store
-  const DB_NAME = "sem-fs";
-  const STORE = "kv";
-
-  // ───────────────────── helpers: strings & DOM ─────────────────────
-  function safeName(s = "article") {
-    return (
-      String(s).trim().replace(/[\/\\:*?"<>|]/g, "-").replace(/\s+/g, " ").slice(0, 80) || "article"
-    );
-  }
-  function safeClientName(s = "client") {
-    return (
-      String(s).trim().replace(/[\/\\:*?"<>|]/g, "-").replace(/\s+/g, " ").slice(0, 80) || "client"
-    );
-  }
-  function safeCompanyFolderName(s = "Societe") {
-    return (
-      String(s).trim().replace(/[\/\\:*?"<>|]/g, "-").replace(/\s+/g, " ").slice(0, 80) || "Societe"
-    );
-  }
-  function getCompanyNameFromForm() {
-    const n = getStr("companyName", "").trim();
-    return safeCompanyFolderName(n || "Societe");
-  }
-
-  function isEnabled(key) {
-    const el = getEl(fieldToggleMap[key]);
-    if (!el) return true;
-    return !!el.checked;
-  }
-  function setEnabled(key, enabled) {
-    const el = getEl(fieldToggleMap[key]);
-    if (!el) return;
-    el.checked = !!enabled;
-  }
-
-  // ───────────────────── capture/fill forms ─────────────────────
-  function captureClientFromForm() {
-    return {
-      type: getStr("clientType"),
-      name: getStr("clientName"),
-      vat: getStr("clientVat"),
-      phone: getStr("clientPhone"),
-      email: getStr("clientEmail"),
-      address: getStr("clientAddress"),
-    };
-  }
-  function fillClientToForm(c = {}) {
-    setVal("clientType", c.type ?? "societe");
-    setVal("clientName", c.name ?? "");
-    setVal("clientVat", c.vat ?? "");
-    setVal("clientPhone", c.phone ?? "");
-    setVal("clientEmail", c.email ?? "");
-    setVal("clientAddress", c.address ?? "");
-    if (typeof SEM.updateClientIdLabel === "function") SEM.updateClientIdLabel();
-  }
-  function pickSuggestedClientName(c) {
-    const n = String(c.name || "").trim();
-    const v = String(c.vat || "").trim();
-    const e = String(c.email || "").trim();
-    const p = String(c.phone || "").trim();
-    return safeClientName(n || v || e || p || "client");
-  }
-
-  function captureArticleFromForm() {
-    const use = {
-      ref: isEnabled("ref"),
-      product: isEnabled("product"),
-      desc: isEnabled("desc"),
-      qty: isEnabled("qty"),
-      price: isEnabled("price"),
-      tva: isEnabled("tva"),
-      discount: isEnabled("discount"),
-    };
-    return {
-      ref: getStr("addRef"),
-      product: getStr("addProduct"),
-      desc: getStr("addDesc"),
-      qty: getNum("addQty", 1),
-      price: getNum("addPrice", 0),
-      tva: getNum("addTva", 19),
-      discount: getNum("addDiscount", 0),
-      use,
-    };
-  }
-  function fillArticleToForm(a = {}) {
-    setVal("addRef", a.ref ?? "");
-    setVal("addProduct", a.product ?? "");
-    setVal("addDesc", a.desc ?? "");
-    setVal("addQty", String(a.qty ?? 1));
-    setVal("addPrice", String(a.price ?? 0));
-    setVal("addTva", String(a.tva ?? 19));
-    setVal("addDiscount", String(a.discount ?? 0));
-    if (a.use && typeof a.use === "object") {
-      Object.keys(fieldToggleMap).forEach((k) => {
-        const enabled = a.use[k];
-        if (typeof enabled === "boolean") setEnabled(k, enabled);
-      });
-      if (typeof SEM.applyColumnHiding === "function") SEM.applyColumnHiding();
+  await showConfirm(msg, {
+    title: "Ouvrir les documents",
+    okText: okBtnText,
+    cancelText: "Fermer",
+    okKeepsOpen: true,
+    extra: resWH?.url ? {
+      text: "Ouvrir le certificat",
+      onClick: () => { try { openViaAnchor(resWH.url); } catch {} }
+    } : undefined,
+    onOk: () => {
+      const invUrl = resInv?.url || null;
+      if (invUrl) openViaAnchor(invUrl);
     }
-  }
-  function pickSuggestedName(a) {
-    const u = { ref: isEnabled("ref"), product: isEnabled("product"), desc: isEnabled("desc") };
-    const ref = String(a.ref || "").trim();
-    const product = String(a.product || "").trim();
-    const desc = String(a.desc || "").trim();
-    const first = (u.ref && ref) || (u.product && product) || (u.desc && desc) || "article";
-    return first;
-  }
-
-  // ───────────────────── helpers: IndexedDB KV ─────────────────────
-  function idbOpen() {
-    return new Promise((res, rej) => {
-      const r = indexedDB.open(DB_NAME, 1);
-      r.onupgradeneeded = () => r.result.createObjectStore(STORE);
-      r.onsuccess = () => res(r.result);
-      r.onerror = () => rej(r.error);
-    });
-  }
-  async function idbSet(key, value) {
-    const db = await idbOpen();
-    return new Promise((res, rej) => {
-      const tx = db.transaction(STORE, "readwrite");
-      tx.objectStore(STORE).put(value, key);
-      tx.oncomplete = () => res();
-      tx.onerror = () => rej(tx.error);
-    });
-  }
-  async function idbGet(key) {
-    const db = await idbOpen();
-    return new Promise((res, rej) => {
-      const tx = db.transaction(STORE, "readonly");
-      const req = tx.objectStore(STORE).get(key);
-      req.onsuccess = () => res(req.result);
-      req.onerror = () => rej(req.error);
-    });
-  }
-
-  // ───────────────────── File System Access: base + folders ─────────────────────
-  function hasFileSystemAccess() {
-    return !!(window.isSecureContext && window.showSaveFilePicker);
-  }
-
-  async function pickWritableBaseDir() {
-    const handle = await window.showDirectoryPicker({
-      id: "sem-company-root",
-      mode: "readwrite",
-      startIn: "documents",
-    });
-    const p = await handle.requestPermission({ mode: "readwrite" });
-    if (p !== "granted") throw new Error("permission denied");
-    return handle;
-  }
-
-  async function getCompanyBaseDirHandle() {
-    let base = await idbGet(DOCS_ROOT_KEY);
-    try {
-      if (base) {
-        const p = await base.requestPermission({ mode: "readwrite" });
-        if (p === "granted") {
-          await base.getDirectoryHandle(".", { create: false }).catch(() => {});
-          return base;
-        }
-      }
-    } catch {}
-    const picked = await pickWritableBaseDir(); // user typically chooses "Documents"
-    await idbSet(DOCS_ROOT_KEY, picked);
-    return picked;
-  }
-
-  // Ensure Documents/<company>/ exists and return it
-  async function ensureCompanyFolder(base) {
-    const companyFolder = getCompanyNameFromForm(); // e.g., "SoukElMeuble"
-    return base.getDirectoryHandle(companyFolder, { create: true });
-  }
-
-  // Returned handles are used as "startIn" in the Save dialog (not direct saving)
-  async function getClientsFolderHandle() {
-    const base = await getCompanyBaseDirHandle();
-    const companyDir = await ensureCompanyFolder(base);
-    const dir = await companyDir.getDirectoryHandle("Clients", { create: true });
-    await dir.requestPermission?.({ mode: "readwrite" });
-    await idbSet(CLIENTS_DIR_KEY, dir);
-    return dir;
-  }
-
-  async function getArticlesFolderHandle() {
-    const base = await getCompanyBaseDirHandle();
-    const companyDir = await ensureCompanyFolder(base);
-    const dir = await companyDir.getDirectoryHandle("Articles", { create: true });
-    await dir.requestPermission?.({ mode: "readwrite" });
-    await idbSet(ARTICLES_DIR_KEY, dir);
-    return dir;
-  }
-
-  // ───────────────────── Save helpers: ALWAYS show Save dialog; cancel-safe ─────────────────────
-  async function browserSaveClientWithDialog(client, suggested = "client") {
-    const data = JSON.stringify(client, null, 2);
-    const blob = new Blob([data], { type: "application/json" });
-
-    if (!hasFileSystemAccess()) {
-      await showDialog(
-        "Votre navigateur ne prend pas en charge la boîte de dialogue d’enregistrement. Utilisez Chrome/Edge récents en HTTPS.",
-        { title: "Fonction non disponible" }
-      );
-      return false; // never save without dialog
-    }
-
-    try {
-      const startDir = await getClientsFolderHandle(); // Documents/<Company>/Clients
-      const handle = await window.showSaveFilePicker({
-        suggestedName: `${safeClientName(suggested)}.client.json`,
-        startIn: startDir,
-        types: [{ description: "Client JSON", accept: { "application/json": [".json"] } }],
-        excludeAcceptAllOption: false,
-      });
-
-      const writable = await handle.createWritable();
-      await writable.write(blob);
-      await writable.close();
-      return true;
-    } catch (e) {
-      // Cancel → AbortError: do NOT save anything, return false
-      if (e && (e.name === "AbortError" || e.code === 20)) return false;
-
-      // Other picker/permission/system-folder errors
-      await showDialog(
-        "Enregistrement annulé ou dossier non autorisé. Réessayez dans « Documents ».",
-        { title: "Échec" }
-      );
-      return false;
-    }
-  }
-
-  async function browserSaveArticleWithDialog(article, suggested = "article") {
-    const data = JSON.stringify(article, null, 2);
-    const blob = new Blob([data], { type: "application/json" });
-
-    if (!hasFileSystemAccess()) {
-      await showDialog(
-        "Votre navigateur ne prend pas en charge la boîte de dialogue d’enregistrement. Utilisez Chrome/Edge récents en HTTPS.",
-        { title: "Fonction non disponible" }
-      );
-      return false;
-    }
-
-    try {
-      const startDir = await getArticlesFolderHandle(); // Documents/<Company>/Articles
-      const handle = await window.showSaveFilePicker({
-        suggestedName: `${safeName(suggested)}.article.json`,
-        startIn: startDir,
-        types: [{ description: "Article JSON", accept: { "application/json": [".json"] } }],
-        excludeAcceptAllOption: false,
-      });
-
-      const writable = await handle.createWritable();
-      await writable.write(blob);
-      await writable.close();
-      return true;
-    } catch (e) {
-      if (e && (e.name === "AbortError" || e.code === 20)) return false;
-      await showDialog(
-        "Enregistrement annulé ou dossier non autorisé. Réessayez dans « Documents ».",
-        { title: "Échec" }
-      );
-      return false;
-    }
-  }
-
-  // ───────────────────── UI niceties ─────────────────────
-  function enableFirstClickSelectSecondClickCaret(input) {
-    if (!input) return;
-    let suppressNextMouseUp = false;
-    let firstClickDone = false;
-    input.addEventListener("mousedown", () => {
-      if (document.activeElement !== input || !firstClickDone) {
-        setTimeout(() => {
-          input.select();
-          try { input.setSelectionRange(0, input.value.length); } catch {}
-        }, 0);
-        suppressNextMouseUp = true;
-        firstClickDone = true;
-      } else {
-        suppressNextMouseUp = false;
-      }
-    });
-    input.addEventListener("mouseup", (e) => {
-      if (suppressNextMouseUp) { e.preventDefault(); suppressNextMouseUp = false; }
-    }, true);
-    input.addEventListener("blur", () => {
-      firstClickDone = false;
-      suppressNextMouseUp = false;
-    });
-  }
-
-  function killOverlays() {
-    document.body.classList.remove("printing", "print-mode");
-    const pdfRoot = document.getElementById("pdfRoot");
-    if (pdfRoot) {
-      pdfRoot.style.display = "none";
-      pdfRoot.style.pointerEvents = "none";
-      pdfRoot.setAttribute("aria-hidden", "true");
-    }
-  }
-
-  function unlockAddInputs() {
-    ["addRef","addProduct","addDesc","addQty","addPrice","addTva","addDiscount"].forEach((id) => {
-      const el = getEl(id);
-      if (el) { el.disabled = false; el.readOnly = false; }
-    });
-  }
-
-  function recoverFocus() {
-    killOverlays();
-    try { window.focus(); } catch {}
-    unlockAddInputs();
-  }
-
-  function installFocusGuards() {
-    const handler = () => recoverFocus();
-    document.addEventListener("pointerdown", handler, true);
-    document.addEventListener("keydown", handler, true);
-    document.addEventListener("focusin", handler, true);
-    window.addEventListener("focus", recoverFocus);
-    document.addEventListener("visibilitychange", () => {
-      if (document.visibilityState === "visible") recoverFocus();
-    });
-  }
-
-  // ───────────────────── init & bindings ─────────────────────
-  function init() {
-    if (!SEM.COMPANY_LOCKED && typeof SEM.loadCompanyFromLocal === "function") {
-      SEM.loadCompanyFromLocal();
-    }
-    if (typeof SEM.bind === "function") SEM.bind();
-    if (typeof SEM.wireLiveBindings === "function") SEM.wireLiveBindings();
-    if (typeof SEM.setSubmitMode === "function") SEM.setSubmitMode("add");
-
-    installFocusGuards();
-
-    ["addPrice","addQty","addTva","addDiscount"].forEach((id) =>
-      enableFirstClickSelectSecondClickCaret(getEl(id))
-    );
-
-    // Header buttons
-    getEl("btnNew")?.addEventListener("click", () => {
-      if (typeof SEM.newInvoice === "function") SEM.newInvoice();
-      if (typeof SEM.clearAddFormAndMode === "function") SEM.clearAddFormAndMode();
-      if (typeof SEM.bind === "function") SEM.bind();
-    });
-
-    getEl("btnOpen")?.addEventListener("click", () => {
-      if (typeof onOpenInvoiceClick === "function") onOpenInvoiceClick();
-    });
-
-    getEl("btnSave")?.addEventListener("click", () => {
-      try { window.__includeCompanyForSave = true; } catch {}
-      if (w.SEM?.readInputs) w.SEM.readInputs();
-      else if (typeof readInputs === "function") readInputs();
-      // app-export.js handles invoice save dialog (should follow same cancel-safe pattern)
-      saveInvoiceJSON();
-    });
-
-    getEl("btnPDF")?.addEventListener("click", () => {
-      if (typeof exportCurrentPDF === "function") exportCurrentPDF();
-    });
-
-    // Add-item controls
-    getEl("btnSubmitItem")?.addEventListener("click", () => {
-      if (typeof SEM.submitItemForm === "function") SEM.submitItemForm();
-    });
-
-    getEl("btnNewItem")?.addEventListener("click", () => {
-      if (typeof SEM.clearAddFormAndMode === "function") SEM.clearAddFormAndMode();
-    });
-
-    ["addRef","addProduct","addDesc","addQty","addPrice","addTva","addDiscount"].forEach((id) => {
-      const el = getEl(id);
-      el?.addEventListener("keydown", (e) => {
-        if (e.key === "Enter") {
-          e.preventDefault();
-          if (typeof SEM.submitItemForm === "function") SEM.submitItemForm();
-        }
-      });
-      if (el) {
-        el.addEventListener("focus", () => { try { el.select(); } catch {} });
-        el.addEventListener("click", () => { try { el.select(); } catch {} });
-      }
-    });
-
-    // Click logo to pick (Electron shell feature)
-    getEl("companyLogo")?.addEventListener("click", async () => {
-      if (!window.SoukElMeuble?.pickLogo) return;
-      const res = await window.SoukElMeuble.pickLogo();
-      if (res?.dataUrl) {
-        SEM.state.company.logo = res.dataUrl;
-        setSrc("companyLogo", res.dataUrl);
-      }
-    });
-
-    // Keep focus stable while overlays are open
-    getEl("addRef")?.closest("fieldset.section-box")?.addEventListener("mousedown", recoverFocus, true);
-
-    // Print mode hooks (Electron)
-    window.SoukElMeuble?.onEnterPrintMode?.(() => {
-      window.PDFView?.show?.(SEM.state, window.SoukElMeuble?.assets || {});
-    });
-    window.SoukElMeuble?.onExitPrintMode?.(() => {
-      window.PDFView?.hide?.();
-      recoverFocus();
-    });
-
-    // Column toggles
-    ["Ref","Price","Product","Desc","Qty","Tva","Discount"].forEach((k) => {
-      getEl(`colToggle${k}`)?.addEventListener("change", () => {
-        if (typeof SEM.applyColumnHiding === "function") SEM.applyColumnHiding();
-      });
-    });
-    if (typeof SEM.applyColumnHiding === "function") SEM.applyColumnHiding();
-
-    // Article save/load
-    getEl("btnSaveArticle")?.addEventListener("click", async () => {
-      const article = captureArticleFromForm();
-      const hasProduct = article.use?.product && String(article.product || "").trim().length > 0;
-      const hasDesc = article.use?.desc && String(article.desc || "").trim().length > 0;
-      if (!hasProduct && !hasDesc) {
-        await showDialog("Veuillez saisir au moins un Produit ou une Description.", { title: "Article incomplet" });
-        return;
-      }
-      const suggested = pickSuggestedName(article);
-      try {
-        const ok = await browserSaveArticleWithDialog(article, suggested);
-        if (ok) await showDialog("Article enregistré.", { title: "Succès" });
-        // canceled: ok === false → do nothing
-      } catch {
-        await showDialog("Échec de l’enregistrement.", { title: "Erreur" });
-      }
-    });
-
-    getEl("btnLoadArticle")?.addEventListener("click", async () => {
-      try {
-        const pick = document.createElement("input");
-        pick.type = "file";
-        pick.accept = ".json,application/json";
-        pick.onchange = async () => {
-          const f = pick.files?.[0];
-          if (!f) return;
-          const txt = await f.text();
-          const data = JSON.parse(txt);
-          fillArticleToForm(data);
-          getEl("addProduct")?.focus();
-        };
-        pick.click();
-      } catch {
-        await showDialog("Ouverture impossible.", { title: "Erreur" });
-      }
-    });
-
-    // Client save/load
-    getEl("btnSaveClient")?.addEventListener("click", async () => {
-      const client = captureClientFromForm();
-      if (!client.name && !client.email && !client.phone) {
-        await showDialog("Veuillez saisir au moins un Nom, un E-mail ou un Téléphone.", { title: "Client incomplet" });
-        return;
-      }
-      const suggested = pickSuggestedClientName(client);
-      try {
-        const ok = await browserSaveClientWithDialog(client, suggested);
-        if (ok) await showDialog("Client enregistré.", { title: "Succès" });
-        // canceled: ok === false → do nothing
-      } catch {
-        await showDialog("Échec de l’enregistrement du client.", { title: "Erreur" });
-      }
-    });
-
-    getEl("btnLoadClient")?.addEventListener("click", async () => {
-      try {
-        const inp = document.createElement("input");
-        inp.type = "file";
-        inp.accept = ".json,application/json";
-        inp.onchange = async () => {
-          const f = inp.files?.[0];
-          if (!f) return;
-          const txt = await f.text();
-          const c = JSON.parse(txt);
-          fillClientToForm(c || {});
-        };
-        inp.click();
-      } catch {
-        await showDialog("Ouverture impossible.", { title: "Erreur" });
-      }
-    });
-  }
-
-  onReady(init);
-})(window);
+  });
+}

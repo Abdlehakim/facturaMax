@@ -1,0 +1,145 @@
+/* ============================================
+CreateInvoiceStyles.css
+============================================ */
+#invoice .actions.toolbar{ display:flex; gap:8px; justify-content:flex-end; margin-bottom:12px; }
+#invoice .section-box{ border:2px solid var(--success); border-radius:5px; padding:14px 16px 16px; margin-bottom:16px; background:#f3f4f6; }
+#invoice .section-box>legend{ font-weight:700; letter-spacing:.02em; text-transform:uppercase; color:var(--success); padding:0 8px; margin-left:8px; }
+#invoice .section-box .grid{ margin-top:10px; }
+#invoice .table-wrap{ overflow-x:auto; border:2px solid var(--primary); border-radius:5px; }
+#invoice table{ width:100%; font-size:14px; border-collapse:collapse; }
+#invoice th,#invoice td{ padding:5px; }
+#invoice td:last-child,#invoice .tabM th:last-child{ text-align:center; }
+#invoice .tabM thead th{ background:var(--primary); text-align:left; color:#fff; }
+#invoice td .del{ background:#fee2e2; color:#b91c1c; border:1px solid #fecaca; border-radius:5px; padding:4px 8px; cursor:pointer; }
+#invoice td .del:hover{ background:#b91c1c; color:#fff; border-color:#b91c1c; }
+#invoice .mini-sum{ border:2px solid var(--primary); min-width:320px; max-width:380px; margin-left:auto; border-radius:5px; }
+#invoice .mini-sum th,#invoice .mini-sum td{ background:#fff; color:#0e1220; font-weight:700; text-align:center; }
+#invoice .mini-sum th{ background:var(--primary); color:#fff; }
+#invoice .mini-sum .grand th{ font-weight:700; }
+#invoice .mini-sum .right,#invoice .mini-sum .symbol{ text-align:center; }
+
+/* Dynamic legends and labels */
+#invoice .section-box legend .for-devis,
+#invoice .section-box legend .for-bl,
+#invoice .section-box legend .for-bc{ display:none; }
+#invoice #invNumberLabel .for-devis,
+#invoice #invNumberLabel .for-bl,
+#invoice #invNumberLabel .for-bc{ display:none; }
+#invoice .section-box:has(#docType option[value="devis"]:checked) legend .for-facture{ display:none; }
+#invoice .section-box:has(#docType option[value="devis"]:checked) legend .for-devis{ display:inline; }
+#invoice .section-box:has(#docType option[value="devis"]:checked) #invNumberLabel .for-facture{ display:none; }
+#invoice .section-box:has(#docType option[value="devis"]:checked) #invNumberLabel .for-devis{ display:inline; }
+#invoice .section-box:has(#docType option[value="bl"]:checked) legend .for-facture,
+#invoice .section-box:has(#docType option[value="bl"]:checked) legend .for-devis{ display:none; }
+#invoice .section-box:has(#docType option[value="bl"]:checked) legend .for-bl{ display:inline; }
+#invoice .section-box:has(#docType option[value="bl"]:checked) #invNumberLabel .for-facture,
+#invoice .section-box:has(#docType option[value="bl"]:checked) #invNumberLabel .for-devis{ display:none; }
+#invoice .section-box:has(#docType option[value="bl"]:checked) #invNumberLabel .for-bl{ display:inline; }
+#invoice .section-box:has(#docType option[value="bc"]:checked) legend .for-facture,
+#invoice .section-box:has(#docType option[value="bc"]:checked) legend .for-devis,
+#invoice .section-box:has(#docType option[value="bc"]:checked) legend .for-bl{ display:none; }
+#invoice .section-box:has(#docType option[value="bc"]:checked) legend .for-bc{ display:inline; }
+#invoice .section-box:has(#docType option[value="bc"]:checked) #invNumberLabel .for-facture,
+#invoice .section-box:has(#docType option[value="bc"]:checked) #invNumberLabel .for-devis,
+#invoice .section-box:has(#docType option[value="bc"]:checked) #invNumberLabel .for-bl{ display:none; }
+#invoice .section-box:has(#docType option[value="bc"]:checked) #invNumberLabel .for-bc{ display:inline; }
+
+/* Client ID label swap (societe vs particulier) */
+#invoice #clientIdLabel .for-soc{ display:inline; }
+#invoice #clientIdLabel .for-part{ display:none; }
+#invoice .section-box:has(#clientType option[value="particulier"]:checked) #clientIdLabel .for-soc{ display:none; }
+#invoice .section-box:has(#clientType option[value="particulier"]:checked) #clientIdLabel .for-part{ display:inline; }
+
+#invoice #items thead th:nth-child(6),
+#invoice #items thead th:nth-child(7){ white-space:nowrap; min-width:84px; }
+
+#invoice .label-inline{ display:inline-flex; align-items:center; gap:.5rem; }
+#invoice .label-text{ cursor:default; user-select:text; white-space:nowrap; }
+#invoice .col-toggle{ cursor:pointer; }
+
+/* ===== Table column visibility (toggled by JS classes on host/root) ===== */
+.hide-col-ref    #invoice #items thead th:nth-child(1),
+.hide-col-ref    #invoice #items tbody td:nth-child(1){ display:none; }
+.hide-col-product#invoice #items thead th:nth-child(2),
+.hide-col-product#invoice #items tbody td:nth-child(2){ display:none; }
+.hide-col-desc   #invoice #items thead th:nth-child(3),
+.hide-col-desc   #invoice #items tbody td:nth-child(3){ display:none; }
+.hide-col-qty    #invoice #items thead th:nth-child(4),
+.hide-col-qty    #invoice #items tbody td:nth-child(4){ display:none; }
+.hide-col-price  #invoice #items thead th:nth-child(5),
+.hide-col-price  #invoice #items tbody td:nth-child(5){ display:none; }
+.hide-col-tva    #invoice #items thead th:nth-child(6),
+.hide-col-tva    #invoice #items tbody td:nth-child(6){ display:none; }
+.hide-col-discount#invoice #items thead th:nth-child(7),
+.hide-col-discount#invoice #items tbody td:nth-child(7){ display:none; }
+
+/* ===== Desktop add-item form: hide the INPUT when its checkbox is OFF ===== */
+/* Keep the label + checkbox visible so user can re-enable it. */
+#invoice .field-ref:has(#colToggleRef:not(:checked)) #addRef{ display:none; }
+#invoice .field-product:has(#colToggleProduct:not(:checked)) #addProduct{ display:none; }
+#invoice .field-desc:has(#colToggleDesc:not(:checked)) #addDesc{ display:none; }
+#invoice .field-qty:has(#colToggleQty:not(:checked)) #addQty{ display:none; }
+#invoice .field-price:has(#colTogglePrice:not(:checked)) #addPrice{ display:none; }
+#invoice .field-tva:has(#colToggleTva:not(:checked)) #addTva{ display:none; }
+#invoice .field-discount:has(#colToggleDiscount:not(:checked)) #addDiscount{ display:none; }
+
+/* Slightly compact a field when its input is hidden */
+#invoice .field:has(.col-toggle:not(:checked)){ margin-bottom:0; }
+
+/* ===== Extras / options visibility ===== */
+#invoice #extrasBox #shipFields,
+#invoice #extrasBox #stampFields,
+#invoice #extrasBox #fodecFields,
+#invoice #whBox #whFields{ display:none; }
+#invoice #extrasBox .grid.two:has(#shipEnabled:checked)  #shipFields{  display:grid; }
+#invoice #extrasBox .grid.two:has(#stampEnabled:checked) #stampFields{ display:grid; }
+#invoice #extrasBox .grid.two:has(#fodecEnabled:checked) #fodecFields{ display:grid; }
+#invoice #whBox:has(#whEnabled:checked) #whFields{ display:grid; }
+
+#invoice #extrasBox #shipFields,
+#invoice #extrasBox #stampFields{ grid-template-columns:2fr 1fr 1fr; gap:12px; align-items:end; width:100%; }
+#invoice #extrasBox #fodecFields{ grid-template-columns:2fr 1fr 1fr 1fr 1fr; gap:12px; align-items:end; width:100%; }
+#invoice #whBox #whFields{ grid-template-columns:1fr 1fr 1fr 2fr 1fr; gap:12px; align-items:end; width:100%; }
+#invoice #whFields label.full{ grid-column:auto; }
+
+/* ===== Recent invoices list ===== */
+#invoice #recentInvoices{ margin-top:10px; border:1px solid #dfe3ea; border-radius:8px; padding:10px; background:#f9fbfd; }
+#invoice #recentInvoices h4{ margin:0 0 8px 0; font-size:14px; }
+#invoice #recentInvoicesList{ display:grid; gap:8px; }
+#invoice .recent-row{ display:grid; grid-template-columns:1fr auto auto; gap:8px; align-items:center; padding:6px 8px; border:1px solid #e6ebf2; border-radius:6px; background:#fff; }
+#invoice .recent-row .meta{ display:flex; flex-wrap:wrap; align-items:center; gap:8px; }
+#invoice .recent-row .meta .tag{ display:inline-block; padding:2px 8px; font-size:12px; line-height:1; color:#3a57a6; background:#eef3ff; border:1px solid #dbe6ff; border-radius:999px; }
+#invoice .recent-row .muted{ color:#212121; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+#invoice .recent-row .actions button{ margin-left:6px; }
+
+/* ===== Responsive ===== */
+@media (max-width:900px){
+  #invoice .grid.two{ grid-template-columns:1fr; }
+  #invoice .grid.three{ grid-template-columns:1fr; }
+  #invoice .grid.four{ grid-template-columns:1fr; }
+  #invoice .table-wrap{ -webkit-overflow-scrolling:touch; }
+  #invoice #items{ min-width:720px; }
+  #invoice #items th,#invoice #items td{ padding:6px; font-size:13px; }
+  #invoice .mini-sum{ margin-left:0; max-width:100%; width:100%; }
+  #invoice #whBox #whFields{ grid-template-columns:1fr 1fr; }
+  #invoice #whFields label.full{ grid-column:1 / -1; }
+  #invoice .recent-row{ grid-template-columns:1fr; gap:6px; align-items:flex-start; }
+  #invoice .recent-row .actions{ display:flex; gap:6px; }
+}
+@media (max-width:720px){
+  #invoice .section-box{ padding:12px; }
+  #invoice .section-box>legend{ margin-left:4px; font-size:12px; }
+  #invoice .btn{ padding:.28rem .7rem; font-size:.82rem; }
+  #invoice input,#invoice select,#invoice textarea{ font-size:12.5px; padding:8px; }
+  #invoice #items{ min-width:640px; }
+  #invoice #items th,#invoice #items td{ padding:5px; font-size:12.5px; }
+  #invoice #extrasBox #shipFields,
+  #invoice #extrasBox #stampFields,
+  #invoice #extrasBox #fodecFields{ grid-template-columns:1fr; }
+}
+@media (max-width:420px){
+  #invoice .btn{ padding:.26rem .6rem; font-size:.8rem; border-radius:4px; }
+  #invoice #items{ min-width:560px; }
+  #invoice #items th,#invoice #items td{ padding:4px; font-size:12px; }
+  #invoice .mini-sum th,#invoice .mini-sum td{ padding:7px; font-size:12.5px; }
+}

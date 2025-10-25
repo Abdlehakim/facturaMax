@@ -1,54 +1,43 @@
-// ===== helpers.js =====
+// ===== helpers.js 
 (function (global) {
   const $  = (sel) => document.querySelector(sel);
   const $$ = (sel) => Array.from(document.querySelectorAll(sel));
   const getEl = (id) => document.getElementById(id);
 
-  const setVal = (id, v) => { const el = getEl(id); if (el) el.value = v; };
-  const getStr = (id, def = "") => { const el = getEl(id); return el ? String(el.value ?? "").trim() : def; };
-  const getNum = (id, def = 0) => {
-    const val = getStr(id, String(def));
-    const n = Number((val.replace?.(",", ".") ?? val));
-    return Number.isFinite(n) ? n : def;
-  };
+  const setVal  = (id, v) => { const el = getEl(id); if (el) el.value = v; };
+  const getStr  = (id, def = "") => { const el = getEl(id); return el ? String(el.value ?? "").trim() : def; };
   const setText = (id, v) => { const el = getEl(id); if (el) el.textContent = v; };
   const setSrc  = (id, v) => { const el = getEl(id); if (el) el.src = v; };
 
-  // Safer filename sanitizer (Windows/macOS)
-  // - strips reserved characters
-  // - collapses whitespace
-  // - avoids trailing dot/space (Windows)
-  // - avoids reserved device names (CON, PRN, AUX, NUL, COM1.., LPT1..)
+  const getNum = (id, def = 0) => {
+    let raw = getStr(id, String(def));
+    if (!raw) return Number(def);
+    raw = String(raw).replace(/\u00A0/g, " ").replace(/['\s]/g, "").replace(/[^\d.,\-]/g, "");
+    const lastDot = raw.lastIndexOf(".");
+    const lastCom = raw.lastIndexOf(",");
+    if (lastDot > -1 && lastCom > -1) {
+      if (lastDot > lastCom) raw = raw.replace(/,/g, "");
+      else { raw = raw.replace(/\./g, ""); raw = raw.replace(/,/, "."); }
+    } else if (lastCom > -1) raw = raw.replace(/,/g, ".");
+    const n = Number(raw);
+    return Number.isFinite(n) ? n : Number(def);
+  };
+
   function slugForFile(s = "") {
     let out = String(s ?? "")
-      .replace(/[\/\\:*?"<>|]/g, "-")   // illegal on Windows
-      .replace(/[\u0000-\u001f]/g, "")  // control chars
+      .replace(/[\/\\:*?"<>|]/g, "-")
+      .replace(/[\u0000-\u001f]/g, "")
       .replace(/\s+/g, " ")
       .trim();
-
-    // Avoid reserved DOS names (case-insensitive)
     const base = out.split(".")[0]?.trim().toUpperCase();
-    const reserved = /^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])$/i;
-    if (!base || reserved.test(base)) out = `file-${Date.now()}`;
-
-    // No trailing dot/space on Windows
+    if (!base || /^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])$/i.test(base)) out = `file-${Date.now()}`;
     out = out.replace(/[.\s]+$/g, "");
-
-    // Keep it reasonable
     if (out.length > 120) out = out.slice(0, 120).trim();
-
     return out || "file";
   }
-  const sanitizeFilename = slugForFile; // alias, if you prefer the name elsewhere
-
-  function ensurePdfExt(name){
-    const n = String(name || "document").trim();
-    return n.toLowerCase().endsWith(".pdf") ? n : (n + ".pdf");
-  }
-  function ensureJsonExt(name){
-    const n = String(name || "data").trim();
-    return n.toLowerCase().endsWith(".json") ? n : (n + ".json");
-  }
+  const sanitizeFilename = slugForFile;
+  const ensurePdfExt  = (name="document") => name.toLowerCase().endsWith(".pdf")  ? name : (name + ".pdf");
+  const ensureJsonExt = (name="data")     => name.toLowerCase().endsWith(".json") ? name : (name + ".json");
 
   function docTypeLabel(t){
     const map = { facture:"Facture", devis:"Devis", bl:"Bon de livraison", bc:"Bon de commande" };
@@ -58,18 +47,14 @@
   function formatMoney(v, currency){
     const n = Number(v || 0);
     try {
-      // Let the runtime pick the current locale; if currency is bad, fall back
-      return new Intl.NumberFormat(undefined, { style: "currency", currency }).format(n);
+      if (currency) return new Intl.NumberFormat(undefined, { style: "currency", currency }).format(n);
+      return new Intl.NumberFormat(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
     } catch {
       return new Intl.NumberFormat(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n) + (currency ? (" " + currency) : "");
     }
   }
-  function formatInt(v){
-    return new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 }).format(Number(v || 0));
-  }
-  function formatPct(v){
-    return new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(Number(v || 0));
-  }
+  const formatInt = (v) => new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 }).format(Number(v || 0));
+  const formatPct = (v) => new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(Number(v || 0));
 
   function enableFirstClickSelectSecondClickCaret(input){
     if (!input) return;
@@ -79,15 +64,12 @@
       if (document.activeElement !== input || !firstClickDone) {
         setTimeout(() => { input.select(); try { input.setSelectionRange(0, input.value.length); } catch {} }, 0);
         suppressNextMouseUp = true; firstClickDone = true;
-      } else {
-        suppressNextMouseUp = false;
-      }
+      } else { suppressNextMouseUp = false; }
     });
     input.addEventListener("mouseup", (e) => { if (suppressNextMouseUp) { e.preventDefault(); suppressNextMouseUp = false; } }, true);
     input.addEventListener("blur", () => { firstClickDone = false; suppressNextMouseUp = false; });
   }
 
-  // Simple, reusable dialog system (A11y-friendly)
   function ensureDialog(){
     let overlay = getEl("swbDialog");
     if (overlay) return overlay;
@@ -119,10 +101,12 @@
     closeX.addEventListener("click", () => { const evt = new KeyboardEvent("keydown", { key: "Escape" }); document.dispatchEvent(evt); });
     return overlay;
   }
+
   function setSiblingsInert(exceptEl, inertOn){
     const kids = Array.from(document.body.children);
     for (const el of kids){ if (el === exceptEl) continue; if (inertOn) el.setAttribute('inert',''); else el.removeAttribute('inert'); }
   }
+
   function openOverlayA11y(overlay, focusEl){
     const panel = overlay.querySelector('.swbDialog__panel');
     if (panel){ panel.setAttribute('role','dialog'); panel.setAttribute('aria-modal','true'); }
@@ -131,12 +115,23 @@
     setSiblingsInert(overlay, true);
     if (focusEl) try { focusEl.focus(); } catch {}
   }
+
   function closeOverlayA11y(overlay, prevFocusEl, buttonsToBlur = []){
     buttonsToBlur.forEach(btn => { try { btn.blur(); } catch {} });
     overlay.setAttribute('aria-hidden','true');
     overlay.style.display = 'none';
     setSiblingsInert(overlay, false);
     if (prevFocusEl && typeof prevFocusEl.focus === 'function'){ try { prevFocusEl.focus(); } catch {} }
+  }
+
+  function toFileURL(p){
+    if (!p) return null;
+    if (/^(file|https?):\/\//i.test(p)) return p;
+    let normalized = String(p).replace(/\\/g, "/");
+    if (normalized.startsWith("//")) return "file:" + encodeURI(normalized);
+    if (/^[a-zA-Z]:\//.test(normalized)) return "file:///" + encodeURI(normalized);
+    if (normalized.startsWith("/")) return "file://" + encodeURI(normalized);
+    return "file://" + encodeURI("/" + normalized);
   }
 
   function showDialog(message, { title = "Information" } = {}){
@@ -196,8 +191,18 @@
         closeOverlayA11y(overlay, previouslyFocused, [ok, cancel, extraBtn]);
         resolve(result);
       }
-      function runOpeners(){ try { onOk && onOk(); } catch {} urls.forEach((u)=>{ try{ window.open(u,"_blank","noopener,noreferrer"); }catch{} }); }
-      function onOkClick(){ runOpeners(); if (!okKeepsOpen) close(true); }
+      async function runOpeners(){
+        try { onOk && onOk(); } catch {}
+        for (const raw of urls) {
+          try {
+            const url = toFileURL(raw);
+            if (window.SoukElMeuble?.openExternal) {
+              await window.SoukElMeuble.openExternal(url);
+            }
+          } catch {}
+        }
+      }
+      async function onOkClick(){ await runOpeners(); if (!okKeepsOpen) close(true); }
       function onCancel(){ close(false); }
       function onBackdrop(e){ if (e.target === overlay) close(false); }
       function onKey(e){ if (e.key === "Enter") onOkClick(); else if (e.key === "Escape") close(false); }
@@ -211,48 +216,12 @@
     });
   }
 
-  // More robust download (revokes URL even if errors happen)
-  function downloadBlob(filename, blob){
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = filename || "download";
-    document.body.appendChild(a);
-    try { a.click(); } finally {
-      setTimeout(() => { try { URL.revokeObjectURL(a.href); } catch {} a.remove(); }, 0);
-    }
-  }
-
-  // Convert OS paths to safe file:// URLs (Windows/macOS)
-  function toFileURL(p){
-    if (!p) return null;
-    if (/^(file|https?):\/\//i.test(p)) return p;
-    let normalized = String(p).replace(/\\/g, "/");
-
-    // UNC paths (\\server\share\...)
-    if (normalized.startsWith("//")) {
-      return "file:" + encodeURI(normalized);
-    }
-
-    // Windows drive letter: C:/...
-    if (/^[a-zA-Z]:\//.test(normalized)) {
-      return "file:///" + encodeURI(normalized);
-    }
-
-    // POSIX absolute path: /Users/...
-    if (normalized.startsWith("/")) {
-      return "file://" + encodeURI(normalized);
-    }
-
-    // Relative -> best-effort
-    return "file://" + encodeURI("/" + normalized);
-  }
-
   async function openPDFFile(path){
     if (!path) return false;
     if (window.SoukElMeuble?.openPath)      { try { return !!(await window.SoukElMeuble.openPath(path)); } catch {} }
     if (window.SoukElMeuble?.showInFolder)  { try { await window.SoukElMeuble.showInFolder(path); return true; } catch {} }
     if (window.SoukElMeuble?.openExternal)  { try { const url = toFileURL(path); await window.SoukElMeuble.openExternal(url); return true; } catch {} }
-    try { const _ = toFileURL(path); return true; } catch { return false; }
+    return false;
   }
 
   function onReady(fn){
@@ -260,26 +229,19 @@
     else fn();
   }
 
-  function escapeHTML(str=""){
-    return String(str).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
-  }
+  const escapeHTML = (str="") => String(str).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
 
-  // ---- Expose: keep old globals AND offer SEM namespace
   const helpers = {
     $, $$, getEl, setVal, getStr, getNum, setText, setSrc,
     slugForFile, sanitizeFilename, ensurePdfExt, ensureJsonExt, docTypeLabel,
     formatMoney, formatInt, formatPct,
     enableFirstClickSelectSecondClickCaret,
     ensureDialog, showDialog, showConfirm,
-    downloadBlob, toFileURL, openPDFFile,
+    toFileURL, openPDFFile,
     onReady, escapeHTML
   };
 
-  // Back-compat globals
   Object.assign(global, helpers);
-
-  // Namespaced
   global.SEM = global.SEM || {};
   global.SEM.helpers = helpers;
-
 })(window);

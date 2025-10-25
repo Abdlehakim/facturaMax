@@ -177,11 +177,15 @@ body.printing #pdfRoot, body.print-mode #pdfRoot {
     return `<div class="boxline">${cells}${empty}</div>`;
   }
 
-  // Totals aligned with app rules
+  // === Totals aligned with the app (incl. FODEC rules) ===
+  // Returns the two bases used by RAS calculation:
+  // - rasBaseHT  = HT items + livraison HT + FODEC HT
+  // - rasBaseTTC = Total TTC (all) - timbre TTC
   function totalsForWH(state) {
     const items = Array.isArray(state?.items) ? state.items : [];
     const ex    = state?.meta?.extras || {};
 
+    // Items
     let subtotal=0, totalDiscount=0, totalTax=0;
     for (const it of items) {
       const base = Number(it.qty||0) * Number(it.price||0);
@@ -191,19 +195,45 @@ body.printing #pdfRoot, body.print-mode #pdfRoot {
       subtotal += base; totalDiscount += disc; totalTax += tax;
     }
     const totalHT_items  = subtotal - totalDiscount;
-    const totalTTC_items = totalHT_items + totalTax;
 
+    // Shipping
     const shipHT  = ex?.shipping?.enabled ? Number(ex.shipping.amount||0) : 0;
     const shipTVA = shipHT * (Number(ex?.shipping?.tva||0)/100);
     const shipTT  = shipHT + shipTVA;
 
+    // Stamp
     const stampHT  = ex?.stamp?.enabled ? Number(ex.stamp.amount||0) : 0;
     const stampTVA = stampHT * (Number(ex?.stamp?.tva||0)/100);
     const stampTT  = stampHT + stampTVA;
 
-    const totalHT_all  = totalHT_items + shipHT;            // stamp exclu
-    const totalTTC_all = totalTTC_items + shipTT + stampTT; // stamp inclu
-    return { totalHT_all, totalTTC_all };
+    // FODEC
+    const fEnabled = !!ex?.fodec?.enabled;
+    const fRate    = Number(ex?.fodec?.rate) || 0;
+    const fBaseSel = String(ex?.fodec?.base || "ht").toLowerCase(); // "ht" | "ht_plus" | "ttc_sans_fodec"
+    const fTvaRate = Number(ex?.fodec?.tva)  || 0;
+
+    const baseHT_simple = totalHT_items;                          // lines HT
+    const baseHT_plus   = totalHT_items + shipHT;                 // HT + shipping
+    const baseTTC_sansF = baseHT_plus + totalTax + shipTVA;       // TTC (sans FODEC)
+
+    let fodecBase = 0;
+    if (fBaseSel === "ht")        fodecBase = baseHT_simple;
+    else if (fBaseSel === "ht_plus") fodecBase = baseHT_plus;
+    else                           fodecBase = baseTTC_sansF;
+
+    const fodecHT  = fEnabled ? (fodecBase * (fRate/100)) : 0;
+    const fodecTVA = fEnabled ? (fodecHT   * (fTvaRate/100)) : 0;
+
+    // Totals (for completeness)
+    const totalHT_display  = totalHT_items + shipHT + (fEnabled ? fodecHT : 0);
+    const totalTVA_display = totalTax + shipTVA + (fEnabled ? fodecTVA : 0);
+    const totalTTC_all     = totalHT_display + totalTVA_display + stampTT;
+
+    // Bases used by RAS in the app:
+    const rasBaseHT  = totalHT_items + shipHT + (fEnabled ? fodecHT : 0);
+    const rasBaseTTC = totalTTC_all - stampTT; // TTC minus timbre
+
+    return { rasBaseHT, rasBaseTTC, totalTTC_all };
   }
 
   function build(state, assets) {
@@ -217,8 +247,10 @@ body.printing #pdfRoot, body.print-mode #pdfRoot {
     const base      = (wh.base === "ttc") ? "ttc" : "ht";
     const threshold = Number(wh.threshold || 0);
 
-    const { totalHT_all, totalTTC_all } = totalsForWH(state);
-    const baseVal = base === "ttc" ? totalTTC_all : totalHT_all;
+    // Use the same bases as the app (now includes FODEC)
+    const { rasBaseHT, rasBaseTTC } = totalsForWH(state);
+    const baseVal = base === "ttc" ? rasBaseTTC : rasBaseHT;
+
     const retenue = (enabled && baseVal > threshold) ? Math.max(0, baseVal) * (rate/100) : 0;
     const net     = Math.max(0, baseVal - retenue);
 

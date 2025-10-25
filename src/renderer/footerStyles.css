@@ -1,0 +1,27 @@
+/* =========================
+footerStyles.css
+========================= */
+.footer{
+  position:relative;
+  background:var(--footer-bg);
+  color:var(--footer-text);
+  border-top:1px solid var(--footer-border);
+  padding:10px 14px;
+  border-radius:6px;
+  display:flex;
+  justify-content:space-between;
+  margin-top:12px;
+  font-size:12px;
+}
+.with-sidebar .app{ display:flex; flex-direction:column; }
+.with-sidebar .app > #panelHost{ flex:1 1 auto; }
+.with-sidebar .app > .footer{ flex:0 0 auto; }
+.footer .muted,.footer span{ color:var(--footer-text); }
+.footer small{ color:var(--footer-muted); }
+@media print{
+  .footer{ display:none !important; }
+}
+@media (max-width:720px){
+  .footer{ padding:10px 12px; border-radius:5px; }
+  .footer span{ display:block; }
+}
