@@ -7,9 +7,9 @@ export function renderStockListSection() {
         <table>
           <thead>
             <tr>
-              <th style="width:12%">Reference</th>
-              <th style="width:18%">Article</th>
-              <th>Description</th>
+              <th class="left" style="width:12%">Reference</th>
+              <th class="left" style="width:18%">Article</th>
+              <th class="left" >Description</th>
               <th style="width:10%">Quantite</th>
               <th style="width:12%">Prix HT</th>
               <th style="width:12%">TVA %</th>
@@ -55,10 +55,10 @@ export function updateStockTable(items, { onEdit, onDelete } = {}) {
         <td>${item.ref ? window.escapeHTML?.(item.ref) ?? item.ref : ""}</td>
         <td>${item.name ? window.escapeHTML?.(item.name) ?? item.name : ""}</td>
         <td>${item.desc ? window.escapeHTML?.(item.desc) ?? item.desc : ""}</td>
-        <td class="right">${Number.isFinite(qty) ? qty : 0}</td>
-        <td class="right">${formatMoney(price, currency)}</td>
-        <td class="right">${Number.isFinite(tva) ? tva.toFixed(2) : "0.00"} %</td>
-        <td class="right">${Number.isFinite(discount) ? discount.toFixed(2) : "0.00"} %</td>
+        <td class="center">${Number.isFinite(qty) ? qty : 0}</td>
+        <td class="center">${formatMoney(price, currency)}</td>
+        <td class="center">${Number.isFinite(tva) ? tva.toFixed(2) : "0.00"} %</td>
+        <td class="center">${Number.isFinite(discount) ? discount.toFixed(2) : "0.00"} %</td>
         <td class="actions-cell">
           <button class="btn tiny" data-action="edit">Editer</button>
           <button class="del" data-action="delete">Supprimer</button>

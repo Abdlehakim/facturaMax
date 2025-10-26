@@ -16,10 +16,11 @@
 #screenStock .btn.primary:hover{transform:translateY(-1px);filter:brightness(1.04);box-shadow:0 14px 22px -14px rgba(37,99,235,.9)}
 #screenStock .table-wrap{overflow:hidden;border-radius:10px;border:1px solid rgba(15,23,42,.06);box-shadow:0 10px 24px -20px rgba(15,23,42,.45)}
 #screenStock table{width:100%;border-collapse:collapse;font-size:13.8px;background:linear-gradient(180deg,rgba(248,250,252,.88) 0,#fff 12%)}
+#screenStock thead th.left {text-align: left}
 #screenStock thead th{background:#eef4ff;color:#1d2a44;font-weight:600;text-transform:uppercase;font-size:12px;letter-spacing:.04em;padding:12px 14px;border-bottom:1px solid rgba(15,23,42,.08)}
 #screenStock tbody td{padding:12px 14px;border-bottom:1px solid rgba(15,23,42,.05);color:#22314f}
 #screenStock tbody tr:hover{background:rgba(37,99,235,.05)}
-#screenStock td.right{text-align:right}
+#screenStock td.center{text-align:center}
 #screenStock .actions-cell{display:flex;gap:10px;justify-content:flex-end}
 #screenStock .actions-cell .btn.tiny{padding:6px 12px;font-size:12px;border-radius:6px;background:#e8efff;color:#1f3c8f;border:1px solid rgba(31,60,143,.18);transition:background .15s ease,color .15s ease}
 #screenStock .actions-cell .btn.tiny:hover{background:#dbe6ff;color:#132a66}
