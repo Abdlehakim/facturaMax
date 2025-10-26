@@ -12,11 +12,20 @@ import {
   bindStockAddPanel,
   clearAddForm,
   fillAddForm,
+  setupFieldVisibilityMenu,
   renderStockAddPanel,
   setAddFormMode,
+  applyStockFormType,
 } from "./StockAddPanel.js";
 
 let activeTableHandlers = null;
+let stockTypeControls = {
+  button: null,
+  label: null,
+  menu: null,
+  radios: [],
+  current: "product",
+};
 
 function suggestedArticleName(entry) {
   const fallback = "article";
@@ -118,15 +127,21 @@ function showSection(section) {
   const listWrap = getEl("stockListSection");
   const panel = getEl("stockAddPanel");
   const addBtn = getEl("stockAddButton");
+  const visibilityWrapper = getEl("stockFieldVisibilityWrapper");
+  if (section === "add") {
+    setStockTypeSelection("product");
+  }
   if (section === "add") {
     if (listWrap) listWrap.style.display = "none";
     if (panel) panel.style.display = "block";
     if (addBtn) addBtn.style.display = "none";
+    if (visibilityWrapper) visibilityWrapper.style.display = "flex";
     updateBreadcrumb("add");
   } else {
     if (listWrap) listWrap.style.display = "";
     if (panel) panel.style.display = "none";
     if (addBtn) addBtn.style.display = "";
+    if (visibilityWrapper) visibilityWrapper.style.display = "none";
     clearAddForm();
     updateBreadcrumb("list");
   }
@@ -209,7 +224,71 @@ export function mount(root) {
       <div class="stock-lead">
         <div class="stock-crumbs" id="stockBreadcrumb"></div>
       </div>
-      <button id="stockAddButton" class="btn primary">Ajouter Article</button>
+      <div class="stock-header-actions">
+        <div class="stock-header-dropdowns" id="stockFieldVisibilityWrapper" style="display:none;">
+          <div class="field-visibility-control stock-type-control">
+            <button id="stockTypeDropdownButton" type="button" class="visibility-dropdown-toggle">
+              <span id="stockTypeDropdownLabel">Produit</span>
+              <svg width="14" height="14" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                <path d="M5 7.5L10 12.5L15 7.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </button>
+            <div id="stockTypeDropdownMenu" class="field-visibility-menu type-menu">
+              <div class="field-visibility-options">
+                <label>
+                  <input type="radio" name="stockTypeOption" value="product" checked />
+                  <span>Produit</span>
+                </label>
+                <label>
+                  <input type="radio" name="stockTypeOption" value="service" />
+                  <span>Service</span>
+                </label>
+              </div>
+            </div>
+          </div>
+          <div class="field-visibility-control">
+            <button id="stockFieldVisibilityButton" type="button" class="visibility-dropdown-toggle">
+              <span>Champs affiches</span>
+              <svg width="14" height="14" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                <path d="M5 7.5L10 12.5L15 7.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </button>
+            <div id="stockFieldVisibilityMenu" class="field-visibility-menu">
+              <div class="field-visibility-options">
+                <label>
+                  <input type="checkbox" class="field-toggle-checkbox" data-toggle-target="stockAddRef" checked />
+                  <span>Reference</span>
+                </label>
+                <label>
+                  <input type="checkbox" class="field-toggle-checkbox" data-toggle-target="stockAddName" checked />
+                  <span>Produit</span>
+                </label>
+                <label>
+                  <input type="checkbox" class="field-toggle-checkbox" data-toggle-target="stockAddDesc" checked />
+                  <span>Description</span>
+                </label>
+                <label>
+                  <input type="checkbox" class="field-toggle-checkbox" data-toggle-target="stockAddQty" checked />
+                  <span>Quantite</span>
+                </label>
+                <label>
+                  <input type="checkbox" class="field-toggle-checkbox" data-toggle-target="stockAddPrice" checked />
+                  <span>Prix HT</span>
+                </label>
+                <label>
+                  <input type="checkbox" class="field-toggle-checkbox" data-toggle-target="stockAddTva" checked />
+                  <span>TVA %</span>
+                </label>
+                <label>
+                  <input type="checkbox" class="field-toggle-checkbox" data-toggle-target="stockAddDiscount" checked />
+                  <span>Remise %</span>
+                </label>
+              </div>
+            </div>
+          </div>
+        </div>
+        <button id="stockAddButton" class="btn primary">Ajouter Article</button>
+      </div>
     </div>
     ${renderStockListSection()}
     ${renderStockAddPanel()}
@@ -232,6 +311,8 @@ export function mount(root) {
     onCancel: () => showSection("list"),
   });
   bindBreadcrumb();
+  setupFieldVisibilityMenu();
+  setupStockTypeMenu();
 
   refreshTable();
   Promise.resolve(refreshStockFromFilesystem())
@@ -243,8 +324,88 @@ export function mount(root) {
 }
 
 export function unmount(root) {
+  if (window.__SEM_StockFieldVisibilityListener) {
+    document.removeEventListener("click", window.__SEM_StockFieldVisibilityListener);
+    delete window.__SEM_StockFieldVisibilityListener;
+  }
+  if (window.__SEM_StockTypeMenuListener) {
+    document.removeEventListener("click", window.__SEM_StockTypeMenuListener);
+    delete window.__SEM_StockTypeMenuListener;
+  }
   if (root) root.innerHTML = "";
   activeTableHandlers = null;
 }
 
 export default { mount, unmount };
+
+function setupStockTypeMenu() {
+  if (typeof document === "undefined") return;
+  const button = document.getElementById("stockTypeDropdownButton");
+  const menu = document.getElementById("stockTypeDropdownMenu");
+  const label = document.getElementById("stockTypeDropdownLabel");
+  if (!button || !menu || !label) return;
+  const radios = Array.from(menu.querySelectorAll('input[name="stockTypeOption"]'));
+  stockTypeControls = {
+    button,
+    label,
+    menu,
+    radios,
+    current: "product",
+  };
+
+  let open = false;
+  const setOpen = (value) => {
+    open = !!value;
+    menu.style.display = open ? "block" : "none";
+    button.classList.toggle("is-open", open);
+    menu.classList.toggle("is-open", open);
+    button.setAttribute("aria-expanded", open ? "true" : "false");
+  };
+  setOpen(false);
+
+  if (!button.dataset.menuSetup) {
+    button.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      setOpen(!open);
+    });
+    button.dataset.menuSetup = "true";
+  }
+
+  radios.forEach((radio) => {
+    radio.addEventListener("change", (event) => {
+      if (!event.target.checked) return;
+      const value = event.target.value === "service" ? "service" : "product";
+      setStockTypeSelection(value, { updateRadios: false });
+      setOpen(false);
+    });
+  });
+
+  if (window.__SEM_StockTypeMenuListener) {
+    document.removeEventListener("click", window.__SEM_StockTypeMenuListener);
+  }
+  const onDocumentClick = (event) => {
+    if (!open) return;
+    if (!menu.contains(event.target) && event.target !== button) {
+      setOpen(false);
+    }
+  };
+  window.__SEM_StockTypeMenuListener = onDocumentClick;
+  document.addEventListener("click", onDocumentClick);
+
+  setStockTypeSelection("product");
+}
+
+function setStockTypeSelection(type, { updateRadios = true } = {}) {
+  const normalized = type === "service" ? "service" : "product";
+  stockTypeControls.current = normalized;
+  if (stockTypeControls.label) {
+    stockTypeControls.label.textContent = normalized === "service" ? "Service" : "Produit";
+  }
+  if (updateRadios && Array.isArray(stockTypeControls.radios)) {
+    stockTypeControls.radios.forEach((radio) => {
+      radio.checked = radio.value === normalized;
+    });
+  }
+  applyStockFormType(normalized);
+}

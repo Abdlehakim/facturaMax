@@ -1,6 +1,6 @@
 /* StockStyles.css */
 #screenStock{padding:16px 18px;background:linear-gradient(180deg,rgba(245,247,250,.65) 0,rgba(255,255,255,.9) 40%),#f8fafc}
-#screenStock .stock-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px}
+#screenStock .stock-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;min-height:40px}
 #screenStock .stock-lead{display:flex;flex-direction:column; gap:6px}
 #screenStock .stock-title{font-size:24px;font-weight:700;color:#0b1f4b;letter-spacing:.02em}
 #screenStock .stock-crumbs{display:flex;align-items:center;gap:10px;font-size:14px;color:#5b6b86}
@@ -50,3 +50,6 @@
   #screenStock table{min-width:640px}
   #screenStock .table-wrap{overflow-x:auto}
 }
+#screenStock .stock-header-actions{display:flex;align-items:center;gap:12px;flex-wrap:wrap;justify-content:flex-end}
+#screenStock .stock-header-dropdowns{display:flex;align-items:stretch;gap:12px;flex-wrap:wrap}
+#screenStock .stock-header-actions .field-visibility-control{margin-bottom:0}
