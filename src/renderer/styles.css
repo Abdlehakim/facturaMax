@@ -103,7 +103,8 @@ textarea{ resize:vertical; }
 }
 .btn:hover{ background:var(--primary); color:#fff; border-color:var(--primary); }
 .btn.ghost{ background:transparent; }
-.btn.primary{ background:var(--primary); color:#fff; border-color:var(--primary); }
+.btn.primary{display:inline-flex;align-items:center;gap:8px;font-weight:600;background:linear-gradient(135deg,#2563eb,#1d4ed8);color:#fff;border:none;padding:10px 18px;border-radius:8px;cursor:pointer;box-shadow:0 8px 18px -12px rgba(37,99,235,.9);transition:transform .15s ease,box-shadow .15s ease,filter .15s ease}
+.btn.primary::before{content:"+";font-size:16px;line-height:1}
 .btn.success{ background:var(--success); color:#0b1220; border-color:var(--success); }
 .btn:disabled,.btn[disabled]{
   border:1px solid #d1d5db; border-radius:5px;
