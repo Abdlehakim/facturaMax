@@ -1,4 +1,4 @@
-"use strict";
+﻿"use strict";
 
 const { app, BrowserWindow, ipcMain, dialog, shell } = require("electron");
 const path = require("path");
@@ -52,7 +52,7 @@ app.on("window-all-closed", () => {
   if (process.platform !== "darwin") app.quit();
 });
 
-// ───────── helpers ─────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€ helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function sanitizeFileName(name = "") {
   let out = String(name)
     .replace(/[<>:"/\\|?*\u0000-\u001F]/g, "_")
@@ -148,8 +148,9 @@ function getProgramFilesDir() {
     "C:\\Program Files"
   );
 }
+const ARTICLES_SUBPATH = path.join("Data", "Articles");
 function pfPath(subdir) {
-  return path.join(getProgramFilesDir(), "FacturaMax", subdir);
+  return path.join(getProgramFilesDir(), "Facturance", subdir);
 }
 async function tryEnsure(dir) {
   try { await fsp.mkdir(dir, { recursive: true }); } catch {}
@@ -158,7 +159,7 @@ function getClientsSystemFolder() {
   if (process.platform === "win32") {
     return pfPath("Clients");
   }
-  return path.join(app.getPath("documents"), "FacturaMax", "Clients");
+  return path.join(app.getPath("documents"), "Facturance", "Clients");
 }
 async function canWriteTo(dir) {
   try {
@@ -227,7 +228,7 @@ function uniqueClientPath(baseDir, baseName) {
   return ensureUniquePath(fp);
 }
 
-/** ───────── Invoices ledger (auto-number + recent list) ───────── **/
+/** â”€â”€â”€â”€â”€â”€â”€â”€â”€ Invoices ledger (auto-number + recent list) â”€â”€â”€â”€â”€â”€â”€â”€â”€ **/
 const LEDGER_FILE = path.join(app.getPath("userData"), "invoices-ledger.json");
 function readLedger() {
   try { return JSON.parse(fs.readFileSync(LEDGER_FILE, "utf-8")); } catch { return { counters:{}, entries:[] }; }
@@ -298,7 +299,7 @@ ipcMain.handle("invoices:delete", async (_evt, { path: p }) => {
   }
 });
 
-/** ───────── Clients IPC ───────── **/
+/** â”€â”€â”€â”€â”€â”€â”€â”€â”€ Clients IPC â”€â”€â”€â”€â”€â”€â”€â”€â”€ **/
 ipcMain.handle("clients:ensureSystemFolder", async () => {
   try {
     return await ensureClientsSystemFolder();
@@ -373,7 +374,7 @@ ipcMain.handle("clients:open", async (event, opts = {}) => {
   }
 });
 
-/** ───────── Invoices: Save / Open (with ledger updates) ───────── **/
+/** â”€â”€â”€â”€â”€â”€â”€â”€â”€ Invoices: Save / Open (with ledger updates) â”€â”€â”€â”€â”€â”€â”€â”€â”€ **/
 ipcMain.handle("save-invoice-json", async (event, payload = {}) => {
   try {
     const incoming =
@@ -461,13 +462,13 @@ ipcMain.handle("open-invoice-json", async (event) => {
   } catch {
     dialog.showErrorBox(
       "JSON invalide",
-      "Le fichier sélectionné n’est pas un JSON de facture valide."
+      "Le fichier sÃ©lectionnÃ© nâ€™est pas un JSON de facture valide."
     );
     return null;
   }
 });
 
-/** ───────── Logo picker ───────── **/
+/** â”€â”€â”€â”€â”€â”€â”€â”€â”€ Logo picker â”€â”€â”€â”€â”€â”€â”€â”€â”€ **/
 ipcMain.handle("SoukElMeuble:pickLogo", async () => {
   const { canceled, filePaths } = await dialog.showOpenDialog({
     title: "Choisir un logo",
@@ -492,7 +493,7 @@ ipcMain.handle("SoukElMeuble:pickLogo", async () => {
   return { dataUrl: `data:${mime};base64,${base64}` };
 });
 
-/** ───────── PDF Export (default PF\FacturaMax\Factures\pdf) ───────── **/
+/** â”€â”€â”€â”€â”€â”€â”€â”€â”€ PDF Export (default PF\Facturance\Factures\pdf) â”€â”€â”€â”€â”€â”€â”€â”€â”€ **/
 ipcMain.handle("SoukElMeuble:exportPDFFromHTML", async (event, payload) => {
   const { html = "", css = "", meta = {} } = payload || {};
   try {
@@ -526,7 +527,7 @@ ipcMain.handle("SoukElMeuble:exportPDFFromHTML", async (event, payload) => {
   }
 });
 
-/** ───────── Shell helpers ───────── **/
+/** â”€â”€â”€â”€â”€â”€â”€â”€â”€ Shell helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€ **/
 ipcMain.handle("SoukElMeuble:openPath", async (_evt, absPath) => {
   try {
     return (await shell.openPath(absPath)) === "";
@@ -568,7 +569,7 @@ ipcMain.handle("SoukElMeuble:deletePath", async (_evt, absPath) => {
   }
 });
 
-/** ───────── Articles (same as before) ───────── **/
+/** â”€â”€â”€â”€â”€â”€â”€â”€â”€ Articles (same as before) â”€â”€â”€â”€â”€â”€â”€â”€â”€ **/
 function ensureSafeName(s = "article") {
   return (
     String(s)
@@ -579,15 +580,15 @@ function ensureSafeName(s = "article") {
   );
 }
 function getArticlesDir() {
-  return pfPath("Articles");
+  return pfPath(ARTICLES_SUBPATH);
 }
 async function ensureArticlesDir() {
-  const pfDir = pfPath("Articles");
+  const pfDir = pfPath(ARTICLES_SUBPATH);
   try {
     await fsp.mkdir(pfDir, { recursive: true });
     if (await canWriteTo(pfDir)) return pfDir;
   } catch {}
-  const docsDir = path.join(app.getPath("documents"), "FacturaMax", "Articles");
+  const docsDir = path.join(app.getPath("documents"), "Facturance", "Data", "Articles");
   await fsp.mkdir(docsDir, { recursive: true });
   return docsDir;
 }
@@ -628,7 +629,7 @@ ipcMain.handle("articles:save", async (event, payload = {}) => {
     const { canceled, filePath } = await dialog.showSaveDialog(
       BrowserWindow.fromWebContents(event.sender),
       {
-        title: "Enregistrer l’article",
+        title: "Enregistrer lâ€™article",
         defaultPath,
         filters: [{ name: "Articles JSON", extensions: ["json"] }],
       }
@@ -696,11 +697,52 @@ ipcMain.handle("articles:list", async () => {
   try {
     const dir = await ensureArticlesDir();
     const files = await fsp.readdir(dir);
-    return files
-      .filter((f) => f.toLowerCase().endsWith(".json"))
-      .map((f) => path.join(dir, f));
+    const entries = await Promise.all(
+      files
+        .filter((f) => f.toLowerCase().endsWith(".json"))
+        .map(async (f) => {
+          const fullPath = path.join(dir, f);
+          try {
+            const txt = await fsp.readFile(fullPath, "utf-8");
+            const data = JSON.parse(txt);
+            const article = {
+              ref: data.ref ?? "",
+              name: data.name ?? data.product ?? "",
+              desc: data.desc ?? data.description ?? "",
+              qty: Number(data.qty ?? data.quantity ?? 0),
+              price: Number(data.price ?? data.unitPrice ?? 0),
+              tva: Number(data.tva ?? data.vat ?? 0),
+              discount: Number(data.discount ?? data.remise ?? 0),
+            };
+            return { path: fullPath, name: f, article };
+          } catch (err) {
+            console.warn("[articles:list] skip invalid article:", fullPath, err);
+            return null;
+          }
+        })
+    );
+    return entries.filter(Boolean);
   } catch (e) {
     console.error("[articles:list] error:", e);
     return [];
   }
 });
+ipcMain.handle("articles:update", async (_evt, payload = {}) => {
+  try {
+    const { path: targetPath, article = {} } = payload;
+    if (!targetPath) return { ok: false, error: "Missing path" };
+    const dir = await ensureArticlesDir();
+    const resolvedTarget = path.resolve(targetPath);
+    const resolvedDir = path.resolve(dir);
+    if (!resolvedTarget.startsWith(resolvedDir)) {
+      return { ok: false, error: "Path outside of articles directory" };
+    }
+    await fsp.writeFile(resolvedTarget, JSON.stringify(article, null, 2), "utf-8");
+    return { ok: true, path: resolvedTarget };
+  } catch (e) {
+    console.error("[articles:update] error:", e);
+    return { ok: false, error: String(e?.message || e) };
+  }
+});
+
+

@@ -1,7 +1,7 @@
-{
-  "name": "facturamax",
+﻿{
+  "name": "facturance",
   "version": "1.0.0",
-  "description": "FacturaMax Maker (Windows) – create, save and export invoices to PDF for development, marketing, graphics and design services.",
+  "description": "Facturance Maker (Windows) â€“ create, save and export invoices to PDF for development, marketing, graphics and design services.",
   "main": "main.desktop.js",
   "author": "Adelhakim Sabkhi",
   "license": "MIT",
@@ -34,8 +34,8 @@
   },
   "build": {
     "afterAllArtifactBuild": "scripts/trim-artifacts.js",
-    "appId": "com.soukelmeuble.facturamax",
-    "productName": "FacturaMax",
+    "appId": "com.soukelmeuble.facturance",
+    "productName": "Facturance",
     "directories": {
       "output": "dist"
     },
@@ -54,7 +54,7 @@
       "target": [
         "nsis"
       ],
-      "artifactName": "FacturaMax-${version}.exe"
+      "artifactName": "Facturance-${version}.exe"
     },
     "mac": {
       "icon": "build/icon.icns",
@@ -95,9 +95,11 @@
       ],
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "FacturaMax",
+      "shortcutName": "Facturance",
       "include": "build/installer.nsh"
     },
     "compression": "maximum"
   }
 }
+
+

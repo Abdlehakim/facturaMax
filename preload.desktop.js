@@ -110,10 +110,11 @@ contextBridge.exposeInMainWorld("SoukElMeuble", {
   },
 
   /* ---------- Articles ---------- */
-  saveArticle:     (payload) => ipcRenderer.invoke("articles:save", payload),
-  saveArticleAuto: (payload) => ipcRenderer.invoke("articles:saveAuto", payload),
-  openArticle:     () => ipcRenderer.invoke("articles:open"),
-  listArticles:    () => ipcRenderer.invoke("articles:list"),
+  saveArticle:       (payload) => ipcRenderer.invoke("articles:save", payload),
+  saveArticleAuto:   (payload) => ipcRenderer.invoke("articles:saveAuto", payload),
+  updateArticleFile: (payload) => ipcRenderer.invoke("articles:update", payload),
+  openArticle:       () => ipcRenderer.invoke("articles:open"),
+  listArticles:      () => ipcRenderer.invoke("articles:list"),
 
   /* ---------- Clients ---------- */
   ensureClientsSystemFolder: () => ipcRenderer.invoke("clients:ensureSystemFolder"),
