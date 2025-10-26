@@ -14,7 +14,7 @@
     "create-facture": { id: "invoice",           title: "Creer facture",       loader: loadCreateFacture },
     "all-factures":   { id: "screenAllFactures", title: "Toutes les factures", loader: loadAllFactures   },
     "stock":          { id: "screenStock",       title: "Gestion de stock",    loader: loadStock         },
-    "clients":        { id: "screenClients",     title: "Gestion de clients",  loader: loadCard          },
+    "clients":        { id: "screenClients",     title: "Gestion de clients",  loader: loadClients       },
   };
   const MOUNTED = Object.create(null);
 
@@ -64,6 +64,10 @@
   async function loadStock(host) {
     try { const { mount } = await import("./gestionStock/Stock.js"); mount(host); }
     catch (e) { loadCard(host, "Gestion de stock"); console.warn("[router] Stock.js failed:", e); }
+  }
+  async function loadClients(host) {
+    try { const { mount } = await import("./gestionClients/Clients.js"); mount(host); }
+    catch (e) { loadCard(host, "Gestion de clients"); console.warn("[router] Clients.js failed:", e); }
   }
   async function loadCard(host, title) {
     host.innerHTML = `

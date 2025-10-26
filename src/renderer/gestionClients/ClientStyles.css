@@ -1,0 +1,47 @@
+#screenClients{padding:16px 18px;background:linear-gradient(180deg,rgba(245,247,250,.65) 0,rgba(255,255,255,.9) 40%),#f8fafc}
+#screenClients .client-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;min-height:40px}
+#screenClients .client-lead{display:flex;flex-direction:column;gap:6px}
+#screenClients .client-title{font-size:24px;font-weight:700;color:#0b1f4b;letter-spacing:.02em}
+#screenClients .client-crumbs{display:flex;align-items:center;gap:10px;font-size:14px;color:#5b6b86}
+#screenClients .client-crumbs .crumb{color:inherit}
+#screenClients .client-crumbs .crumb.current{font-weight:600;color:#102349;cursor:default}
+#screenClients .client-crumbs .crumb.link{background:none;border:none;padding:0;font:inherit;color:#2563eb;cursor:pointer;text-decoration:none;transition:color .15s ease,transform .15s ease}
+#screenClients .client-crumbs .crumb.link:hover{color:#1d4ed8;text-decoration:underline;transform:translateY(-1px)}
+#screenClients .client-crumbs .crumb-sep{color:#96a1b7;font-size:13px}
+#screenClients .section-box{border:1px solid rgba(28,63,170,.08);box-shadow:0 12px 30px -18px rgba(28,63,170,.55),0 0 0 1px rgba(15,23,42,.04);border-radius:14px;background:#fff;padding:22px 24px;margin-bottom:24px}
+
+#screenClients .table-wrap{overflow:hidden;border-radius:10px;border:1px solid rgba(15,23,42,.06);box-shadow:0 10px 24px -20px rgba(15,23,42,.45)}
+#screenClients table{width:100%;border-collapse:collapse;font-size:13.8px;background:linear-gradient(180deg,rgba(248,250,252,.88) 0,#fff 12%)}
+#screenClients thead th{background:#eef4ff;color:#1d2a44;font-weight:600;text-transform:uppercase;font-size:12px;letter-spacing:.04em;padding:12px 14px;border-bottom:1px solid rgba(15,23,42,.08)}
+#screenClients tbody td{padding:12px 14px;border-bottom:1px solid rgba(15,23,42,.05);color:#22314f}
+#screenClients tbody tr:hover{background:rgba(37,99,235,.05)}
+#screenClients td.center{text-align:center}
+#screenClients td.left{text-align:left}
+#screenClients .client-id-tag{display:block;margin-top:4px;font-size:12px;color:#5b6b86}
+#screenClients .actions-cell{display:flex;gap:10px;justify-content:flex-end}
+#screenClients .actions-cell .btn.tiny{padding:6px 12px;font-size:12px;border-radius:6px;background:#e8efff;color:#1f3c8f;border:1px solid rgba(31,60,143,.18);transition:background .15s ease,color .15s ease}
+#screenClients .actions-cell .btn.tiny:hover{background:#dbe6ff;color:#132a66}
+#screenClients .actions-cell .del{padding:6px 12px;border-radius:6px;border:1px solid rgba(220,38,38,.18);background:rgba(254,226,226,.75);color:#b91c1c;font-size:12px;cursor:pointer;transition:background .15s ease,color .15s ease}
+#screenClients .actions-cell .del:hover{background:#dc2626;color:#fff}
+#screenClients .no-data td{padding:28px 18px;text-align:center;font-style:italic;color:#5f6b87;background:rgba(248,250,252,.65)}
+
+#screenClients #clientAddPanel{display:none;margin-top:18px;border:1px solid rgba(28,63,170,.1);border-radius:14px;background:#f7f9ff;padding:24px 26px;box-shadow:0 10px 26px -20px rgba(15,23,42,.5)}
+#screenClients .client-subtitle{font-size:18px;font-weight:600;color:#0b1f4b;margin-bottom:18px}
+#screenClients #clientAddPanel .grid.four{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;margin-bottom:20px}
+#screenClients #clientAddPanel .grid.four label{display:flex;flex-direction:column;gap:6px;font-size:13px;color:#1a2b4d;font-weight:500}
+#screenClients #clientAddPanel input,
+#screenClients #clientAddPanel select{padding:10px 12px;border:1px solid #c9d6f0;border-radius:8px;font-size:13px;background:#fff;transition:border-color .15s ease,box-shadow .15s ease}
+#screenClients #clientAddPanel input:focus,
+#screenClients #clientAddPanel select:focus{outline:none;border-color:#2563eb;box-shadow:0 0 0 3px rgba(37,99,235,.14)}
+#screenClients .client-add-actions{display:flex;justify-content:flex-end;gap:12px}
+
+@media (max-width:900px){
+  #screenClients #clientAddPanel .grid.four{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media (max-width:640px){
+  #screenClients #clientAddPanel .grid.four{grid-template-columns:repeat(1,minmax(0,1fr))}
+
+  #screenClients .actions-cell{justify-content:flex-start}
+  #screenClients table{min-width:640px}
+  #screenClients .table-wrap{overflow-x:auto}
+}
