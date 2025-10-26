@@ -72,7 +72,6 @@ function initFieldToggles() {
 export function renderStockAddPanel() {
   return `
     <fieldset id="stockAddPanel" class="" style="display:none;">
-      <div class="stock-subtitle">Ajouter un article</div>
       <form id="stockAddForm" class="grid">
         <div class="grid four">
           <div class="field">

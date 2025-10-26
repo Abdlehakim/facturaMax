@@ -21,7 +21,6 @@ const FIELD_DEFAULTS = {
 export function renderClientAddPanel() {
   return `
     <fieldset id="clientAddPanel" style="display:none;">
-      <div class="client-subtitle">Ajouter un client</div>
       <form id="clientAddForm" class="grid">
         <div class="grid four">
           <!-- 1) Type de client -->
