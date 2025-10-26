@@ -261,11 +261,11 @@ export function mount(root) {
   root.id = "screenStock";
   root.classList.add("paper");
   root.innerHTML = `
-    <div class="stock-title">Gestion de stock</div>
-    <div class="stock-crumbs" id="stockBreadcrumb"></div>
     <section class="grid" id="stockListSection">
-      <fieldset class="section-box">
         <div class="stock-header">
+          <div class="stock-lead">
+            <div class="stock-crumbs" id="stockBreadcrumb"></div>
+          </div>
           <button id="stockAddButton" class="btn primary">Ajouter Article</button>
         </div>
         <div class="table-wrap stock-table">
@@ -284,10 +284,9 @@ export function mount(root) {
             <tbody id="stockTableBody"></tbody>
           </table>
         </div>
-      </fieldset>
     </section>
 
-    <fieldset id="stockAddPanel" class="section-box" style="display:none;">
+    <fieldset id="stockAddPanel" class="" style="display:none;">
       <div class="stock-subtitle">Ajouter un article</div>
       <form id="stockAddForm" class="grid">
         <div class="grid four">

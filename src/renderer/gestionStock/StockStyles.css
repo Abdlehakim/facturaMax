@@ -1,14 +1,16 @@
 /* StockStyles.css */
 #screenStock{padding:16px 18px;background:linear-gradient(180deg,rgba(245,247,250,.65) 0,rgba(255,255,255,.9) 40%),#f8fafc}
-#screenStock .stock-title{font-size:24px;font-weight:700;color:#0b1f4b;letter-spacing:.02em;margin-bottom:4px}
-#screenStock .stock-crumbs{display:flex;align-items:center;gap:10px;margin-bottom:18px;font-size:14px;color:#5b6b86}
+#screenStock .stock-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px}
+#screenStock .stock-lead{display:flex;flex-direction:column; gap:6px}
+#screenStock .stock-title{font-size:24px;font-weight:700;color:#0b1f4b;letter-spacing:.02em}
+#screenStock .stock-crumbs{display:flex;align-items:center;gap:10px;font-size:14px;color:#5b6b86}
 #screenStock .stock-crumbs .crumb{color:inherit}
 #screenStock .stock-crumbs .crumb.current{font-weight:600;color:#102349;cursor:default}
 #screenStock .stock-crumbs .crumb.link{background:none;border:none;padding:0;font:inherit;color:#2563eb;cursor:pointer;text-decoration:none;transition:color .15s ease,transform .15s ease}
 #screenStock .stock-crumbs .crumb.link:hover{color:#1d4ed8;text-decoration:underline;transform:translateY(-1px)}
 #screenStock .stock-crumbs .crumb-sep{color:#96a1b7;font-size:13px}
 #screenStock .section-box{border:1px solid rgba(28,63,170,.08);box-shadow:0 12px 30px -18px rgba(28,63,170,.55),0 0 0 1px rgba(15,23,42,.04);border-radius:14px;background:#fff;padding:22px 24px;margin-bottom:24px}
-#screenStock .stock-header{display:flex;justify-content:flex-end;align-items:center;margin-bottom:18px;padding-bottom:12px;border-bottom:1px solid rgba(15,23,42,.08)}
+
 #screenStock .btn.primary{display:inline-flex;align-items:center;gap:8px;font-weight:600;background:linear-gradient(135deg,#2563eb,#1d4ed8);color:#fff;border:none;padding:10px 18px;border-radius:8px;cursor:pointer;box-shadow:0 8px 18px -12px rgba(37,99,235,.9);transition:transform .15s ease,box-shadow .15s ease,filter .15s ease}
 #screenStock .btn.primary::before{content:"+";font-size:16px;line-height:1}
 #screenStock .btn.primary:hover{transform:translateY(-1px);filter:brightness(1.04);box-shadow:0 14px 22px -14px rgba(37,99,235,.9)}
@@ -42,7 +44,7 @@
 }
 @media (max-width:640px){
   #screenStock #stockAddPanel .grid.four{grid-template-columns:repeat(1,minmax(0,1fr))}
-  #screenStock .stock-header{flex-direction:column;align-items:flex-start}
+
   #screenStock .actions-cell{justify-content:flex-start}
   #screenStock table{min-width:640px}
   #screenStock .table-wrap{overflow-x:auto}
