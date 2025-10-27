@@ -3,13 +3,6 @@ export function mount(root) {
   root.id = "invoice";
   root.classList.add("paper");
   root.innerHTML = `
-    <div class="actions toolbar" style="display:flex; gap:8px; justify-content:flex-end; margin-bottom:12px;">
-      <button id="btnNew" class="btn">Nouveau</button>
-      <button id="btnSave" class="btn">Enregistrer</button>
-      <button id="btnOpen" class="btn">Ouvrir</button>
-      <button id="btnPDF" class="btn">Exporter PDF</button>
-    </div>
-
     <section class="grid three">
       <fieldset class="section-box">
         <legend id="docTypeLegend">
@@ -127,10 +120,6 @@ export function mount(root) {
             <input id="clientAddress" placeholder="Rue, Ville, Pays" />
           </label>
         </div>
-        <div class="full" style="display:flex; gap:8px; margin-top:8px">
-          <button id="btnSaveClient" type="button" class="btn">Enregistrer le client</button>
-          <button id="btnLoadClient" type="button" class="btn">Charger un client...</button>
-        </div>
       </fieldset>
     </section>
 
@@ -139,7 +128,6 @@ export function mount(root) {
         <label for="itemSearchInput" class="item-search__label">Rechercher un article</label>
         <div class="item-search__row">
           <input id="itemSearchInput" type="search" placeholder="Rechercher un article (nom, reference...)" autocomplete="off" />
-          <button id="itemSearchButton" type="button" class="btn">Ajouter</button>
         </div>
         <div id="itemSearchResults" class="item-search__results" role="listbox" aria-label="Suggestions d'articles"></div>
       </div>

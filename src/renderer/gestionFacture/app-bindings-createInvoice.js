@@ -5,8 +5,10 @@
   const CLIENT_STORE_KEY = "sem_saved_clients_v1";
   const MAX_STORED_CLIENTS = 8;
   const STOCK_STORAGE_KEY = "sem_stock_items_v1";
+  const canFetchStockFromFS = () => !!(w.SoukElMeuble && typeof w.SoukElMeuble.listArticles === "function");
 
   let cachedStockSearchPool = null;
+  let stockPoolLoadPromise = null;
 
   function escapeHtmlLite(value) {
     const str = String(value ?? "");
@@ -43,17 +45,21 @@
     return item;
   }
 
-  function buildStockSearchPool() {
+  function pushStockCandidate(pool, seen, entry) {
+    const normalized = normalizeStockCandidate(entry);
+    if (!normalized) return null;
+    const key = `${normalized.ref}|${normalized.name}|${normalized.desc}`.toLowerCase();
+    if (seen.has(key)) return null;
+    seen.add(key);
+    pool.push(normalized);
+    return normalized;
+  }
+
+  function buildStockSearchPool(seedEntries = []) {
     const pool = [];
     const seen = new Set();
-    const push = (entry) => {
-      const normalized = normalizeStockCandidate(entry);
-      if (!normalized) return;
-      const key = `${normalized.ref}|${normalized.name}|${normalized.desc}`.toLowerCase();
-      if (seen.has(key)) return;
-      seen.add(key);
-      pool.push(normalized);
-    };
+    const push = (entry) => pushStockCandidate(pool, seen, entry);
+    if (Array.isArray(seedEntries)) seedEntries.forEach(push);
     const fromState = w.SEM?.stock?.items;
     if (Array.isArray(fromState)) fromState.forEach(push);
     if (typeof localStorage !== "undefined") {
@@ -76,6 +82,39 @@
 
   function invalidateStockSearchPool() {
     cachedStockSearchPool = null;
+  }
+
+  function ensureStockPoolFromFilesystem({ force = false } = {}) {
+    if (!canFetchStockFromFS()) return null;
+    if (!force && Array.isArray(cachedStockSearchPool) && cachedStockSearchPool.length) return null;
+    if (stockPoolLoadPromise) return stockPoolLoadPromise;
+    stockPoolLoadPromise = (async () => {
+      try {
+        const rawList = await w.SoukElMeuble.listArticles();
+        const arr = Array.isArray(rawList?.items) ? rawList.items : Array.isArray(rawList) ? rawList : [];
+        const seed = arr.map((entry) => {
+          const base = entry?.article || entry || {};
+          return { ...base, __path: entry?.path, __fileName: entry?.name };
+        });
+        const pool = buildStockSearchPool(seed);
+        cachedStockSearchPool = pool;
+        const stock = (w.SEM.stock = w.SEM.stock || {});
+        stock.items = pool.map((item) => ({ ...item }));
+        if (typeof localStorage !== "undefined") {
+          try {
+            const persistable = pool.map(({ __path, __fileName, ...rest }) => rest);
+            localStorage.setItem(STOCK_STORAGE_KEY, JSON.stringify(persistable));
+          } catch {}
+        }
+        return pool;
+      } catch (error) {
+        console.warn("[invoice] Failed to load stock articles:", error);
+        return Array.isArray(cachedStockSearchPool) ? cachedStockSearchPool : [];
+      } finally {
+        stockPoolLoadPromise = null;
+      }
+    })();
+    return stockPoolLoadPromise;
   }
 
   function filterStockMatches(term, limit = 8) {
@@ -426,6 +465,7 @@
   };
 
   SEM.invalidateStockSearchPool = invalidateStockSearchPool;
+  SEM.ensureStockPoolFromFilesystem = ensureStockPoolFromFilesystem;
 
   SEM.addItemFromStock = function (stockItem) {
     const normalized = normalizeStockCandidate(stockItem);
@@ -447,7 +487,6 @@
 
   SEM.attachItemSearch = function () {
     const input = getEl("itemSearchInput");
-    const button = getEl("itemSearchButton");
     const results = getEl("itemSearchResults");
     if (!input || !results) return;
     if (input.dataset.bound === "1") return;
@@ -485,7 +524,6 @@
               </div>
               <div class="item-search__meta">
                 <span class="item-search__price">${priceLabel}</span>
-                <button type="button" class="btn tiny" data-action="pick-item" data-index="${idx}">Ajouter</button>
               </div>
             </div>`;
         })
@@ -504,6 +542,17 @@
       if (!currentResults.length) {
         results.innerHTML = `<div class="item-search__empty">Aucun article trouve.</div>`;
         results.classList.add("is-visible");
+        const maybeReload = ensureStockPoolFromFilesystem();
+        if (maybeReload && typeof maybeReload.then === "function") {
+          const requestedTerm = currentTerm;
+          maybeReload
+            .then(() => {
+              if (input.value.trim() !== requestedTerm) return;
+              currentResults = filterStockMatches(requestedTerm, 10);
+              if (currentResults.length) renderResults();
+            })
+            .catch(() => {});
+        }
         return;
       }
       renderResults();
@@ -526,6 +575,17 @@
       input.focus();
     };
 
+    const maybeInitialLoad = ensureStockPoolFromFilesystem();
+    if (maybeInitialLoad && typeof maybeInitialLoad.then === "function") {
+      maybeInitialLoad.then(() => {
+        if (input.value.trim().length >= 2) {
+          currentTerm = input.value.trim();
+          currentResults = filterStockMatches(currentTerm, 10);
+          if (currentResults.length) renderResults();
+        }
+      }).catch(() => {});
+    }
+
     input.addEventListener("input", updateResults);
     input.addEventListener("keydown", (ev) => {
       if (ev.key === "Enter") {
@@ -537,18 +597,11 @@
       }
     });
 
-    button?.addEventListener("click", () => addSelection(0));
-
     results.addEventListener("mousedown", (ev) => {
       ev.preventDefault();
     });
 
     results.addEventListener("click", (ev) => {
-      const pickBtn = ev.target.closest("[data-action=\"pick-item\"]");
-      if (pickBtn) {
-        addSelection(Number(pickBtn.dataset.index || "0"));
-        return;
-      }
       const row = ev.target.closest(".item-search__result");
       if (row) addSelection(Number(row.dataset.index || "0"));
     });
@@ -559,21 +612,12 @@
     body.innerHTML = "";
     const currency = state().meta.currency || "TND";
 
-    const items = state().items || [];
+    let items = state().items;
+    if (!Array.isArray(items)) {
+      items = [];
+      state().items = items;
+    }
     if (items.length === 0) {
-      const tr = document.createElement("tr");
-      tr.className = "demo-row";
-      tr.innerHTML = `
-        <td style="color:#64748b;">EX-001</td>
-        <td style="color:#64748b;">Chaise (exemple)</td>
-        <td style="color:#64748b;">Ligne de demonstration  ajoutez votre premier article.</td>
-        <td class="right" style="color:#64748b;">1</td>
-        <td class="right" style="color:#64748b;">${formatMoney(100, currency)}</td>
-        <td class="right" style="color:#64748b;">${formatPct(19)}</td>
-        <td class="right" style="color:#64748b;">${formatPct(0)}</td>
-        <td class="right" style="color:#64748b;">${formatMoney(119, currency)}</td>
-        <td class="add-actions" style="color:#64748b;"></td>`;
-      body.appendChild(tr);
       SEM.computeTotals(); SEM.applyColumnHiding(); SEM.updateWHAmountPreview(); SEM.updateExtrasMiniRows();
       return;
     }
@@ -752,88 +796,6 @@
     getEl("clientAddress")?.addEventListener("input", () => { state().client.address = getStr("clientAddress", state().client.address); });
     getEl("notes")?.addEventListener("input", () => { state().notes = getStr("notes", state().notes); });
 
-    const btnSaveClient = getEl("btnSaveClient");
-    if (btnSaveClient) {
-      btnSaveClient.addEventListener("click", async () => {
-        SEM.readInputs?.();
-        const source = state().client || {};
-        const entry = {
-          type: String(source.type || "societe").trim() || "societe",
-          name: String(source.name || "").trim(),
-          email: String(source.email || "").trim(),
-          phone: String(source.phone || "").trim(),
-          vat: String(source.vat || "").trim(),
-          address: String(source.address || "").trim(),
-          savedAt: new Date().toISOString(),
-        };
-        if (!entry.name && !entry.vat) {
-          if (typeof showDialog === "function") {
-            await showDialog("Renseignez au moins un nom ou un identifiant avant d'enregistrer.", { title: "Clients" });
-          }
-          return;
-        }
-        const existing = readSavedClients().filter((item) => clientKey(item) !== clientKey(entry));
-        existing.unshift(entry);
-        writeSavedClients(existing);
-        if (typeof showDialog === "function") {
-          await showDialog("Client enregistre.", { title: "Clients" });
-        }
-      });
-    }
-
-    const btnLoadClient = getEl("btnLoadClient");
-    if (btnLoadClient) {
-      btnLoadClient.addEventListener("click", async () => {
-        const records = readSavedClients();
-        if (!records.length) {
-          if (typeof showDialog === "function") {
-            await showDialog("Aucun client enregistre pour le moment.", { title: "Clients" });
-          }
-          return;
-        }
-        for (const item of records) {
-          const name = item.name || item.vat || item.email || "Client";
-          const lines = [
-            name,
-            item.vat ? `Identifiant: ${item.vat}` : "",
-            item.email ? `Email: ${item.email}` : "",
-            item.phone ? `Telephone: ${item.phone}` : "",
-            item.address ? item.address : "",
-          ].filter(Boolean).join("\n");
-          let ok = false;
-          if (typeof showConfirm === "function") {
-            ok = await showConfirm(`Charger ce client ?\n\n${lines}`, {
-              title: "Clients",
-              okText: "Charger",
-              cancelText: "Suivant",
-            });
-          } else {
-            ok = window.confirm(`Charger ce client ?\n\n${lines}`);
-          }
-          if (ok) {
-            const st = state();
-            st.client = st.client || {};
-            st.client.type = item.type || st.client.type || "societe";
-            st.client.name = item.name || "";
-            st.client.email = item.email || "";
-            st.client.phone = item.phone || "";
-            st.client.vat = item.vat || "";
-            st.client.address = item.address || "";
-            setVal("clientType", st.client.type);
-            setVal("clientName", st.client.name);
-            setVal("clientEmail", st.client.email);
-            setVal("clientPhone", st.client.phone);
-            setVal("clientVat", st.client.vat);
-            setVal("clientAddress", st.client.address);
-            SEM.updateClientIdPlaceholder?.();
-            SEM.computeTotals?.();
-            SEM.updateWHAmountPreview?.();
-            break;
-          }
-        }
-      });
-    }
-
     ["colToggleRef","colToggleProduct","colToggleDesc","colToggleQty","colTogglePrice","colToggleTva","colToggleDiscount"]
       .forEach(id => getEl(id)?.addEventListener("change", SEM.applyColumnHiding));
 
@@ -883,3 +845,4 @@
     SEM.updateClientIdPlaceholder(); forceExtrasVisibility();
   }
 })(window);
+

@@ -35,7 +35,7 @@
       }
     },
     notes: "",
-    items: [{ ref: "SKU-001", product: "Ordinateur portable", desc: "Garantie 2 ans", qty: 1, price: 1000, tva: 19, discount: 0 }]
+    items: []
   };
 
   SEM.COMPANY_LOCKED = true;
@@ -215,7 +215,7 @@
       fodec:    { enabled:false, label:"FODEC", rate:1, base:"ht", tva:19 }
     };
     st.notes = "";
-    st.items = [{ ref: "SKU-001", product: "Ordinateur portable", desc: "Garantie 2 ans", qty: 1, price: 1000, tva: 19, discount: 0 }];
+    st.items = [];
     // Do not touch st.company or st.company.seal here.
   };
 

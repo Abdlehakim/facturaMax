@@ -181,51 +181,6 @@
     try { SEM.wireColumnToggles?.(); } catch {}
     try { SEM.attachItemSearch?.(); } catch {}
 
-    getEl("btnNew")?.addEventListener("click", () => {
-      if (typeof SEM.newInvoice === "function") {
-        SEM.newInvoice();
-        SEM.selectedItemIndex = null;
-        SEM.bind?.();
-        SEM.wireColumnToggles?.();   // reset toggles checked + apply
-        SEM.attachItemSearch?.();
-        autoNumberFromRegistryIfEmpty();
-        SEM.navigate?.("create-facture");
-      }
-    });
-
-    getEl("btnOpen")?.addEventListener("click", () => {
-      if (typeof w.onOpenInvoiceClick === "function") w.onOpenInvoiceClick();
-      SEM.navigate?.("create-facture");
-    });
-
-    getEl("btnSave")?.addEventListener("click", async () => {
-      try { w.__includeCompanyForSave = true; } catch {}
-      w.SEM?.readInputs?.();
-      const snap = (SEM.captureForm ? SEM.captureForm({ includeCompany: true }) : null) || null;
-
-      if (!w.SoukElMeuble?.saveInvoiceJSON) {
-        await w.showDialog?.("Sauvegarde indisponible dans cette version.", { title: "Info" });
-        return;
-      }
-      const res = await w.SoukElMeuble.saveInvoiceJSON({ data: snap });
-      if (res?.ok) {
-        await w.showDialog?.("Document enregistre.", { title: "Succes" });
-        // Desktop: refresh native recent list; Browser: update registry
-        if (IS_DESKTOP) {
-          renderRecentList();
-        } else if (String(snap?.meta?.docType || "facture").toLowerCase() === "facture") {
-          const entry = buildRegistryEntryFromSnapshot(snap, res);
-          entry.typeLabel = "Facture";
-          pushRegistry(entry);
-          renderRecentList();
-        }
-      }
-    });
-
-    getEl("btnPDF")?.addEventListener("click", () => {
-      if (typeof w.exportCurrentPDF === "function") w.exportCurrentPDF();
-    });
-
     // Auto-numbering hooks
     getEl("invDate")?.addEventListener("change", () => autoNumberFromRegistryIfEmpty());
     getEl("docType")?.addEventListener("change", () => {

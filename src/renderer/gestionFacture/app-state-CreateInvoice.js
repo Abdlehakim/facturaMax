@@ -46,10 +46,8 @@
   };
   SEM.state.notes = SEM.state.notes || "";
 
-  // One demo line if empty
-  SEM.state.items = Array.isArray(SEM.state.items) && SEM.state.items.length
-    ? SEM.state.items
-    : [{ ref: "SKU-001", product: "Ordinateur portable", desc: "Garantie 2 ans", qty: 1, price: 1000, tva: 19, discount: 0 }];
+  // Guarantee items state is always an array
+  SEM.state.items = Array.isArray(SEM.state.items) ? SEM.state.items : [];
 
   SEM.COMPANY_LOCKED = true;
   SEM.selectedItemIndex = null;
@@ -58,8 +56,8 @@
 
   // ---- helper to guarantee a seed row for first render ----
   SEM.ensureItemsSeed = function () {
-    if (!Array.isArray(SEM.state.items) || SEM.state.items.length === 0) {
-      SEM.newInvoice?.();
+    if (!Array.isArray(SEM.state.items)) {
+      SEM.state.items = [];
     }
   };
 
@@ -229,9 +227,7 @@
       fodec:    { enabled: false, label: "FODEC", rate: 1, base: "ht", tva: 19, amount: 0, tvaAmount: 0 }
     };
     st.notes = "";
-    st.items = [
-      { ref: "SKU-001", product: "Ordinateur portable", desc: "Garantie 2 ans", qty: 1, price: 1000, tva: 19, discount: 0 }
-    ];
+    st.items = [];
   };
 
   // ============== Optional simple renderer (fallback) ==============
@@ -295,14 +291,14 @@
     const tbody = document.getElementById("itemBody");
     if (!tbody) return;
 
-    if (!Array.isArray(st.items) || !st.items.length) {
-      st.items = [{ ref: "SKU-001", product: "Ordinateur portable", desc: "Garantie 2 ans", qty: 1, price: 1000, tva: 19, discount: 0 }];
-    }
-
     let html = "";
     const cur = st.meta.currency || "TND";
 
-    st.items.forEach((it, idx) => {
+    const items = Array.isArray(st.items) ? st.items : [];
+    if (!Array.isArray(st.items)) {
+      st.items = items;
+    }
+    items.forEach((it, idx) => {
       const qty = n(it.qty);
       const pht = n(it.price);
       const disc = n(it.discount) / 100;
