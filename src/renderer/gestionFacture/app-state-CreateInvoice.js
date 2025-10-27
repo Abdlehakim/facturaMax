@@ -159,7 +159,8 @@
 
     st.meta.docType  = getStr("docType", st.meta.docType) || st.meta.docType;
     st.meta.number   = getStr("invNumber", st.meta.number);
-    st.meta.currency = getStr("currency", st.meta.currency) || st.meta.currency;
+    // Currency selector removed; enforce default TND
+    st.meta.currency = "TND";
     st.meta.date     = getStr("invDate", st.meta.date);
     st.meta.due      = getStr("invDue", st.meta.due);
 
@@ -247,7 +248,7 @@
 
     setVal("docType",   st.meta.docType);
     setVal("invNumber", st.meta.number);
-    setVal("currency",  st.meta.currency);
+    // Currency UI removed
     setVal("invDate",   st.meta.date);
     if (getEl("invDue")) setVal("invDue", st.meta.due);
 

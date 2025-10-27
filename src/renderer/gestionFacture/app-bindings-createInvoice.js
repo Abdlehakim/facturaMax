@@ -178,7 +178,7 @@
 
     setVal("docType", st.meta.docType || "facture");
     setVal("invNumber", st.meta.number);
-    setVal("currency", st.meta.currency);
+    // Currency UI removed; always TND
     setVal("invDate", st.meta.date);
     setVal("invDue", st.meta.due);
 
@@ -504,10 +504,7 @@
     getEl("invNumber")?.addEventListener("input",  () => { state().meta.number  = getStr("invNumber",state().meta.number); });
     getEl("invDate")  ?.addEventListener("input",  () => { state().meta.date    = getStr("invDate",  state().meta.date); });
     getEl("invDue")   ?.addEventListener("input",  () => { state().meta.due     = getStr("invDue",   state().meta.due); });
-    getEl("currency") ?.addEventListener("change", () => {
-      state().meta.currency = getStr("currency", state().meta.currency);
-      SEM.renderItems(); SEM.computeTotals(); SEM.updateWHAmountPreview(); SEM.updateExtrasMiniRows();
-    });
+    // Currency control removed; default currency is TND
 
     document.addEventListener("change", (e) => {
       if ((e.target)?.id === "clientType") { state().client.type = getStr("clientType", state().client.type || "societe"); SEM.updateClientIdPlaceholder(); }

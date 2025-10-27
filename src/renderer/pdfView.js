@@ -523,7 +523,6 @@ body.print-mode #pdfRoot {
               <div class="pdf-meta-grid">
                 <span>Date&nbsp;:</span><span style="font-weight:600">${esc(meta.date || "")}</span>
                 <span>${NUM_LABEL}&nbsp;:</span><span style="font-weight:600">${esc(meta.number || "—")}</span>
-                <span>Devise&nbsp;:</span><span style="font-weight:600">${esc(cur)}</span>
               </div>
             </div>
           </div>
@@ -590,3 +589,5 @@ body.print-mode #pdfRoot {
 
   global.PDFView = { build, render, show, hide, cleanup, css: PDF_CSS };
 })(window);
+
+
