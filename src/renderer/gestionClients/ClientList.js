@@ -11,7 +11,7 @@ export function renderClientListSection() {
               <th class="left" style="width:18%">Type de client</th>
               <th class="left" style="width:20%">Telephone</th>
               <th class="left" style="width:24%">E-mail</th>
-              <th style="width:10%">Actions</th>
+              <th style="width:15%">Actions</th>
             </tr>
           </thead>
           <tbody id="clientTableBody"></tbody>

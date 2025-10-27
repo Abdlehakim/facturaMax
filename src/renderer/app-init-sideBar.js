@@ -58,8 +58,8 @@
     catch (e) { loadCard(host, "Creer facture"); console.warn("[router] CreateInvoice.js failed:", e); }
   }
   async function loadAllFactures(host) {
-    try { const { mount } = await import("./InvoiceTable.js"); mount(host); }
-    catch (e) { loadCard(host, "Toutes les factures"); console.warn("[router] InvoiceTable.js failed:", e); }
+    try { const { mount } = await import("./allInvoices/InvoiceTable.js"); mount(host); }
+    catch (e) { loadCard(host, "Toutes les factures"); console.warn("[router] allInvoices/InvoiceTable.js failed:", e); }
   }
   async function loadStock(host) {
     try { const { mount } = await import("./gestionStock/Stock.js"); mount(host); }

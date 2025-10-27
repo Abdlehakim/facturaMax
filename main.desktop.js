@@ -1,4 +1,4 @@
-﻿"use strict";
+"use strict";
 
 const { app, BrowserWindow, ipcMain, dialog, shell } = require("electron");
 const path = require("path");
@@ -52,7 +52,7 @@ app.on("window-all-closed", () => {
   if (process.platform !== "darwin") app.quit();
 });
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€ helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ───────── helpers ─────────
 function sanitizeFileName(name = "") {
   let out = String(name)
     .replace(/[<>:"/\\|?*\u0000-\u001F]/g, "_")
@@ -229,7 +229,7 @@ function uniqueClientPath(baseDir, baseName) {
   return ensureUniquePath(fp);
 }
 
-/** â”€â”€â”€â”€â”€â”€â”€â”€â”€ Invoices ledger (auto-number + recent list) â”€â”€â”€â”€â”€â”€â”€â”€â”€ **/
+/** ───────── Invoices ledger (auto-number + recent list) ───────── **/
 const LEDGER_FILE = path.join(app.getPath("userData"), "invoices-ledger.json");
 function readLedger() {
   try { return JSON.parse(fs.readFileSync(LEDGER_FILE, "utf-8")); } catch { return { counters:{}, entries:[] }; }
@@ -300,7 +300,7 @@ ipcMain.handle("invoices:delete", async (_evt, { path: p }) => {
   }
 });
 
-/** â”€â”€â”€â”€â”€â”€â”€â”€â”€ Clients IPC â”€â”€â”€â”€â”€â”€â”€â”€â”€ **/
+/** ───────── Clients IPC ───────── **/
 ipcMain.handle("clients:ensureSystemFolder", async () => {
   try {
     return await ensureClientsSystemFolder();
@@ -375,7 +375,7 @@ ipcMain.handle("clients:open", async (event, opts = {}) => {
   }
 });
 
-/** â”€â”€â”€â”€â”€â”€â”€â”€â”€ Invoices: Save / Open (with ledger updates) â”€â”€â”€â”€â”€â”€â”€â”€â”€ **/
+/** ───────── Invoices: Save / Open (with ledger updates) ───────── **/
 ipcMain.handle("save-invoice-json", async (event, payload = {}) => {
   try {
     const incoming =
@@ -397,7 +397,7 @@ ipcMain.handle("save-invoice-json", async (event, payload = {}) => {
     const base = providedName || suggestedBase;
     const fileName = withJsonExt(sanitizeFileName(base));
 
-    const defaultDir = pfPath("Factures");
+    const defaultDir = pfPath(path.join("Data", "factures"));
     await tryEnsure(defaultDir);
     const defaultPath = path.join(defaultDir, fileName);
 
@@ -444,8 +444,21 @@ ipcMain.handle("save-invoice-json", async (event, payload = {}) => {
   }
 });
 
+
+// Update invoice JSON at given path
+ipcMain.handle("invoices:update", async (_evt, payload = {}) => {
+  try {
+    const p = payload && (payload.path || payload.filePath || payload.targetPath);
+    const data = payload && (payload.data || payload.invoice || payload.document || payload);
+    if (!p || typeof p !== "string") return { ok: false, error: "Missing path" };
+    await fsp.writeFile(p, JSON.stringify(data, null, 2), "utf-8");
+    return { ok: true, path: p };
+  } catch (e) {
+    return { ok: false, error: String(e?.message || e) };
+  }
+});
 ipcMain.handle("open-invoice-json", async (event) => {
-  const defaultDir = pfPath("Factures");
+  const defaultDir = pfPath(path.join("Data", "factures"));
   await tryEnsure(defaultDir);
   const { canceled, filePaths } = await dialog.showOpenDialog(
     BrowserWindow.fromWebContents(event.sender),
@@ -463,13 +476,13 @@ ipcMain.handle("open-invoice-json", async (event) => {
   } catch {
     dialog.showErrorBox(
       "JSON invalide",
-      "Le fichier sÃ©lectionnÃ© nâ€™est pas un JSON de facture valide."
+      "Le fichier sélectionné n’est pas un JSON de facture valide."
     );
     return null;
   }
 });
 
-/** â”€â”€â”€â”€â”€â”€â”€â”€â”€ Logo picker â”€â”€â”€â”€â”€â”€â”€â”€â”€ **/
+/** ───────── Logo picker ───────── **/
 ipcMain.handle("SoukElMeuble:pickLogo", async () => {
   const { canceled, filePaths } = await dialog.showOpenDialog({
     title: "Choisir un logo",
@@ -494,7 +507,7 @@ ipcMain.handle("SoukElMeuble:pickLogo", async () => {
   return { dataUrl: `data:${mime};base64,${base64}` };
 });
 
-/** â”€â”€â”€â”€â”€â”€â”€â”€â”€ PDF Export (default PF\Facturance\Factures\pdf) â”€â”€â”€â”€â”€â”€â”€â”€â”€ **/
+/** ───────── PDF Export (default PF\Facturance\Factures\pdf) ───────── **/
 ipcMain.handle("SoukElMeuble:exportPDFFromHTML", async (event, payload) => {
   const { html = "", css = "", meta = {} } = payload || {};
   try {
@@ -528,7 +541,7 @@ ipcMain.handle("SoukElMeuble:exportPDFFromHTML", async (event, payload) => {
   }
 });
 
-/** â”€â”€â”€â”€â”€â”€â”€â”€â”€ Shell helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€ **/
+/** ───────── Shell helpers ───────── **/
 ipcMain.handle("SoukElMeuble:openPath", async (_evt, absPath) => {
   try {
     return (await shell.openPath(absPath)) === "";
@@ -570,7 +583,7 @@ ipcMain.handle("SoukElMeuble:deletePath", async (_evt, absPath) => {
   }
 });
 
-/** â”€â”€â”€â”€â”€â”€â”€â”€â”€ Articles (same as before) â”€â”€â”€â”€â”€â”€â”€â”€â”€ **/
+/** ───────── Articles (same as before) ───────── **/
 function ensureSafeName(s = "article") {
   return (
     String(s)
@@ -630,7 +643,7 @@ ipcMain.handle("articles:save", async (event, payload = {}) => {
     const { canceled, filePath } = await dialog.showSaveDialog(
       BrowserWindow.fromWebContents(event.sender),
       {
-        title: "Enregistrer lâ€™article",
+        title: "Enregistrer l’article",
         defaultPath,
         filters: [{ name: "Articles JSON", extensions: ["json"] }],
       }
@@ -764,5 +777,7 @@ ipcMain.handle("articles:update", async (_evt, payload = {}) => {
     return { ok: false, error: String(e?.message || e) };
   }
 });
+
+
 
 

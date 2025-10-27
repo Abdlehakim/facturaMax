@@ -1,0 +1,87 @@
+/* =========================
+InvoiceTable.css
+========================= */
+#screenAllFactures fieldset .grid{ gap:12px; }
+#screenAllFactures label{ font-size:12px; color:#334; }
+#screenAllFactures input[type="date"],
+#screenAllFactures input[type="number"],
+#screenAllFactures input[type="text"],
+#screenAllFactures select{
+  border:1px solid #caddff; border-radius:5px; padding:8px 10px; font-size:14px; margin-top:6px;
+}
+#ftSaveSeq.btn,#ftZip.btn{ padding:.4rem .9rem; font-size:.85rem; }
+#screenAllFactures .table-wrap{
+  /* Match Stock table container */
+  overflow:hidden; border-radius:10px; border:1px solid rgba(15,23,42,.06);
+  box-shadow:0 10px 24px -20px rgba(15,23,42,.45);
+}
+#facturesTable{
+  width:100%; border-collapse:collapse; font-size:13.8px;
+  background:linear-gradient(180deg,rgba(248,250,252,.88) 0,#fff 12%);
+}
+#facturesTable thead th{
+  background:#eef4ff; color:#1d2a44; font-weight:600; text-transform:uppercase;
+  font-size:12px; letter-spacing:.04em; padding:12px 14px; border-bottom:1px solid rgba(15,23,42,.08);
+}
+#screenAllFactures thead th.left{ text-align:left }
+#facturesTable tbody td{
+  padding:12px 14px; border-bottom:1px solid rgba(15,23,42,.05); color:#22314f;
+}
+#facturesTable tbody tr:hover{ background:rgba(37,99,235,.05); }
+#facturesTable td.center{ text-align:center }
+#facturesTable select[data-act="status"]{
+  border:1px solid var(--it-border); border-radius:6px; padding:6px 8px; background:#fff; font-size:13px;
+}
+#facturesTable .btn.tiny{
+  padding:.25rem .5rem; font-size:.8rem; line-height:1rem; border-radius:5px;
+  border:1px solid #d1d5db; background:#fff; cursor:pointer;
+  transition: background .15s, color .15s, border-color .15s;
+}
+#facturesTable .btn.tiny:hover{ background:var(--primary); color:#fff; border-color:var(--primary); }
+#facturesTable .btn.tiny.danger{ background:var(--it-danger-bg); color:var(--it-danger); border-color:var(--it-danger-br); }
+#facturesTable .btn.tiny.danger:hover{ background:var(--it-danger); color:#fff; border-color:var(--it-danger); }
+#screenAllFactures .tag{
+  display:inline-block; padding:2px 8px; font-size:12px; line-height:1;
+  color:var(--it-chip-text); background:var(--it-chip-bg); border:1px solid var(--it-border); border-radius:999px;
+}
+#facturesTable tbody td[colspan]{ text-align:center; color:#475569; padding:18px 8px; }
+@media (max-width:900px){
+  #facturesTable{ min-width:820px; }
+  #screenAllFactures .table-wrap{ -webkit-overflow-scrolling:touch; }
+}
+
+/* Actions + delete: match stock */
+#screenAllFactures .actions-cell{ display:flex; gap:10px; justify-content:center }
+#screenAllFactures .actions-cell .btn.tiny{
+  padding:6px 12px; font-size:12px; border-radius:6px; background:#e8efff; color:#1f3c8f;
+  border:1px solid rgba(31,60,143,.18); transition:background .15s ease,color .15s ease
+}
+#screenAllFactures .actions-cell .btn.tiny:hover{ background:#dbe6ff; color:#132a66 }
+#screenAllFactures .actions-cell .del{
+  padding:6px 12px; border-radius:6px; border:1px solid rgba(220,38,38,.18); background:rgba(254,226,226,.75);
+  color:#b91c1c; font-size:12px; cursor:pointer; transition:background .15s ease,color .15s ease
+}
+#screenAllFactures .actions-cell .del:hover{ background:#dc2626; color:#fff }
+
+/* No data row */
+#screenAllFactures .no-data td{ padding:28px 18px; text-align:center; font-style:italic; color:#5f6b87; background:rgba(248,250,252,.65) }
+
+/* Responsive matching stock */
+@media (max-width:640px){
+  #screenAllFactures .actions-cell{ justify-content:flex-start }
+  #screenAllFactures table{ min-width:640px }
+  #screenAllFactures .table-wrap{ overflow-x:auto }
+}
+
+
+/* All Invoices: header + crumbs styled like Stock */
+#screenAllFactures{padding:16px 18px;background:linear-gradient(180deg,rgba(245,247,250,.65) 0,rgba(255,255,255,.9) 40%),#f8fafc}
+#screenAllFactures .inv-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;min-height:40px}
+#screenAllFactures .inv-lead{display:flex;flex-direction:column;gap:6px}
+#screenAllFactures .inv-crumbs{display:flex;align-items:center;gap:10px;font-size:14px;color:#5b6b86}
+#screenAllFactures .inv-crumbs .crumb{color:inherit}
+#screenAllFactures .inv-crumbs .crumb.current{font-weight:600;color:#102349;cursor:default}
+#screenAllFactures .inv-crumbs .crumb.link{background:none;border:none;padding:0;font:inherit;color:#2563eb;cursor:pointer;text-decoration:none;transition:color .15s ease,transform .15s ease}
+#screenAllFactures .inv-crumbs .crumb.link:hover{color:#1d4ed8;text-decoration:underline;transform:translateY(-1px)}
+#screenAllFactures .inv-crumbs .crumb-sep{color:#96a1b7;font-size:13px}
+#screenAllFactures .inv-header-actions{display:flex;align-items:center;gap:12px;flex-wrap:wrap;justify-content:flex-end}

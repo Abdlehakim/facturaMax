@@ -21,7 +21,7 @@
 #screenStock tbody td{padding:12px 14px;border-bottom:1px solid rgba(15,23,42,.05);color:#22314f}
 #screenStock tbody tr:hover{background:rgba(37,99,235,.05)}
 #screenStock td.center{text-align:center}
-#screenStock .actions-cell{display:flex;gap:10px;justify-content:flex-end}
+#screenStock .actions-cell{display:flex;gap:10px;justify-content:center}
 #screenStock .actions-cell .btn.tiny{padding:6px 12px;font-size:12px;border-radius:6px;background:#e8efff;color:#1f3c8f;border:1px solid rgba(31,60,143,.18);transition:background .15s ease,color .15s ease}
 #screenStock .actions-cell .btn.tiny:hover{background:#dbe6ff;color:#132a66}
 #screenStock .actions-cell .del{padding:6px 12px;border-radius:6px;border:1px solid rgba(220,38,38,.18);background:rgba(254,226,226,.75);color:#b91c1c;font-size:12px;cursor:pointer;transition:background .15s ease,color .15s ease}

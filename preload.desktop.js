@@ -77,6 +77,7 @@ contextBridge.exposeInMainWorld("SoukElMeuble", {
   invoicesListRecent:   (opts) => ipcRenderer.invoke("invoices:listRecent",   opts || {}),
   invoicesRead:         (opts) => ipcRenderer.invoke("invoices:read",         opts || {}),
   invoicesDelete:       (opts) => ipcRenderer.invoke("invoices:delete",       opts || {}),
+  updateInvoiceFile:    (payload) => ipcRenderer.invoke("invoices:update",     payload || {}),
 
   /* ---------- PDF export ---------- */
   exportPDFFromHTML: async (payload) => {

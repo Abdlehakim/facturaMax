@@ -14,7 +14,7 @@ export function renderStockListSection() {
               <th style="width:12%">Prix HT</th>
               <th style="width:10%">TVA %</th>
               <th style="width:10%">Remise %</th>
-              <th style="width:12%">Actions</th>
+              <th style="width:15%">Actions</th>
             </tr>
           </thead>
           <tbody id="stockTableBody"></tbody>

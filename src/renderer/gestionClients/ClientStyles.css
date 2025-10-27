@@ -57,7 +57,7 @@
 #screenClients td.center{text-align:center}
 #screenClients td.left{text-align:left}
 #screenClients .client-id-tag{display:block;margin-top:4px;font-size:12px;color:#5b6b86}
-#screenClients .actions-cell{display:flex;gap:10px;justify-content:flex-end}
+#screenClients .actions-cell{display:flex;gap:10px;justify-content:center}
 #screenClients .actions-cell .btn.tiny{
   padding:6px 12px;font-size:12px;border-radius:6px;background:#e8efff;color:#1f3c8f;
   border:1px solid rgba(31,60,143,.18);transition:background .15s ease,color .15s ease
