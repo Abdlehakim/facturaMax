@@ -2,8 +2,6 @@
 (function (w) {
   const SEM = (w.SEM = w.SEM || {});
   const state = () => SEM.state;
-  const CLIENT_STORE_KEY = "sem_saved_clients_v1";
-  const MAX_STORED_CLIENTS = 8;
   const STOCK_STORAGE_KEY = "sem_stock_items_v1";
   const canFetchStockFromFS = () => !!(w.SoukElMeuble && typeof w.SoukElMeuble.listArticles === "function");
 
@@ -141,46 +139,6 @@
       const n = Number(value || 0);
       return `${Number.isFinite(n) ? n.toFixed(2) : "0.00"} ${currency}`.trim();
     }
-  }
-
-  function clientKey(item) {
-    return String(item?.vat || item?.email || item?.name || "")
-      .trim()
-      .toLowerCase();
-  }
-
-  function readSavedClients() {
-    if (typeof localStorage === "undefined") return [];
-    try {
-      const raw = localStorage.getItem(CLIENT_STORE_KEY);
-      if (!raw) return [];
-      const parsed = JSON.parse(raw);
-      if (!Array.isArray(parsed)) return [];
-      return parsed
-        .map((item) => {
-          if (!item || typeof item !== "object") return null;
-          return {
-            type: typeof item.type === "string" && item.type ? item.type : "societe",
-            name: typeof item.name === "string" ? item.name : "",
-            email: typeof item.email === "string" ? item.email : "",
-            phone: typeof item.phone === "string" ? item.phone : "",
-            vat: typeof item.vat === "string" ? item.vat : "",
-            address: typeof item.address === "string" ? item.address : "",
-            savedAt: typeof item.savedAt === "string" ? item.savedAt : "",
-          };
-        })
-        .filter(Boolean);
-    } catch {
-      return [];
-    }
-  }
-
-  function writeSavedClients(list) {
-    if (typeof localStorage === "undefined") return;
-    try {
-      const slim = Array.isArray(list) ? list.slice(0, MAX_STORED_CLIENTS) : [];
-      localStorage.setItem(CLIENT_STORE_KEY, JSON.stringify(slim));
-    } catch {}
   }
 
   SEM.toggleSealFields = function (enabled) {
