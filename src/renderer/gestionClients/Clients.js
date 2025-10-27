@@ -87,17 +87,50 @@ function handleEditRequested(index) {
   showSection("edit");
 }
 
-function handleDeleteRequested(index) {
-  deleteClient(index);
-  refreshTable();
+async function handleDeleteRequested(index) {
+  try {
+    const items = getClientItems();
+    const target = items[index];
+    const path = target && target.__path;
+    deleteClient(index);
+    if (path && window.SoukElMeuble?.deletePath) {
+      try { await window.SoukElMeuble.deletePath(path); } catch {}
+    }
+  } finally {
+    refreshTable();
+  }
 }
 
-function handleSubmit({ entry, mode, editIndex }) {
+async function handleSubmit({ entry, mode, editIndex }) {
   if (!entry) return;
+  const isDesktop = !!(window.SoukElMeuble && window.SoukElMeuble.isDesktop);
   if (mode === "edit" && Number.isInteger(editIndex) && editIndex >= 0) {
+    // Update in-memory state first
     updateClient(editIndex, entry);
+    if (isDesktop) {
+      try {
+        const current = getClientItems()[editIndex];
+        const targetPath = current?.__path;
+        if (targetPath && window.SoukElMeuble?.updateClientFile) {
+          await window.SoukElMeuble.updateClientFile({ path: targetPath, client: entry });
+        } else if (window.SoukElMeuble?.saveClientDirect) {
+          const res = await window.SoukElMeuble.saveClientDirect({ client: entry, suggestedName: entry?.name || "client" });
+          if (res?.ok) updateClient(editIndex, entry, { __path: res.path, __fileName: res.name });
+        }
+      } catch (e) { console.warn("[clients] FS update failed:", e); }
+    }
   } else {
+    // Add to in-memory list then persist to FS (desktop)
     addClient(entry);
+    if (isDesktop && window.SoukElMeuble?.saveClientDirect) {
+      try {
+        const res = await window.SoukElMeuble.saveClientDirect({ client: entry, suggestedName: entry?.name || "client" });
+        if (res?.ok) {
+          const idx = getClientItems().length - 1;
+          updateClient(idx, entry, { __path: res.path, __fileName: res.name });
+        }
+      } catch (e) { console.warn("[clients] FS save failed:", e); }
+    }
   }
   showSection("list");
   refreshTable();

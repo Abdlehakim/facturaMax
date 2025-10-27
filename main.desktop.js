@@ -156,10 +156,11 @@ async function tryEnsure(dir) {
   try { await fsp.mkdir(dir, { recursive: true }); } catch {}
 }
 function getClientsSystemFolder() {
+  // Store clients under Facturance\Data\clients (lowercase) to align with request
   if (process.platform === "win32") {
-    return pfPath("Clients");
+    return pfPath(path.join("Data", "clients"));
   }
-  return path.join(app.getPath("documents"), "Facturance", "Clients");
+  return path.join(app.getPath("documents"), "Facturance", "Data", "clients");
 }
 async function canWriteTo(dir) {
   try {
@@ -725,6 +726,25 @@ ipcMain.handle("articles:list", async () => {
   } catch (e) {
     console.error("[articles:list] error:", e);
     return [];
+  }
+});
+
+// Update an existing client JSON file in-place (only inside the clients directory)
+ipcMain.handle("clients:update", async (_evt, payload = {}) => {
+  try {
+    const { path: targetPath, client = {} } = payload || {};
+    if (!targetPath) return { ok: false, error: "Missing path" };
+    const dir = getClientsSystemFolder();
+    await tryEnsure(dir);
+    const resolvedTarget = path.resolve(targetPath);
+    const resolvedDir = path.resolve(dir);
+    if (!resolvedTarget.startsWith(resolvedDir)) {
+      return { ok: false, error: "Path outside of clients directory" };
+    }
+    await fsp.writeFile(resolvedTarget, JSON.stringify(client, null, 2), "utf-8");
+    return { ok: true, path: resolvedTarget };
+  } catch (e) {
+    return { ok: false, error: String(e?.message || e) };
   }
 });
 ipcMain.handle("articles:update", async (_evt, payload = {}) => {

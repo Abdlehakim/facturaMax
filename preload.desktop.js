@@ -121,6 +121,7 @@ contextBridge.exposeInMainWorld("SoukElMeuble", {
   saveClientDirect:          (payload) => ipcRenderer.invoke("clients:saveDirect", payload),
   saveClientWithDialog:      (payload) => ipcRenderer.invoke("clients:saveWithDialog", payload),
   openClientWithDialog:      (opts = {}) => ipcRenderer.invoke("clients:open", opts),
+  updateClientFile:          (payload) => ipcRenderer.invoke("clients:update", payload),
 
   /* ---------- Pre-bundled assets ---------- */
   assets: { logo: logoDataURL },
