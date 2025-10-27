@@ -4,6 +4,105 @@
   const state = () => SEM.state;
   const CLIENT_STORE_KEY = "sem_saved_clients_v1";
   const MAX_STORED_CLIENTS = 8;
+  const STOCK_STORAGE_KEY = "sem_stock_items_v1";
+
+  let cachedStockSearchPool = null;
+
+  function escapeHtmlLite(value) {
+    const str = String(value ?? "");
+    if (!str) return "";
+    if (typeof w.escapeHTML === "function") return w.escapeHTML(str);
+    return str
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+  }
+
+  function normalizeStockCandidate(data = {}) {
+    if (!data || typeof data !== "object") return null;
+    const refSource = data.ref ?? data.reference ?? "";
+    const nameSource = data.name ?? data.product ?? data.label ?? "";
+    const descSource = data.desc ?? data.description ?? data.details ?? "";
+    const qtyRaw = Number(data.qty ?? data.quantity ?? 1);
+    const priceRaw = Number(data.price ?? data.unitPrice ?? 0);
+    const tvaRaw = Number(data.tva ?? data.vat ?? 0);
+    const discountRaw = Number(data.discount ?? data.remise ?? 0);
+    const item = {
+      ref: typeof refSource === "string" ? refSource.trim() : String(refSource ?? "").trim(),
+      name: typeof nameSource === "string" ? nameSource.trim() : String(nameSource ?? "").trim(),
+      desc: typeof descSource === "string" ? descSource.trim() : String(descSource ?? "").trim(),
+      qty: Number.isFinite(qtyRaw) && qtyRaw > 0 ? qtyRaw : 1,
+      price: Number.isFinite(priceRaw) ? priceRaw : 0,
+      tva: Number.isFinite(tvaRaw) ? tvaRaw : 0,
+      discount: Number.isFinite(discountRaw) ? discountRaw : 0,
+    };
+    if (data.__path) item.__path = data.__path;
+    if (data.__fileName) item.__fileName = data.__fileName;
+    return item;
+  }
+
+  function buildStockSearchPool() {
+    const pool = [];
+    const seen = new Set();
+    const push = (entry) => {
+      const normalized = normalizeStockCandidate(entry);
+      if (!normalized) return;
+      const key = `${normalized.ref}|${normalized.name}|${normalized.desc}`.toLowerCase();
+      if (seen.has(key)) return;
+      seen.add(key);
+      pool.push(normalized);
+    };
+    const fromState = w.SEM?.stock?.items;
+    if (Array.isArray(fromState)) fromState.forEach(push);
+    if (typeof localStorage !== "undefined") {
+      try {
+        const raw = localStorage.getItem(STOCK_STORAGE_KEY);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) parsed.forEach(push);
+        }
+      } catch {}
+    }
+    return pool;
+  }
+
+  function getStockSearchPool(force = false) {
+    if (!force && Array.isArray(cachedStockSearchPool)) return cachedStockSearchPool;
+    cachedStockSearchPool = buildStockSearchPool();
+    return cachedStockSearchPool;
+  }
+
+  function invalidateStockSearchPool() {
+    cachedStockSearchPool = null;
+  }
+
+  function filterStockMatches(term, limit = 8) {
+    const value = String(term || "").trim().toLowerCase();
+    if (!value) return [];
+    const tokens = value.split(/\s+/).filter(Boolean);
+    if (!tokens.length) return [];
+    const pool = getStockSearchPool();
+    if (!Array.isArray(pool) || !pool.length) return [];
+    return pool
+      .filter((item) => {
+        const haystack = `${item.ref} ${item.name} ${item.desc}`.toLowerCase();
+        return tokens.every((token) => haystack.includes(token));
+      })
+      .slice(0, limit);
+  }
+
+  function formatMoneyForSearch(value) {
+    const currency = state()?.meta?.currency || "TND";
+    if (typeof w.formatMoney === "function") return w.formatMoney(value, currency);
+    try {
+      return new Intl.NumberFormat(undefined, { style: "currency", currency }).format(Number(value) || 0);
+    } catch {
+      const n = Number(value || 0);
+      return `${Number.isFinite(n) ? n.toFixed(2) : "0.00"} ${currency}`.trim();
+    }
+  }
 
   function clientKey(item) {
     return String(item?.vat || item?.email || item?.name || "")
@@ -326,6 +425,135 @@
     SEM.clearAddFormAndMode();
   };
 
+  SEM.invalidateStockSearchPool = invalidateStockSearchPool;
+
+  SEM.addItemFromStock = function (stockItem) {
+    const normalized = normalizeStockCandidate(stockItem);
+    if (!normalized) return;
+    const st = state();
+    if (!Array.isArray(st.items)) st.items = [];
+    const invoiceItem = {
+      ref: normalized.ref || "",
+      product: normalized.name || "",
+      desc: normalized.desc || "",
+      qty: Number.isFinite(normalized.qty) && normalized.qty > 0 ? normalized.qty : 1,
+      price: Number.isFinite(normalized.price) ? normalized.price : 0,
+      tva: Number.isFinite(normalized.tva) ? normalized.tva : 0,
+      discount: Number.isFinite(normalized.discount) ? normalized.discount : 0,
+    };
+    st.items.push(invoiceItem);
+    SEM.renderItems?.();
+  };
+
+  SEM.attachItemSearch = function () {
+    const input = getEl("itemSearchInput");
+    const button = getEl("itemSearchButton");
+    const results = getEl("itemSearchResults");
+    if (!input || !results) return;
+    if (input.dataset.bound === "1") return;
+    input.dataset.bound = "1";
+
+    let currentResults = [];
+    let currentTerm = "";
+
+    const hideResults = () => {
+      results.innerHTML = "";
+      results.classList.remove("is-visible");
+    };
+
+    const renderResults = () => {
+      if (!currentResults.length) {
+        results.innerHTML = `<div class="item-search__empty">Aucun article trouve.</div>`;
+        results.classList.add("is-visible");
+        return;
+      }
+      results.innerHTML = currentResults
+        .map((item, idx) => {
+          const title = escapeHtmlLite(item.name || item.ref || "Article");
+          const badge = item.ref ? `<span class="item-search__badge">${escapeHtmlLite(item.ref)}</span>` : "";
+          const desc = item.desc ? `<span class="item-search__desc">${escapeHtmlLite(item.desc)}</span>` : "";
+          const subtitleParts = [];
+          if (badge) subtitleParts.push(badge);
+          if (desc) subtitleParts.push(desc);
+          const subtitle = subtitleParts.length ? `<div class="item-search__subtitle">${subtitleParts.join("")}</div>` : "";
+          const priceLabel = escapeHtmlLite(formatMoneyForSearch(item.price));
+          return `
+            <div class="item-search__result" data-index="${idx}" role="option" aria-selected="false">
+              <div class="item-search__info">
+                <div class="item-search__title">${title}</div>
+                ${subtitle}
+              </div>
+              <div class="item-search__meta">
+                <span class="item-search__price">${priceLabel}</span>
+                <button type="button" class="btn tiny" data-action="pick-item" data-index="${idx}">Ajouter</button>
+              </div>
+            </div>`;
+        })
+        .join("");
+      results.classList.add("is-visible");
+    };
+
+    const updateResults = () => {
+      currentTerm = input.value.trim();
+      if (currentTerm.length < 2) {
+        currentResults = [];
+        hideResults();
+        return;
+      }
+      currentResults = filterStockMatches(currentTerm, 10);
+      if (!currentResults.length) {
+        results.innerHTML = `<div class="item-search__empty">Aucun article trouve.</div>`;
+        results.classList.add("is-visible");
+        return;
+      }
+      renderResults();
+    };
+
+    const addSelection = (index = 0) => {
+      const entry = currentResults[index];
+      if (!entry) {
+        if (currentTerm.length >= 2) {
+          if (typeof w.showDialog === "function") w.showDialog("Aucun article ne correspond a votre recherche.", { title: "Stock" });
+          else if (typeof w.alert === "function") w.alert("Aucun article ne correspond a votre recherche.");
+        }
+        return;
+      }
+      SEM.addItemFromStock(entry);
+      input.value = "";
+      currentTerm = "";
+      currentResults = [];
+      hideResults();
+      input.focus();
+    };
+
+    input.addEventListener("input", updateResults);
+    input.addEventListener("keydown", (ev) => {
+      if (ev.key === "Enter") {
+        ev.preventDefault();
+        addSelection(0);
+      } else if (ev.key === "Escape") {
+        hideResults();
+        currentResults = [];
+      }
+    });
+
+    button?.addEventListener("click", () => addSelection(0));
+
+    results.addEventListener("mousedown", (ev) => {
+      ev.preventDefault();
+    });
+
+    results.addEventListener("click", (ev) => {
+      const pickBtn = ev.target.closest("[data-action=\"pick-item\"]");
+      if (pickBtn) {
+        addSelection(Number(pickBtn.dataset.index || "0"));
+        return;
+      }
+      const row = ev.target.closest(".item-search__result");
+      if (row) addSelection(Number(row.dataset.index || "0"));
+    });
+  };
+
   SEM.renderItems = function () {
     const body = getEl("itemBody"); if (!body) return;
     body.innerHTML = "";
@@ -428,13 +656,14 @@
   }
 
   SEM.applyColumnHiding = function () {
-    const refVis      = !!getEl('colToggleRef')?.checked;
-    const productVis  = !!getEl('colToggleProduct')?.checked;
-    const descVis     = !!getEl('colToggleDesc')?.checked;
-    const qtyVis      = !!getEl('colToggleQty')?.checked;
-    const priceVis    = !!getEl('colTogglePrice')?.checked;
-    const tvaVis      = !!getEl('colToggleTva')?.checked;
-    const discountVis = !!getEl('colToggleDiscount')?.checked;
+    const checkedOrTrue = (el) => (el == null ? true : !!el.checked);
+    const refVis      = checkedOrTrue(getEl('colToggleRef'));
+    const productVis  = checkedOrTrue(getEl('colToggleProduct'));
+    const descVis     = checkedOrTrue(getEl('colToggleDesc'));
+    const qtyVis      = checkedOrTrue(getEl('colToggleQty'));
+    const priceVis    = checkedOrTrue(getEl('colTogglePrice'));
+    const tvaVis      = checkedOrTrue(getEl('colToggleTva'));
+    const discountVis = checkedOrTrue(getEl('colToggleDiscount'));
 
     document.body.classList.toggle('hide-col-ref',      !refVis);
     document.body.classList.toggle('hide-col-product',  !productVis);

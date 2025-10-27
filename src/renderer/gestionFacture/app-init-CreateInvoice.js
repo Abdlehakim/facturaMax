@@ -179,6 +179,7 @@
     try { SEM.bind?.(); } catch {}
     try { SEM.wireLiveBindings?.(); } catch {}
     try { SEM.wireColumnToggles?.(); } catch {}
+    try { SEM.attachItemSearch?.(); } catch {}
 
     getEl("btnNew")?.addEventListener("click", () => {
       if (typeof SEM.newInvoice === "function") {
@@ -186,6 +187,7 @@
         SEM.selectedItemIndex = null;
         SEM.bind?.();
         SEM.wireColumnToggles?.();   // reset toggles checked + apply
+        SEM.attachItemSearch?.();
         autoNumberFromRegistryIfEmpty();
         SEM.navigate?.("create-facture");
       }

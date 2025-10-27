@@ -135,6 +135,14 @@ export function mount(root) {
     </section>
 
     <section class="flexit">
+      <div class="item-search">
+        <label for="itemSearchInput" class="item-search__label">Rechercher un article</label>
+        <div class="item-search__row">
+          <input id="itemSearchInput" type="search" placeholder="Rechercher un article (nom, reference...)" autocomplete="off" />
+          <button id="itemSearchButton" type="button" class="btn">Ajouter</button>
+        </div>
+        <div id="itemSearchResults" class="item-search__results" role="listbox" aria-label="Suggestions d'articles"></div>
+      </div>
       <div class="table-wrap tabM">
         <table id="items">
           <thead>
@@ -192,109 +200,6 @@ export function mount(root) {
           </tbody>
         </table>
       </div>
-
-      <fieldset class="section-box">
-        <legend>Ajouter un article</legend>
-        <div class="field-visibility-control">
-          <button id="fieldVisibilityButton" type="button" class="visibility-dropdown-toggle">
-            <span>Champs affiches</span>
-            <svg width="14" height="14" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-              <path d="M5 7.5L10 12.5L15 7.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-          </button>
-          <div id="fieldVisibilityMenu" class="field-visibility-menu">
-            <div class="field-visibility-options">
-              <label>
-                <input id="colToggleRef" type="checkbox" class="col-toggle" aria-label="Afficher colonne Reference" checked />
-                <span>Reference</span>
-              </label>
-              <label>
-                <input id="colToggleProduct" type="checkbox" class="col-toggle" aria-label="Afficher colonne Produit" checked />
-                <span>Produit</span>
-              </label>
-              <label>
-                <input id="colToggleDesc" type="checkbox" class="col-toggle" aria-label="Afficher colonne Description" checked />
-                <span>Description</span>
-              </label>
-              <label>
-                <input id="colToggleQty" type="checkbox" class="col-toggle" aria-label="Afficher colonne Quantite" checked />
-                <span>Quantite</span>
-              </label>
-              <label>
-                <input id="colTogglePrice" type="checkbox" class="col-toggle" aria-label="Afficher colonne Prix HT" checked />
-                <span>Prix HT</span>
-              </label>
-              <label>
-                <input id="colToggleTva" type="checkbox" class="col-toggle" aria-label="Afficher colonne TVA" checked />
-                <span>TVA %</span>
-              </label>
-              <label>
-                <input id="colToggleDiscount" type="checkbox" class="col-toggle" aria-label="Afficher colonne Remise" checked />
-                <span>Remise %</span>
-              </label>
-            </div>
-          </div>
-        </div>
-        <div class="grid">
-          <div class="grid four">
-            <div class="field field-ref">
-              <div class="label-inline">
-                <label for="addRef" class="label-text">Reference</label>
-              </div>
-              <input id="addRef" placeholder="ex. : SKU-12345" />
-            </div>
-
-            <div class="field field-product">
-              <div class="label-inline">
-                <label for="addProduct" class="label-text">Produit</label>
-              </div>
-              <input id="addProduct" placeholder="ex. : Ordinateur portable" />
-            </div>
-
-            <div class="field field-desc full">
-              <div class="label-inline">
-                <label for="addDesc" class="label-text">Description</label>
-              </div>
-              <input id="addDesc" placeholder="ex. : Garantie 2 ans, couleur noire..." />
-            </div>
-
-            <div class="field field-qty">
-              <div class="label-inline">
-                <label for="addQty" class="label-text">Qte</label>
-              </div>
-              <input id="addQty" type="number" min="0" step="1" value="1" />
-            </div>
-
-            <div class="field field-price">
-              <div class="label-inline">
-                <label for="addPrice" class="label-text">Prix&nbsp;HT</label>
-              </div>
-              <input id="addPrice" type="number" min="0" step="0.01" value="0" />
-            </div>
-
-            <div class="field field-tva">
-              <div class="label-inline">
-                <label for="addTva" class="label-text">TVA&nbsp;%</label>
-              </div>
-              <input id="addTva" type="number" min="0" step="0.01" value="19" />
-            </div>
-
-            <div class="field field-discount">
-              <div class="label-inline">
-                <label for="addDiscount" class="label-text">Remise&nbsp;%</label>
-              </div>
-              <input id="addDiscount" type="number" min="0" step="0.01" value="0" />
-            </div>
-          </div>
-
-          <div class="add-actions end" style="display:flex; gap:8px; flex-wrap:wrap;">
-            <button id="btnSubmitItem" type="button" class="btn">+ Ajouter</button>
-            <button id="btnNewItem" type="button" class="btn">Nouveau</button>
-            <button id="btnSaveItem" type="button" class="btn">Enregistrer l'article</button>
-            <button id="btnLoadItem" type="button" class="btn">Charger un article...</button>
-          </div>
-        </div>
-      </fieldset>
 
       <fieldset class="section-box" id="extrasBox">
         <legend>Frais & options</legend>

@@ -17,6 +17,24 @@
 #invoice td .del{background:#fee2e2;color:#b91c1c;border:1px solid #fecaca;border-radius:6px;padding:6px 12px;cursor:pointer;transition:background .15s ease,color .15s ease}
 #invoice td .del:hover{background:#dc2626;color:#fff;border-color:#dc2626}
 
+#invoice .item-search{display:flex;flex-direction:column;gap:6px;margin-bottom:6px}
+#invoice .item-search__label{font-weight:600;color:#1d2a44;font-size:13px}
+#invoice .item-search__row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+#invoice .item-search__row input{flex:1 1 240px;min-width:200px;padding:10px 12px;border:1px solid rgba(15,23,42,.14);border-radius:8px;background:#fff;color:#132a66}
+#invoice .item-search__row input:focus{outline:2px solid rgba(37,99,235,.36);outline-offset:1px}
+#invoice .item-search__results{display:none;border:1px solid rgba(15,23,42,.08);border-radius:10px;background:#fff;box-shadow:0 12px 28px -24px rgba(15,23,42,.45);padding:6px;max-height:240px;overflow-y:auto}
+#invoice .item-search__results.is-visible{display:block}
+#invoice .item-search__result{display:flex;justify-content:space-between;align-items:center;padding:6px 10px;border-radius:8px;gap:12px;cursor:pointer;transition:background .15s ease}
+#invoice .item-search__result:hover{background:rgba(37,99,235,.08)}
+#invoice .item-search__info{display:flex;flex-direction:column;gap:4px;min-width:0}
+#invoice .item-search__title{font-weight:600;color:#0b1f4b}
+#invoice .item-search__subtitle{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:12px;color:#4b5563}
+#invoice .item-search__badge{display:inline-flex;align-items:center;justify-content:center;padding:2px 8px;border-radius:999px;background:#eef4ff;color:#1d2a44;font-weight:500}
+#invoice .item-search__desc{max-width:320px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#invoice .item-search__meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+#invoice .item-search__price{font-weight:600;color:#1d2a44;font-size:13px}
+#invoice .item-search__empty{padding:8px 10px;font-size:13px;color:#4b5563}
+
 /* Mini summary */
 #invoice .mini-sum{border:1px solid rgba(15,23,42,.06);border-radius:10px;box-shadow:0 10px 24px -20px rgba(15,23,42,.25);min-width:320px;max-width:380px;margin-left:auto;background:#fff}
 #invoice .mini-sum th,#invoice .mini-sum td{background:#fff;color:#0e1220;font-weight:700;text-align:center;padding:10px}
