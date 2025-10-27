@@ -28,10 +28,27 @@ export function renderClientAddPanel() {
             <div class="label-inline">
               <label for="clientAddType" class="label-text">Type de client</label>
             </div>
-            <select id="clientAddType">
-              <option value="societe">Societe / personne morale</option>
-              <option value="particulier">Particulier</option>
-            </select>
+            <div class="field-visibility-control" id="clientTypeControl">
+              <button id="clientAddTypeButton" type="button" class="visibility-dropdown-toggle" aria-haspopup="true" aria-expanded="false">
+                <span id="clientAddTypeLabel">Societe / personne morale</span>
+                <svg width="14" height="14" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                  <path d="M5 7.5L10 12.5L15 7.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </button>
+              <div id="clientAddTypeMenu" class="field-visibility-menu type-menu">
+                <div class="field-visibility-options">
+                  <label>
+                    <input type="radio" name="clientTypeOption" value="societe" checked />
+                    <span>Societe / personne morale</span>
+                  </label>
+                  <label>
+                    <input type="radio" name="clientTypeOption" value="particulier" />
+                    <span>Particulier</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+            <input id="clientAddType" type="hidden" value="societe" />
           </div>
 
           <!-- 2) Nom du client -->
@@ -115,11 +132,7 @@ export function bindClientAddPanel({ onSubmit, onCancel } = {}) {
     });
   }
 
-  const typeSelect = getEl("clientAddType");
-  if (typeSelect && !typeSelect.dataset.behaviorSetup) {
-    typeSelect.addEventListener("change", () => updateIdentifierUI());
-    typeSelect.dataset.behaviorSetup = "true";
-  }
+  setupClientTypeMenu();
   updateIdentifierUI();
 }
 
@@ -129,6 +142,7 @@ export function clearAddForm() {
     if (el) el.value = FIELD_DEFAULTS[id] ?? "";
   });
   setAddFormMode("add");
+  syncClientTypeUI();
   updateIdentifierUI();
 }
 
@@ -147,6 +161,7 @@ export function fillAddForm(item = {}) {
       el.value = values[id];
     }
   });
+  syncClientTypeUI();
   updateIdentifierUI();
 }
 
@@ -189,14 +204,69 @@ function readAddForm() {
 
 function updateIdentifierUI() {
   const type = getEl("clientAddType")?.value || FIELD_DEFAULTS.clientAddType;
-  const label = getEl("clientAddIdentifierLabel");
-  const input = getEl("clientAddIdentifier");
-  if (!label || !input) return;
-  if (type === "particulier") {
-    label.textContent = "CIN / passeport";
-    input.placeholder = "ex. : CIN 12345678";
-  } else {
-    label.textContent = "Identifiant fiscal / TVA";
-    input.placeholder = "ex. : 1234567/A/M/000";
+  const idLabel = getEl("clientAddIdentifierLabel");
+  const idInput = getEl("clientAddIdentifier");
+  const btnLabel = getEl("clientAddTypeLabel");
+  const radios = document.querySelectorAll('input[type="radio"][name="clientTypeOption"]');
+  if (idLabel && idInput) {
+    if (type === "particulier") {
+      idLabel.textContent = "CIN / passeport";
+      idInput.placeholder = "ex. : CIN 12345678";
+    } else {
+      idLabel.textContent = "Identifiant fiscal / TVA";
+      idInput.placeholder = "ex. : 1234567/A/M/000";
+    }
   }
+  if (btnLabel) btnLabel.textContent = type === "particulier" ? "Particulier" : "Societe / personne morale";
+  radios.forEach((r) => { r.checked = r.value === type; });
+}
+
+function syncClientTypeUI() {
+  // Keep button label and radios in sync with hidden input value
+  updateIdentifierUI();
+}
+
+function setupClientTypeMenu() {
+  if (typeof document === "undefined") return;
+  const button = document.getElementById("clientAddTypeButton");
+  const menu = document.getElementById("clientAddTypeMenu");
+  const hidden = document.getElementById("clientAddType");
+  const btnLabel = document.getElementById("clientAddTypeLabel");
+  const radios = menu ? menu.querySelectorAll('input[type="radio"][name="clientTypeOption"]') : [];
+  if (!button || !menu || !hidden || !btnLabel) return;
+  let open = false;
+  const setOpen = (value) => {
+    open = !!value;
+    menu.style.display = open ? "block" : "none";
+    button.classList.toggle("is-open", open);
+    menu.classList.toggle("is-open", open);
+    button.setAttribute("aria-expanded", open ? "true" : "false");
+  };
+  setOpen(false);
+  if (!button.dataset.menuSetup) {
+    button.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      setOpen(!open);
+    });
+    button.dataset.menuSetup = "true";
+  }
+  radios.forEach((r) => {
+    r.addEventListener("change", () => {
+      if (!r.checked) return;
+      hidden.value = r.value === "particulier" ? "particulier" : "societe";
+      btnLabel.textContent = hidden.value === "particulier" ? "Particulier" : "Societe / personne morale";
+      updateIdentifierUI();
+      setOpen(false);
+    });
+  });
+  if (window.__SEM_ClientTypeListener) {
+    document.removeEventListener("click", window.__SEM_ClientTypeListener);
+  }
+  const onDocumentClick = (event) => {
+    if (!open) return;
+    if (!menu.contains(event.target) && event.target !== button) setOpen(false);
+  };
+  window.__SEM_ClientTypeListener = onDocumentClick;
+  document.addEventListener("click", onDocumentClick);
 }

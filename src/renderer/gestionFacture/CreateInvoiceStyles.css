@@ -1,18 +1,26 @@
 /* CreateInvoiceStyles.css */
 #invoice .actions.toolbar{display:flex;gap:8px;justify-content:flex-end;margin-bottom:12px}
-#invoice .section-box{border:2px solid var(--success);border-radius:5px;padding:14px 16px 16px;margin-bottom:16px;background:#f3f4f6}
-#invoice .section-box>legend{font-weight:700;letter-spacing:.02em;text-transform:uppercase;color:var(--success);padding:0 8px;margin-left:8px}
+
+/* Section boxes aligned with StockStyles */
+#invoice .section-box{border:1px solid rgba(28,63,170,.08);box-shadow:0 12px 30px -18px rgba(28,63,170,.55),0 0 0 1px rgba(15,23,42,.04);border-radius:14px;background:#fff;padding:22px 24px;margin-bottom:24px}
+#invoice .section-box>legend{font-weight:700;letter-spacing:.02em;text-transform:uppercase;color:#0b1f4b;padding:0 8px;margin-left:2px}
 #invoice .section-box .grid{margin-top:10px}
-#invoice .table-wrap{overflow-x:auto;border:2px solid var(--primary);border-radius:5px}
+
+/* Items table */
+#invoice .table-wrap{overflow:hidden;border-radius:10px;border:1px solid rgba(15,23,42,.06);box-shadow:0 10px 24px -20px rgba(15,23,42,.45)}
 #invoice table{width:100%;font-size:14px;border-collapse:collapse}
 #invoice th,#invoice td{padding:5px}
 #invoice td:last-child,#invoice .tabM th:last-child{text-align:center}
-#invoice .tabM thead th{background:var(--primary);text-align:left;color:#fff}
-#invoice td .del{background:#fee2e2;color:#b91c1c;border:1px solid #fecaca;border-radius:5px;padding:4px 8px;cursor:pointer}
-#invoice td .del:hover{background:#b91c1c;color:#fff;border-color:#b91c1c}
-#invoice .mini-sum{border:2px solid var(--primary);min-width:320px;max-width:380px;margin-left:auto;border-radius:5px}
-#invoice .mini-sum th,#invoice .mini-sum td{background:#fff;color:#0e1220;font-weight:700;text-align:center}
-#invoice .mini-sum th{background:var(--primary);color:#fff}
+#invoice .tabM thead th{background:#eef4ff;color:#1d2a44;font-weight:600;text-transform:uppercase;font-size:12px;letter-spacing:.04em;text-align:left;padding:12px 14px;border-bottom:1px solid rgba(15,23,42,.08)}
+#invoice .tabM tbody td{padding:12px 14px;border-bottom:1px solid rgba(15,23,42,.05);color:#22314f}
+#invoice .tabM tbody tr:hover{background:rgba(37,99,235,.05)}
+#invoice td .del{background:#fee2e2;color:#b91c1c;border:1px solid #fecaca;border-radius:6px;padding:6px 12px;cursor:pointer;transition:background .15s ease,color .15s ease}
+#invoice td .del:hover{background:#dc2626;color:#fff;border-color:#dc2626}
+
+/* Mini summary */
+#invoice .mini-sum{border:1px solid rgba(15,23,42,.06);border-radius:10px;box-shadow:0 10px 24px -20px rgba(15,23,42,.25);min-width:320px;max-width:380px;margin-left:auto;background:#fff}
+#invoice .mini-sum th,#invoice .mini-sum td{background:#fff;color:#0e1220;font-weight:700;text-align:center;padding:10px}
+#invoice .mini-sum th{background:#eef4ff;color:#1d2a44}
 #invoice .mini-sum .grand th{font-weight:700}
 #invoice .mini-sum .right,#invoice .mini-sum .symbol{text-align:center}
 
