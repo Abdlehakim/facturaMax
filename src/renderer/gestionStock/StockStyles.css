@@ -27,7 +27,7 @@
 #screenStock .actions-cell .del{padding:6px 12px;border-radius:6px;border:1px solid rgba(220,38,38,.18);background:rgba(254,226,226,.75);color:#b91c1c;font-size:12px;cursor:pointer;transition:background .15s ease,color .15s ease}
 #screenStock .actions-cell .del:hover{background:#dc2626;color:#fff}
 #screenStock .no-data td{padding:28px 18px;text-align:center;font-style:italic;color:#5f6b87;background:rgba(248,250,252,.65)}
-#screenStock #stockAddPanel{display:none;margin-top:18px;border:1px solid rgba(28,63,170,.1);border-radius:14px;background:#f7f9ff;padding:24px 26px;box-shadow:0 10px 26px -20px rgba(15,23,42,.5)}
+#screenStock #stockAddPanel{display:none;border:1px solid rgba(28,63,170,.1);border-radius:14px;background:#f7f9ff;padding:24px 26px;box-shadow:0 10px 26px -20px rgba(15,23,42,.5)}
 #screenStock .stock-subtitle{font-size:18px;font-weight:600;color:#0b1f4b;margin-bottom:18px}
 #screenStock #stockAddPanel .grid.four{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;margin-bottom:20px}
 #screenStock #stockAddPanel .grid.four label{display:flex;flex-direction:column;gap:6px;font-size:13px;color:#1a2b4d;font-weight:500}

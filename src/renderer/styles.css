@@ -65,11 +65,12 @@ textarea{ resize:vertical; }
 
 .with-sidebar{
   display:flex;
-  align-items:flex-start;
+  align-items:stretch; /* stretch children to equal heights (sidebar/app) */
   gap:12px;
   max-width:1920px;
   margin:0 auto;
   padding:12px;
+  min-height:100vh; /* ensure container defines a height for stretch */
 }
 .with-sidebar .app{
   flex:1 1 auto;
@@ -85,6 +86,15 @@ textarea{ resize:vertical; }
 .actions{ display:flex; gap:10px; }
 .flexit{ display:flex; flex-direction:column; gap:12px; }
 .paper{ background:#fff; color:#0e1220; border-radius:5px; padding:18px; }
+
+/* Make main screens fill remaining height beside the sidebar */
+#screenAllFactures,
+#screenStock,
+#screenClients{
+  flex:1 1 auto;
+  display:flex;
+  flex-direction:column;
+}
 
 /* Shared sections and tables aligned with StockStyles */
 .section-box{

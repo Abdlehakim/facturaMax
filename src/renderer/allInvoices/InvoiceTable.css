@@ -11,8 +11,8 @@ InvoiceTable.css
 }
 #ftSaveSeq.btn,#ftZip.btn{ padding:.4rem .9rem; font-size:.85rem; }
 #screenAllFactures .table-wrap{
-  /* Match Stock table container */
-  overflow:hidden; border-radius:10px; border:1px solid rgba(15,23,42,.06);
+  /* Match Stock table container, but allow dropdowns to overflow vertically */
+  overflow:visible; border-radius:10px; border:1px solid rgba(15,23,42,.06);
   box-shadow:0 10px 24px -20px rgba(15,23,42,.45);
 }
 #facturesTable{
@@ -85,3 +85,33 @@ InvoiceTable.css
 #screenAllFactures .inv-crumbs .crumb.link:hover{color:#1d4ed8;text-decoration:underline;transform:translateY(-1px)}
 #screenAllFactures .inv-crumbs .crumb-sep{color:#96a1b7;font-size:13px}
 #screenAllFactures .inv-header-actions{display:flex;align-items:center;gap:12px;flex-wrap:wrap;justify-content:flex-end}
+
+/* Status dropdown sized + colored like stock type control */
+#screenAllFactures .status-control{ width:180px; margin:0 auto; position:relative }
+#screenAllFactures .status-control .visibility-dropdown-toggle{ padding:6px 10px; font-size:12.5px; width:100% }
+#screenAllFactures .status-control .field-visibility-menu{ width:100%; left:0; right:auto; z-index:100 }
+#screenAllFactures .status-control .status-label{ display:inline-flex; align-items:center; gap:8px }
+#screenAllFactures .status-control .status-label::before{ content:""; width:8px; height:8px; border-radius:50%; background: currentColor }
+#screenAllFactures .status-control.is-payer .visibility-dropdown-toggle{
+  border-color:#16a34a; background:#ecfdf3; color:#03694f; box-shadow:0 2px 6px rgba(22,163,74,.18)
+}
+#screenAllFactures .status-control.is-payer .visibility-dropdown-toggle:is(:hover,:focus-visible){
+  background:#dcfce7; color:#065f46; border-color:#16a34a
+}
+#screenAllFactures .status-control.is-annuler .visibility-dropdown-toggle{
+  border-color:#ef4444; background:#fee2e2; color:#991b1b; box-shadow:0 2px 6px rgba(239,68,68,.18)
+}
+#screenAllFactures .status-control.is-annuler .visibility-dropdown-toggle:is(:hover,:focus-visible){
+  background:#fecaca; color:#7f1d1d; border-color:#ef4444
+}
+#screenAllFactures .status-control .status-toggle.is-busy{ opacity:.8; pointer-events:none }
+#screenAllFactures .status-control .status-toggle.is-busy::after{
+  content:""; width:12px; height:12px; margin-left:6px; border:2px solid currentColor; border-top-color:transparent;
+  border-radius:50%; display:inline-block; animation:invspin .8s linear infinite
+}
+@keyframes invspin { from { transform:rotate(0) } to { transform:rotate(360deg) } }
+
+/* Match menu border/shadow to state */
+#screenAllFactures .status-control.is-payer .status-menu{ border-color: rgba(22,163,74,.25); box-shadow:0 12px 26px -12px rgba(22,163,74,.45) }
+#screenAllFactures .status-control.is-annuler .status-menu{ border-color: rgba(239,68,68,.25); box-shadow:0 12px 26px -12px rgba(239,68,68,.45) }
+#screenAllFactures .status-control.is-annuler input[type=radio]{ accent-color:#ef4444 }

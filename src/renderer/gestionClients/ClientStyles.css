@@ -76,7 +76,7 @@
 
 /* ---------- Add Panel ---------- */
 #screenClients #clientAddPanel{
-  display:none;margin-top:18px;border:1px solid rgba(28,63,170,.1);
+  display:none;border:1px solid rgba(28,63,170,.1);
   border-radius:14px;background:#f7f9ff;padding:24px 26px;
   box-shadow:0 10px 26px -20px rgba(15,23,42,.5)
 }
