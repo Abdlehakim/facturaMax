@@ -7,7 +7,7 @@ export function renderClientListSection() {
         <table>
           <thead>
             <tr>
-              <th class="left" style="width:28%">Nom du client</th>
+              <th class="left" style="width:18%">Nom du client</th>
               <th class="left" style="width:18%">Type de client</th>
               <th class="left" style="width:20%">Telephone</th>
               <th class="left" style="width:24%">E-mail</th>
@@ -68,7 +68,7 @@ export function updateClientTable(items, { onEdit, onDelete } = {}) {
     return `
       <tr data-index="${idx}">
         <td>${name}</td>
-        <td>${type}${identifierMarkup}</td>
+        <td>${type}</td>
         <td>${phone}</td>
         <td>${email}</td>
         <td class="actions-cell">

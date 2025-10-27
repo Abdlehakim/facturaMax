@@ -44,6 +44,8 @@
   width:100%;border-collapse:collapse;font-size:13.8px;
   background:linear-gradient(180deg,rgba(248,250,252,.88) 0,#fff 12%)
 }
+
+#screenClients thead th.left{text-align:left}
 #screenClients thead th{
   background:#eef4ff;color:#1d2a44;font-weight:600;text-transform:uppercase;
   font-size:12px;letter-spacing:.04em;padding:12px 14px;border-bottom:1px solid rgba(15,23,42,.08)
