@@ -170,8 +170,9 @@
   }
 
   function wireCreateInvoice(root) {
+    try { console.log("[invoice] wireCreateInvoice called"); } catch {}
     const host = root?.querySelector?.("#invoice") || document.getElementById("invoice");
-    if (!host) return false;
+    if (!host) { try { console.log("[invoice] wireCreateInvoice: #invoice not found yet"); } catch {} return false; }
     if (host.dataset.wired === "1") return true;   // double-bind guard
     host.dataset.wired = "1";
 
@@ -179,9 +180,14 @@
     try { SEM.bind?.(); } catch {}
     try { SEM.wireLiveBindings?.(); } catch {}
     try { SEM.wireColumnToggles?.(); } catch {}
-    try { SEM.attachItemSearch?.(); } catch {}
-
-    // Auto-numbering hooks
+    try {
+      const a = document.getElementById("itemSearchInput");
+      const b = document.getElementById("itemSearchResults");
+      console.log("[invoice] before attachItemSearch", { hasInput: !!a, hasResults: !!b });
+      SEM.attachItemSearch?.();
+      console.log("[invoice] after attachItemSearch call");
+    } catch {}
+// Auto-numbering hooks
     getEl("invDate")?.addEventListener("change", () => autoNumberFromRegistryIfEmpty());
     getEl("docType")?.addEventListener("change", () => {
       const v = getStr("docType", "facture").toLowerCase();
@@ -218,3 +224,7 @@
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", tryAutoWire);
   else tryAutoWire();
 })(window);
+
+
+
+

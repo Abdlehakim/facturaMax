@@ -143,7 +143,7 @@ export function mount(root) {
               <th>TVA %</th>
               <th>Remise %</th>
               <th>Total TTC</th>
-              <th style="width: 15%">Action</th>
+              <th style="width: 18%">Action</th>
             </tr>
           </thead>
           <tbody id="itemBody"></tbody>

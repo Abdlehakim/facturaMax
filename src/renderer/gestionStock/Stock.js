@@ -269,7 +269,7 @@ export function mount(root) {
                 </label>
                 <label>
                   <input type="checkbox" class="field-toggle-checkbox" data-toggle-target="stockAddQty" checked />
-                  <span>Quantite</span>
+                  <span>En stock</span>
                 </label>
                 <label>
                   <input type="checkbox" class="field-toggle-checkbox" data-toggle-target="stockAddPrice" checked />

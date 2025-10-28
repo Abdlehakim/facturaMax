@@ -17,12 +17,12 @@
 #invoice td .del{background:#fee2e2;color:#b91c1c;border:1px solid #fecaca;border-radius:6px;padding:6px 12px;cursor:pointer;transition:background .15s ease,color .15s ease}
 #invoice td .del:hover{background:#dc2626;color:#fff;border-color:#dc2626}
 
-#invoice .item-search{display:flex;flex-direction:column;gap:6px;margin-bottom:6px}
+#invoice .item-search{display:flex;flex-direction:column;gap:6px;margin-bottom:12px;position:relative;width:100%;z-index:5}
 #invoice .item-search__label{font-weight:600;color:#1d2a44;font-size:13px}
-#invoice .item-search__row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-#invoice .item-search__row input{flex:1 1 240px;min-width:200px;padding:10px 12px;border:1px solid rgba(15,23,42,.14);border-radius:8px;background:#fff;color:#132a66}
+#invoice .item-search__row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;width:100%}
+#invoice .item-search__row input{flex:1 1 240px;min-width:200px;padding:10px 12px;border:1px solid rgba(15,23,42,.14);border-radius:8px;background:#fff;color:#132a66;width:100%}
 #invoice .item-search__row input:focus{outline:2px solid rgba(37,99,235,.36);outline-offset:1px}
-#invoice .item-search__results{display:none;border:1px solid rgba(15,23,42,.08);border-radius:10px;background:#fff;box-shadow:0 12px 28px -24px rgba(15,23,42,.45);padding:6px;max-height:240px;overflow-y:auto}
+#invoice .item-search__results{display:none;border:1px solid rgba(15,23,42,.12);border-radius:12px;background:#fff;box-shadow:0 16px 34px -22px rgba(15,23,42,.35);padding:10px;max-height:280px;min-height:44px;overflow-y:auto;position:absolute;top:calc(100% + 8px);left:0;right:0;width:100%;z-index:1000;pointer-events:auto}
 #invoice .item-search__results.is-visible{display:block}
 #invoice .item-search__result{display:flex;justify-content:space-between;align-items:center;padding:6px 10px;border-radius:8px;gap:12px;cursor:pointer;transition:background .15s ease}
 #invoice .item-search__result:hover{background:rgba(37,99,235,.08)}
@@ -34,6 +34,12 @@
 #invoice .item-search__meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 #invoice .item-search__price{font-weight:600;color:#1d2a44;font-size:13px}
 #invoice .item-search__empty{padding:8px 10px;font-size:13px;color:#4b5563}
+
+/* Inline QTE controls inside the ACTION column */
+#invoice td.add-actions{display:flex;align-items:center;gap:10px;justify-content:flex-end}
+#invoice .qte-controls{display:inline-flex;align-items:center;gap:6px}
+#invoice .qte-controls .btn.tiny{padding:2px 8px;line-height:1;border-radius:6px}
+#invoice .qte-controls .qte-input{width:56px;min-width:56px;text-align:center;padding:6px 8px}
 
 /* Mini summary */
 #invoice .mini-sum{border:1px solid rgba(15,23,42,.06);border-radius:10px;box-shadow:0 10px 24px -20px rgba(15,23,42,.25);min-width:320px;max-width:380px;margin-left:auto;background:#fff}

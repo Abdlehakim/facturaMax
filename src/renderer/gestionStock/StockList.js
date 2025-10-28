@@ -10,7 +10,7 @@ export function renderStockListSection() {
               <th class="left" style="width:12%">Reference</th>
               <th class="left" style="width:12%">Article</th>
               <th class="left" style="width:18%">Description</th>
-              <th style="width:8%">Quantite</th>
+              <th style="width:8%">En stock</th>
               <th style="width:12%">Prix HT</th>
               <th style="width:10%">TVA %</th>
               <th style="width:10%">Remise %</th>

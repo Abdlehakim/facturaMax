@@ -100,7 +100,7 @@ export function renderStockAddPanel() {
           </div>
           <div class="field">
             <div class="label-inline">
-              <label for="stockAddQty" class="label-text">Quantite</label>
+              <label for="stockAddQty" class="label-text">En stock</label>
             </div>
             <div class="field-toggle-control" data-input-wrapper="stockAddQty">
               <input id="stockAddQty" type="number" min="0" step="1" value="0" />
